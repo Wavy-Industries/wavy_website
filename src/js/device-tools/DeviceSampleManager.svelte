@@ -84,7 +84,7 @@
         <br />
         <br />
         <br />
-        <p><i>This page is <a target="_blank" href="https://github.com/ReinBentdal/wavy-website">open-source</a></i>. Contributions are very welcome.</p>
+        <p><i>This page is <a target="_blank" href="https://github.com/Wavy-Industries/wavy_website">open-source</a></i>. Contributions are very welcome.</p>
     </div>
 </div>
 
