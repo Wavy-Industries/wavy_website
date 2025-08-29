@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+      "baseUrl": ".",
+      "paths": {
+        "~/*": ["src/*"]
+      },
+      "lib": [ "es2015" ],
+      "target": "es2015",
+      "experimentalDecorators": true
+    },
+    "exclude": [
+      "node_modules/"
+    ]
+  }

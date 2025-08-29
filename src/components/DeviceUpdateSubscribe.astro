@@ -1,0 +1,93 @@
+---
+const {...rest} = Astro.props;
+---
+
+<div id="mc_embed_shell" {...rest}>
+    <link
+        href="//cdn-images.mailchimp.com/embedcode/classic-061523.css"
+        rel="stylesheet"
+        type="text/css"
+    />
+    <div>
+        <p class="note">get updates on new firmware releases and new tools</p>
+        <form
+            action="https://wavyindustries.us16.list-manage.com/subscribe/post?u=bb7820faa1731474446659e64&amp;id=c034f9210c&amp;f_id=00c8c2e1f0"
+            method="post"
+            id="mc-embedded-subscribe-form"
+            name="mc-embedded-subscribe-form"
+            class="validate"
+            target="_blank"
+        >
+            <input
+                type="email"
+                name="EMAIL"
+                placeholder="enter email address.."
+                class="required email input-small"
+                id="mce-EMAIL"
+                required=""
+                value=""
+            />
+            <div hidden="">
+                <input type="hidden" name="tags" value="35" />
+            </div>
+
+            <div
+                aria-hidden="true"
+                style="position: absolute; left: -5000px;"
+            >
+            /* real people should not fill this in and expect good
+            things - do not remove this or risk form bot signups */
+            <input
+                type="text"
+                name="b_bb7820faa1731474446659e64_c034f9210c"
+                tabindex="-1"
+                value=""
+            />
+            </div>
+            <input
+                type="submit"
+                name="subscribe"
+                class="button input-small"
+                value="Subscribe"
+            />
+        </form>
+    </div>
+</div>
+
+<style>
+form {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+}
+input[type="email"] {
+    width: 100%;
+    max-width: 400px;
+}
+</style>
+
+<script type="text/javascript">
+    function loadMailchimpScript() {
+        // Load script
+        var script = document.createElement("script");
+        script.type = "text/javascript";
+        script.src = "//s3.amazonaws.com/downloads.mailchimp.com/js/mc-validate.js";
+        document.head.appendChild(script);
+        
+        // Run it
+        script.onload = function() {
+            (function ($) {
+                window.fnames = new Array();
+                window.ftypes = new Array();
+                fnames[0] = "EMAIL";
+                ftypes[0] = "email";
+            })(jQuery);
+            var $mcj = jQuery.noConflict(true);
+        };
+    }
+
+    // Load script when page is loaded. Give it a little delay to prioritize other scripts
+    window.addEventListener('load', function() {
+        setTimeout(loadMailchimpScript, 100);
+    });
+</script>

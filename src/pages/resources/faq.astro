@@ -1,0 +1,30 @@
+---
+import '~/styles/global.css';
+import Layout from '~/layouts/Layout.astro';
+import Header from '~/layouts/Header.astro';
+import Footer from '~/layouts/Footer.astro';
+---
+
+<Layout title="Wavy Industries">
+	<main>
+		<Header />
+		<section>
+			<h1>Frequently asked questions</h1>
+		</section>
+		<Footer />
+	</main>
+</Layout>
+
+<style>
+main {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+}
+section {
+	width: 100%;
+	padding: 0 20px;
+	max-width: 1000px;
+	margin: 0 auto;
+}
+</style>

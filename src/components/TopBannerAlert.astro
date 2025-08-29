@@ -1,0 +1,65 @@
+
+<section id="top-banner">
+  <!-- <div id="remove-btn">×</div> -->
+  <div>
+    <span><slot /></span>
+    <span><slot /></span>
+  </div>
+</section>
+
+<style>
+:root {
+  --banner-color: rgb(137,112,88);
+}
+section {
+  width: 100%;
+  padding: 0px 15px;
+  background-color: var(--banner-color);
+  color: white;
+
+  font-weight: 400;
+  font-size: 14px;
+  font-style: italic;
+
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflowing content */
+  position: relative;
+
+  display: flex;
+  align-items: center;
+}
+
+@keyframes scroll {
+  0% {
+    transform: translateX(0vw); /* Start fully outside the right of the container */
+  }
+  100% {
+    transform: translateX(-100vw); /* End fully outside the left of the container */
+  }
+}
+
+section span {
+    position: relative;
+    display: inline-block;
+    width: 100vw;
+    animation: scroll 15s linear infinite;
+    padding: 5px 0;
+  }
+
+/* #remove-btn {
+  z-index: 1000;
+  display: inline-block;
+  position: absolute;
+  color: white;
+  padding: 5px 15px;
+  height: max-content;
+  right: 0;
+  cursor: pointer;
+}
+</style>
+<script>
+  import { $ } from "~/js/utils/S";
+  $('#remove-btn').addEventListener('click', () => {
+    $('#top-banner').style.display = 'none';
+  })
+</script> */
