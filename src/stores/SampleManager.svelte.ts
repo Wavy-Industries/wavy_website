@@ -6,120 +6,113 @@ import { canonicalize } from '~/js/utilities.js'
 
 export const sampleManager = new SampleManager(mcumgr);
 
-// if null, it means the device does not support samples, or perhaps failed to communicate for some reason
-export const sampleState = $state({
-	isSupported: false,
+type Nullable<T> = T | null;
+
+interface SampleState {
+    // Supported means the device responded to sample queries
+    isSupported: boolean;
+    // Device reports that samples are set (if supported)
+    isset: Nullable<boolean>;
+    // Storage stats
+    storageTotal: Nullable<number>;
+    storageUsed: Nullable<number>;
+    storagePacksUsed: Nullable<number[]>;
+    // Names/IDs for each pack slot
+    names: Nullable<(string | null)[]>;
+    // Upload progress when uploading
+    uploadPercentage: Nullable<number>;
+}
+
+// Reactive state for the Sample Manager
+export const sampleState = $state<SampleState>({
+    isSupported: false,
     isset: null,
-	storageTotal: null,
+    storageTotal: null,
     storageUsed: null,
-	storagePacksUsed: null,
+    storagePacksUsed: null,
     names: null,
-	uploadPercentage: null,
+    uploadPercentage: null,
 });
 
-bluetoothManager.onConnect(() => {
-	sampleState.isSupported = false;
-	(async () => {
-		const hasSamples = await checkDeviceHasSamples()
-		hasSamples && await checkDeviceSamples()
-	})();
-    getAvailableSamples();
-});
+// Default DRM page IDs
+export const DEFAULT_PAGE_IDS = [
+    'MIXED', 'UNDRGND', 'OLLI', 'OG',
+    null, null, null, null, null, null,
+];
 
-bluetoothManager.onConnectionReestablished(() => {
-	sampleState.isSupported = false;
-	(async () => {
-		const hasSamples = await checkDeviceHasSamples()
-		hasSamples && await checkDeviceSamples()
-	})();
-});
-
-export const DEFAULT_PAGE_IDS = ["MIXED", "UNDRGND", "OLLI", "OG", null, null, null, null, null, null]
-
+// Public API: Upload the default pack
 export async function deviceSampleUploadDefault() {
-	await deviceSamplesUpload(DEFAULT_PAGE_IDS);
+    await deviceSamplesUpload(DEFAULT_PAGE_IDS);
 }
 
+// Public API: Upload specified pack IDs
 export async function deviceSamplesUpload(selectedIds: string[]) {
-	const samplePack = await generateSamplePack(selectedIds)
-
-	console.log("sample pack:")
-	console.log(samplePack)
-
-	// return;
-
-	sampleState.uploadPercentage = 0;
-    await sampleManager.uploadSamples(samplePack, (percent) => sampleState.uploadPercentage = percent);
-	sampleState.uploadPercentage = null;
-
-	await checkDeviceSamples()
+    const samplePack = await generateSamplePack(selectedIds);
+    sampleState.uploadPercentage = 0;
+    await sampleManager.uploadSamples(samplePack, (percent) => (sampleState.uploadPercentage = Number(percent)));
+    sampleState.uploadPercentage = null;
+    await refreshDeviceSamples();
 }
 
+// Public API: Compare a download with the default pack
 export async function deviceSamplesDownloadMatchesDefault(): Promise<boolean> {
-	// Generate the expected default pack using the same IDs used for default upload
-	const generated = await generateSamplePack(DEFAULT_PAGE_IDS)
-	const downloaded = await sampleManager.downloadSamples()
-
-	if (!generated || !downloaded) {
-		console.log("Generated or downloaded pack is null; cannot compare")
-		return false;
-	}
-
-	const genCanonical = canonicalize(generated)
-	const downCanonical = canonicalize(downloaded)
-	const equal = JSON.stringify(genCanonical) === JSON.stringify(downCanonical)
-	if (!equal) {
-		console.log("Default generated pack (canonical):")
-		console.log(genCanonical)
-		console.log("Downloaded pack (canonical):")
-		console.log(downCanonical)
-	}
-	return equal;
+    const generated = await generateSamplePack(DEFAULT_PAGE_IDS);
+    const downloaded = await sampleManager.downloadSamples();
+    if (!generated || !downloaded) return false;
+    const genCanonical = canonicalize(generated);
+    const downCanonical = canonicalize(downloaded);
+    return JSON.stringify(genCanonical) === JSON.stringify(downCanonical);
 }
 
-async function checkDeviceSamples() {
-	try {
-		const ids = await sampleManager.getIDs();
-		sampleState.names = ids
-		console.log("sample names:")
-		console.log(sampleState.names)
-		const storage = await sampleManager.getSpaceUsed();
-
-		sampleState.storageUsed = storage.usd
-		sampleState.storageTotal = storage.tot
-		sampleState.storagePacksUsed = storage.packs
-		console.log("storage used:")
-		console.log(storage)
-	} catch (e) {
-		console.log(e)
-	}
+// Refresh device sample metadata (IDs and storage)
+export async function refreshDeviceSamples() {
+    try {
+        const ids = await sampleManager.getIDs();
+        sampleState.names = ids;
+        const storage = await sampleManager.getSpaceUsed();
+        sampleState.storageUsed = storage.usd;
+        sampleState.storageTotal = storage.tot;
+        sampleState.storagePacksUsed = storage.packs;
+    } catch (_) {
+        // Swallow errors here; support flag is handled in init checks
+    }
 }
 
-async function checkDeviceHasSamples() {
-	console.log("checking sample manager state")
-	try {
-		sampleState.isset = await sampleManager.isSet();
-		sampleState.isSupported = true;
-		if (!sampleState.isset) {
-			console.log("no samples are set, setting default")
-			await deviceSampleUploadDefault()
-			sampleState.isset = true;
-		}
-		return true;
-	} catch (e) {
-        console.log(e)
-	}
-	return false;
+// Internal: Ensure samples exist; upload default if not set
+async function ensureSamplesOrUploadDefault() {
+    try {
+        const isset = await sampleManager.isSet();
+        sampleState.isSupported = true;
+        sampleState.isset = isset;
+        if (!isset) {
+            await deviceSampleUploadDefault();
+            sampleState.isset = true;
+        }
+        return true;
+    } catch (_) {
+        // Unsupported or error
+        sampleState.isSupported = false;
+        sampleState.isset = null;
+        sampleState.names = null;
+        sampleState.storageUsed = null;
+        sampleState.storageTotal = null;
+        sampleState.storagePacksUsed = null;
+        return false;
+    }
 }
 
-async function getAvailableSamples() {
-    // const device_name = "MONKEY"; // TODO: use DIS instead to get the ID of the device
-    // try {
-    //     const response = await fetch(`/samples/${device_name}/DRM/record.json`);
-    //     const data = await response.json();
-    //     sampleState.names = data;
-    // } catch (e) {
-    //     console.error('Failed to get available samples:', e);
-    //     sampleState.names = {};
-    // }
+// Wire to Bluetooth lifecycle
+function initializeSampleLifecycle() {
+    const onConnected = async () => {
+        sampleState.isSupported = false;
+        const ok = await ensureSamplesOrUploadDefault();
+        if (ok) await refreshDeviceSamples();
+    };
+
+    bluetoothManager.onConnect(onConnected);
+    bluetoothManager.onConnectionReestablished(onConnected);
+    // We intentionally do not reset on onDisconnect here because the app reloads.
 }
+
+// Initialize on module import
+initializeSampleLifecycle();

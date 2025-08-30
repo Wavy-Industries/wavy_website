@@ -16,30 +16,10 @@
     import { fade } from 'svelte/transition';
     import ActionStatus from '../components/ActionStatus.svelte';
     import { sampleState } from '~/stores/SampleManager.svelte';
-
-    const View = {
-        DeviceUpdate: 'DeviceUpdate',
-        SampleManager: 'SampleManager',
-        DeviceTester: 'DeviceTester'
-    };
-
-    let currentView = $state(View.DeviceUpdate);
-
-    // Update view based on URL hash
-    function updateView() {
-        const hash = window.location.hash.slice(1); // Remove the # symbol
-        if (hash === 'sample-manager') {
-            currentView = View.SampleManager;
-        } else if (hash === 'device-tester' && $devMode) {
-            currentView = View.DeviceTester;
-        } else {
-            currentView = View.DeviceUpdate;
-        }
-    }
+    import { deviceUtilityView, DeviceUtilityView, initDeviceUtilityView } from '~/stores/DeviceUtilityView.svelte';
 
     onMount(() => {
-        window.addEventListener('hashchange', updateView);
-        updateView(); // Initial view setup
+        initDeviceUtilityView();
     });
 </script>
 
@@ -59,10 +39,10 @@
             {/if}
         </div>
         <div>
-            <a href="#device-update" class={currentView === View.DeviceUpdate ? 'active' : ''}>Device Update</a>
+            <a href="#device-update" class={deviceUtilityView.current === DeviceUtilityView.DeviceUpdate ? 'active' : ''}>Device Update</a>
             <a 
                 href="#sample-manager" 
-                class={currentView === View.SampleManager ? 'active' : ''}
+                class={deviceUtilityView.current === DeviceUtilityView.SampleManager ? 'active' : ''}
                 class:disabled={!sampleState.isSupported}
                 onclick={e => sampleState.isSupported == false && e.preventDefault()}
                 title={!sampleState.isSupported ? "firmware version 1.2.0 or greater is required" : ""}
@@ -72,7 +52,7 @@
             {#if $devMode}
                 <a 
                     href="#device-tester" 
-                    class={currentView === View.DeviceTester ? 'active' : ''}
+                    class={deviceUtilityView.current === DeviceUtilityView.DeviceTester ? 'active' : ''}
                 >
                     Device Tester
                 </a>
@@ -80,15 +60,15 @@
         </div>
     </nav>
 
-    {#if currentView === View.DeviceUpdate}
+    {#if deviceUtilityView.current === DeviceUtilityView.DeviceUpdate}
     <div in:fade={{ duration: 200 }}>
         <DeviceUpdate />
     </div>
-    {:else if currentView === View.SampleManager}
+    {:else if deviceUtilityView.current === DeviceUtilityView.SampleManager}
         <div in:fade={{ duration: 200 }}>
             <DeviceSampleManager />
         </div>
-    {:else if currentView === View.DeviceTester}
+    {:else if deviceUtilityView.current === DeviceUtilityView.DeviceTester}
         <div in:fade={{ duration: 200 }}>
             <DeviceTester />
         </div>
