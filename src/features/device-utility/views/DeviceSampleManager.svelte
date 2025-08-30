@@ -1,6 +1,7 @@
 <script>
     import { sampleState, addPackToSelected, removeSelectedAt, moveSelected, uploadSelected, loadInitialData, openPackEditorFor, revertToDevice, deviceSampleUploadDefault, deleteUserPackById } from "~/features/device-utility/stores/samples.svelte";
     import { packDisplayName, canonicalIdKey, deviceIndexForDisplay } from "~/features/device-utility/utils/packs";
+    import { getPageByteSize } from "~/lib/parsers/samples_parser";
     import { onMount } from 'svelte';
     import PackEditor from '~/features/device-utility/views/PackEditor.svelte';
 
@@ -26,6 +27,52 @@
         pretty
       );
       return `mailto:hello@wavyindustries.com?subject=${subject}&body=${body}`;
+    }
+
+    function usagePercentFor(p, i) {
+      if (!(i < 10)) return '';
+      const total = sampleState.storageTotal || 0;
+      if (!total) return '';
+      // For user-local packs, estimate from encoded page size
+      if (p?.source === 'user_local') {
+        const page = p.loops || sampleState.userPacks.find(x => x.id === p.id)?.loops;
+        if (page) {
+          try {
+            const bytes = getPageByteSize(page);
+            return ((bytes / total) * 100).toFixed(1) + '%';
+          } catch {}
+        }
+      }
+      // Otherwise, use device-reported usage if available
+      const used = sampleState.storagePacksUsed?.[deviceIndexForDisplay(i)];
+      if (used != null) return ((used / total) * 100).toFixed(1) + '%';
+      return '';
+    }
+
+    // JSON dialog state
+    let jsonDialog = $state({ open: false, title: '', content: '', copied: false });
+    async function openJsonDialogFor(id) {
+      jsonDialog.title = `${packDisplayName(id)} — JSON`;
+      jsonDialog.copied = false;
+      jsonDialog.content = 'Loading…';
+      jsonDialog.open = true;
+      try {
+        const { getPackPageById } = await import('~/features/device-utility/stores/samples.svelte');
+        const page = await getPackPageById(id);
+        jsonDialog.content = JSON.stringify(page ?? {}, null, 2);
+      } catch (_) {
+        jsonDialog.content = '{}';
+      }
+    }
+    function closeJsonDialog() { jsonDialog.open = false; }
+    async function copyJsonToClipboard() {
+      try {
+        await navigator.clipboard.writeText(jsonDialog.content || '');
+        jsonDialog.copied = true;
+        setTimeout(() => { jsonDialog.copied = false; }, 1500);
+      } catch (_) {
+        // no-op
+      }
     }
 </script>
 
@@ -53,6 +100,13 @@
       <span>Uploading... {sampleState.uploadPercentage == 0 ? "(preparing device)" : `${sampleState.uploadPercentage}%`}</span>
     {/if}
     {#if sampleState.dirty}<span class="dirty">unsaved changes</span>{/if}
+    {#if sampleState.errors.length > 0}
+      <div class="errors">
+        {#each sampleState.errors as e}
+          <div class="error">{e}</div>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <div class="pane">
@@ -63,10 +117,7 @@
           <span class="index">{i<9 ? i+1 : (i===9 ? 0 : '-')}</span>
           <span class="badge {p.type}">{p.type}</span>
           <span class="name" title={(p.author || p.created) ? `${p.author ?? ''}${p.author && p.created ? ' • ' : ''}${p.created ?? ''}` : ''}>{packDisplayName(p.id)}</span>
-          {#if sampleState.storageTotal && sampleState.storagePacksUsed && i < 10}
-            {@const used = sampleState.storagePacksUsed?.[deviceIndexForDisplay(i)]}
-            <span class="usage">{used != null ? ((used / sampleState.storageTotal * 100).toFixed(1) + '%') : ''}</span>
-          {/if}
+          <span class="usage">{usagePercentFor(p, i)}</span>
           <div class="actions">
             <button title="Move up" onclick={() => moveSelected(i, -1)}>↑</button>
             <button title="Move down" onclick={() => moveSelected(i, 1)}>↓</button>
@@ -89,9 +140,7 @@
           <div class="title"><span class="badge {p.type}">{p.type}</span> {packDisplayName(p.id)}</div>
           <div class="meta">
             {#if p.author || p.created}
-              <span>{p.author ?? ''}{p.author && p.created ? ' • ' : ''}{p.created ?? ''}</span>
-            {:else}
-              <span>{p.source}</span>
+              <span>{p.author}</span>
             {/if}
           </div>
           <div class="actions">
@@ -101,6 +150,7 @@
               <button title="Delete user pack" onclick={() => deleteUserPackById(p.id)}>🗑</button>
               <a class="button-link publish" title="Publish pack via email" href={mailtoForUserPack(p.id)}>📤 Publish</a>
             {/if}
+            <button class="button-link" title="View raw JSON" onclick={() => openJsonDialogFor(p.id)}>View raw</button>
           </div>
         </div>
       {/each}
@@ -110,6 +160,24 @@
 </div>
 {:else}
   <PackEditor />
+{/if}
+
+{#if jsonDialog.open}
+  <div class="modal-backdrop" onclick={closeJsonDialog}>
+    <div class="modal" onclick={(e)=>e.stopPropagation()}>
+      <div class="modal-header">
+        <div class="title">{jsonDialog.title}</div>
+        <button class="icon" onclick={closeJsonDialog}>✕</button>
+      </div>
+      <div class="modal-body">
+        <pre class="json-block">{jsonDialog.content}</pre>
+      </div>
+      <div class="modal-actions">
+        <button class="button-link" onclick={copyJsonToClipboard}>Copy</button>
+        {#if jsonDialog.copied}<span class="copied">Copied!</span>{/if}
+      </div>
+    </div>
+  </div>
 {/if}
 
 <style>
@@ -128,6 +196,8 @@
 .green { background:#2ecc71; color:white; }
 .icon { border-radius: 4px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
 .status { display:flex; gap: 12px; align-items: center; }
+.errors { display:flex; flex-direction: column; gap:4px; }
+.error { color:#b00020; background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:4px; }
 .pane { display: flex; flex-direction: column; gap: 8px; }
 .selected-list { display: flex; flex-direction: column; gap: 6px; }
 	.row { display: grid; grid-template-columns: 40px 80px 1fr 90px auto; align-items: center; gap: 8px; padding: 8px; border: 1px solid #ddd; border-radius:4px; background: white; }
@@ -139,6 +209,7 @@
 	.badge.private { background:#f3f3f3; color:#555; }
 	.usage { text-align: right; font-variant-numeric: tabular-nums; color: #555; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.actions button:disabled { opacity: 0.5; cursor: not-allowed; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
 .card { border: 1px solid #ddd; border-radius:4px; background: white; padding: 10px; display:flex; flex-direction: column; gap: 6px; }
 .card.selected .title, .card.selected .meta { opacity: 0.5; }
@@ -147,4 +218,14 @@
 .button-link { display: inline-flex; align-items: center; justify-content: center; padding: 4px 8px; border: 1px solid #ddd; border-radius:4px; text-decoration: none; color: inherit; white-space: nowrap; }
 .button-link.publish { color: #0B5FFF; border-color: #BFD6FF; }
 .button-link.publish:hover { background: #F3F8FF; }
+
+/* Modal */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 1000; padding: 12px; }
+.modal { background: white; border-radius: 8px; border: 1px solid #ddd; width: min(800px, 90vw); max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #eee; }
+.modal-header .title { font-weight: 600; }
+.modal-body { padding: 0; }
+.json-block { margin: 0; padding: 12px; background: #0b1020; color: #d7e2ff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; line-height: 1.4; max-height: 60vh; overflow: auto; }
+.modal-actions { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid #eee; }
+.copied { color: #2e7d32; font-weight: 600; }
 </style>

@@ -3,7 +3,8 @@ import { mcumgr } from './mcumgr.svelte';
 import { SampleManager } from '~/lib/mcumgr/SampleManager';
 import { canonicalize } from '~/lib/utilities'
 import { packDisplayName, packTypeFromId, makeUserPackId, type PackType, canonicalIdKey as canonicalIdKeyUtil, toUiId, toDeviceId, deviceIndexForDisplay, rotateForDevice } from '../utils/packs';
-import { samplesParser_decode, type Page, type SamplePack } from '~/lib/parsers/samples_parser';
+import { samplesParser_decode, samplesParser_encode, type Page, type SamplePack } from '~/lib/parsers/samples_parser';
+import { validatePack, validatePage as validatePageStandalone } from '~/features/device-utility/validation/packs';
 import { fetchPageByUiId, loadWebsiteIndex } from '~/features/device-utility/data/website';
 
 export const sampleManager = new SampleManager(mcumgr);
@@ -49,6 +50,7 @@ interface SampleState {
         loops: (Page|null)[]; // we will store a single Page shape per pack, but here use per-slot (15)
         loading: boolean;
     };
+    errors: string[];
 }
 
 // Reactive state for the Sample Manager
@@ -68,6 +70,7 @@ export const sampleState = $state<SampleState>({
     userPacks: [],
     contentDirty: false,
     editor: { open: false, id: null, name7: '', bpm: 120, loops: Array(15).fill(null), loading: false },
+    errors: [],
 });
 
 // Default DRM page IDs
@@ -261,10 +264,14 @@ export function moveSelected(index: number, dir: -1 | 1) {
 }
 
 export async function uploadSelected() {
+  sampleState.errors = [];
   // Build sample pack from selected using website/device/user sources
   let ids = sampleState.selected.slice(0,10).map(p => p.id);
   while (ids.length < 10) ids.push(null as any);
   const pack = await buildSamplePackFromIds(ids as any);
+  // Validate pack before upload
+  const ok = await validatePackForDevice(pack);
+  if (!ok) return; // errors populated
   sampleState.uploadPercentage = 0;
   await sampleManager.uploadSamples(pack, (percent) => (sampleState.uploadPercentage = Number(percent)));
   sampleState.uploadPercentage = null;
@@ -317,6 +324,16 @@ async function buildSamplePackFromIds(ids: (string|null)[]): Promise<SamplePack>
     pages,
   } as SamplePack;
 }
+
+// --------- Validation ---------
+
+async function validatePackForDevice(pack: SamplePack): Promise<boolean> {
+  const errs = validatePack(pack, { storageTotal: sampleState.storageTotal ?? undefined });
+  sampleState.errors = errs;
+  return errs.length === 0;
+}
+
+export function validatePageForUi(uiId: string, page: Page): string[] { return validatePageStandalone(uiId, page); }
 
 // --------- Preview (simple) ---------
 
@@ -397,6 +414,10 @@ async function fetchPackPage(id: string): Promise<Page|null> {
   // Fallback: user local pack
   const up = sampleState.userPacks.find(p=>p.id===id);
   return up?.loops || null;
+}
+
+export async function getPackPageById(id: string): Promise<Page|null> {
+  return await fetchPackPage(id);
 }
 
 // --------- Pack Editor API ---------

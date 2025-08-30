@@ -11,7 +11,7 @@ import mido
 import sys
 
 from colorama import Fore, Style
-LOG_LEVEL = 3  # 0=important, 1=error, 2=warning, 3=info
+LOG_LEVEL = 2  # 0=important, 1=error, 2=warning, 3=info
 def print_important(msg): print(Fore.BLUE + "IMP: " + msg + Style.RESET_ALL) if LOG_LEVEL >= 0 else None
 def print_error(msg): print(Fore.RED + "ERR: " + msg + Style.RESET_ALL) if LOG_LEVEL >= 1 else None
 def print_warning(msg): print(Fore.YELLOW + "WRN: " + msg + Style.RESET_ALL) if LOG_LEVEL >= 2 else None
@@ -83,17 +83,23 @@ def main(pack_name):
         total_ticks = max((max(event["time_ticks_press"], event["time_ticks_release"] or 0) for event in loop))
         total_beats = total_ticks / (4*TICKS_PER_BEAT)
 
-        # Handle any remaining press events (terminate at end)
-        for event in loop:
-            if event["time_ticks_release"] is None:
-                print_warning(f"Note {event['note']} pressed at tick {event['time_ticks_press']} has no release - terminating at end")
-                event["time_ticks_release"] = int(math.ceil(total_ticks))
-        
+        loop_length_beats = int(4 * 2 ** math.ceil(math.log2(total_ticks / (4 * TICKS_PER_BEAT))))
+        loop_length_ticks = loop_length_beats * TICKS_PER_BEAT
+
         if total_beats > MAX_BEATS:
             print_error(f"{midi_file}: Length {total_beats:.1f} beats exceeds {MAX_BEATS} beat limit")
             exit(1)
-            
-        loop_length_beats = int(4 * 2 ** math.ceil(math.log2(total_ticks / (4 * TICKS_PER_BEAT))))
+
+        # Handle any remaining press events (terminate at end)
+        for event in loop:
+            if event["time_ticks_release"] is None:
+                if event["time_ticks_press"] == loop_length_ticks:
+                    print_warning(f"Note {event['note']} pressed at tick {event['time_ticks_press']} has no release - removing")
+                    loop.remove(event)
+                    continue
+                print_warning(f"Note {event['note']} pressed at tick {event['time_ticks_press']} has no release - terminating at end")
+                event["time_ticks_release"] = loop_length_ticks
+        
         loop = {
             "length_beats": loop_length_beats,
             "events": loop
@@ -109,7 +115,7 @@ def main(pack_name):
 
     out_dir = Path("public/samples/MONKEY/DRM")
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"{pack_name}.json"
+    out_path = out_dir / f"W-{pack_name}.json"
 
     with open(out_path, 'w') as f:
         json.dump(output, f, indent=2)

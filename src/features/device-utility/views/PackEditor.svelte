@@ -3,6 +3,7 @@
   import { getPageByteSize } from '~/lib/parsers/samples_parser';
   import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
   import { SoundEngine } from '~/features/device-utility/utils/sound';
+  import { validatePage as validatePackPage } from '~/features/device-utility/validation/packs';
   import { packDisplayName } from '~/features/device-utility/utils/packs';
 
   const slots = $derived(sampleState.editor.loops);
@@ -81,6 +82,44 @@
     const updated = { ...page, loops: arr };
     setEditorLoopData(0, updated);
   }
+
+  // Import raw JSON dialog
+  let importDialog = $state({ open: false, text: '', error: '', errors: [] });
+  function openImportDialog() {
+    importDialog.open = true;
+    importDialog.text = '';
+    importDialog.error = '';
+    importDialog.errors = [];
+  }
+  function closeImportDialog() { importDialog.open = false; }
+  function normalizeLoops(input) {
+    const loops = Array.isArray(input) ? input : [];
+    const out = Array(15).fill(null);
+    for (let i = 0; i < Math.min(15, loops.length); i++) out[i] = loops[i] ?? null;
+    return out;
+  }
+  async function doImportRaw() {
+    try {
+      importDialog.error = '';
+      importDialog.errors = [];
+      const obj = JSON.parse(importDialog.text || '');
+      const loops = Array.isArray(obj) ? obj : (Array.isArray(obj?.loops) ? obj.loops : null);
+      if (!loops) throw new Error('Expected an array of loops or an object with a "loops" array');
+      const currentName = slots[0]?.name || `U-${sampleState.editor.name7}`;
+      const page = { name: currentName, loops: normalizeLoops(loops) };
+      // Validate using central validator
+      const uiId = sampleState.editor.id ?? `U-${(sampleState.editor.name7 || 'NONAME').slice(0,7)}`;
+      const errs = validatePackPage(uiId, page) || [];
+      if (errs.length > 0) {
+        importDialog.errors = errs;
+        return; // keep dialog open
+      }
+      setEditorLoopData(0, page);
+      importDialog.open = false;
+    } catch (e) {
+      importDialog.error = (e && e.message) ? e.message : 'Invalid JSON input';
+    }
+  }
 </script>
 
 <div class="page">
@@ -90,13 +129,15 @@
       <h2>{sampleState.editor.id ? 'Edit Pack' : 'Create Pack'}</h2>
     </div>
     <div class="actions">
+      <button class="button-link" onclick={openImportDialog}>Import raw</button>
       <button onclick={saveEditorAsUserPack} class="primary">Save</button>
     </div>
   </div>
   <div class="toolbar settings">
     <div class="namer">
       <label>Name</label>
-      <input maxlength="7" bind:value={sampleState.editor.name7} placeholder="MYPACK" />
+      <input maxlength="7" bind:value={sampleState.editor.name7} placeholder="MYPACK" oninput={(e)=>{ const v=e.target.value||''; if (/[^\x20-\x7E]/.test(v)) { e.target.value = v.replace(/[^\x20-\x7E]/g,''); sampleState.editor.name7 = e.target.value; } }} />
+      <span class="hint">ASCII, up to 7 characters</span>
     </div>
     {#if sampleState.editor.id}
       {@const meta = sampleState.available.find(p => p.id === sampleState.editor.id)}
@@ -143,6 +184,34 @@
   </div>
 </div>
 
+{#if importDialog.open}
+  <div class="modal-backdrop" onclick={closeImportDialog}>
+    <div class="modal" onclick={(e)=>e.stopPropagation()}>
+      <div class="modal-header">
+        <div class="title">Import raw JSON</div>
+        <button class="icon" onclick={closeImportDialog}>✕</button>
+      </div>
+      <div class="modal-body padded">
+        <textarea class="json-input" bind:value={importDialog.text} placeholder='Paste loops array or an object with a "loops" array'></textarea>
+        {#if importDialog.error}
+          <div class="error">{importDialog.error}</div>
+        {/if}
+        {#if importDialog.errors.length}
+          <div class="errors">
+            {#each importDialog.errors as e}
+              <div class="error">{e}</div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      <div class="modal-actions">
+        <button class="button-link" onclick={doImportRaw}>Import</button>
+        <button class="button-link" onclick={closeImportDialog}>Cancel</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
 .page { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
 .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; }
@@ -150,10 +219,12 @@
 .icon { width: 36px; height: 36px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; }
 .sub { color: #777; font-size: 0.9em; }
 .actions { display: flex; gap: 8px; }
+.button-link { display:inline-flex; align-items:center; justify-content:center; padding:4px 8px; border:1px solid #ddd; border-radius:4px; background:white; color:inherit; text-decoration:none; }
 .primary { background: #2ecc71; color: white; }
 .toolbar { display:flex; gap: 16px; align-items: center; }
 .settings { background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 10px; }
 .namer, .kit, .bpm { display: flex; gap: 6px; align-items: center; }
+.namer .hint { color:#666; font-size: 0.85em; }
 .meta { color: #666; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 .row { display: grid; grid-template-columns: 40px 60px 1fr 120px 80px; align-items: center; gap: 8px; border: 1px solid #eee; border-radius: 6px; padding: 8px; }
@@ -162,4 +233,15 @@
 .hint { color: #777; font-size: 0.9em; }
 .pianoroll { background: #f7f7f7; border-radius: 4px; padding: 6px; font-size: 0.9em; height: 48px; display: flex; align-items: center; }
 input[type="file"] { width: 100%; }
+
+/* Modal reused styles */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 1000; padding: 12px; }
+.modal { background: white; border-radius: 8px; border: 1px solid #ddd; width: min(800px, 90vw); max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #eee; }
+.modal-header .title { font-weight: 600; }
+.modal-body { padding: 0; }
+.modal-body.padded { padding: 12px; display:flex; flex-direction:column; gap:8px; }
+.modal-actions { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid #eee; }
+.json-input { width: 100%; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+.error { color:#b00020; background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:4px; }
 </style>

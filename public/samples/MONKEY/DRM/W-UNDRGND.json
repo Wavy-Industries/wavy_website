@@ -461,7 +461,7 @@
           "note": 43,
           "time_ticks_press": 90,
           "velocity": 88,
-          "time_ticks_release": 90
+          "time_ticks_release": 96
         }
       ]
     },
@@ -592,7 +592,7 @@
           "note": 43,
           "time_ticks_press": 90,
           "velocity": 74,
-          "time_ticks_release": 90
+          "time_ticks_release": 96
         }
       ]
     },
@@ -783,13 +783,13 @@
           "note": 43,
           "time_ticks_press": 90,
           "velocity": 88,
-          "time_ticks_release": 90
+          "time_ticks_release": 96
         },
         {
           "note": 44,
           "time_ticks_press": 90,
           "velocity": 88,
-          "time_ticks_release": 90
+          "time_ticks_release": 96
         }
       ]
     },
@@ -1358,7 +1358,7 @@
           "note": 40,
           "time_ticks_press": 90,
           "velocity": 61,
-          "time_ticks_release": 90
+          "time_ticks_release": 96
         }
       ]
     },
@@ -1638,13 +1638,13 @@
           "note": 40,
           "time_ticks_press": 88,
           "velocity": 83,
-          "time_ticks_release": 90
+          "time_ticks_release": 96
         },
         {
           "note": 38,
           "time_ticks_press": 90,
           "velocity": 26,
-          "time_ticks_release": 90
+          "time_ticks_release": 96
         }
       ]
     }
