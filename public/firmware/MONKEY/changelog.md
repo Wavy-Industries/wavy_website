@@ -1,3 +1,8 @@
+# 1.2.0[29. Aug 2025] The drum update
+- User selectable drum loops (through device utility sample manager tab)
+- 10 pages of drum packs, each with 15 drum loops (SHIFT + number key)
+- Minor improvements & fixes
+
 # 1.1.97[28. Aug 2025] -dev
 - reduced memory footprint
 - if coming from earlier beta, please re-upload the drum packs
