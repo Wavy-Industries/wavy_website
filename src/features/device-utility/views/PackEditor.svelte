@@ -142,7 +142,7 @@
     {#if sampleState.editor.id}
       {@const meta = sampleState.available.find(p => p.id === sampleState.editor.id)}
       {#if meta?.author || meta?.created}
-        <div class="meta">by {meta?.author}{meta?.author && meta?.created ? ' • ' : ''}{meta?.created}</div>
+        <div class="meta">by {meta?.author}</div>
       {/if}
     {/if}
     <div class="bytes">Total: {totalBytes()} bytes ({percentTotal()}%)</div>
@@ -214,34 +214,34 @@
 
 <style>
 .page { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
-.header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+.header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--du-border); padding-bottom: 8px; }
 .header .left { display: flex; align-items: center; gap: 10px; }
-.icon { width: 36px; height: 36px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; }
-.sub { color: #777; font-size: 0.9em; }
+.icon { width: 36px; height: 36px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; }
+.sub { color: var(--du-muted); font-size: 0.9em; }
 .actions { display: flex; gap: 8px; }
-.button-link { display:inline-flex; align-items:center; justify-content:center; padding:4px 8px; border:1px solid #ddd; border-radius:4px; background:white; color:inherit; text-decoration:none; }
-.primary { background: #2ecc71; color: white; }
+.button-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border:1px solid var(--du-border); border-radius:8px; background:white; color:inherit; text-decoration:none; font-size: 13px; }
+.primary { background: var(--du-accent); color: white; border: 1px solid transparent; }
 .toolbar { display:flex; gap: 16px; align-items: center; }
-.settings { background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 10px; }
+.settings { background: #fafafa; border: 1px solid var(--du-border); border-radius: 10px; padding: 10px; }
 .namer, .kit, .bpm { display: flex; gap: 6px; align-items: center; }
-.namer .hint { color:#666; font-size: 0.85em; }
-.meta { color: #666; }
+.namer .hint { color:var(--du-muted); font-size: 0.85em; }
+.meta { color: var(--du-muted); }
 .list { display: flex; flex-direction: column; gap: 8px; }
-.row { display: grid; grid-template-columns: 40px 60px 1fr 120px 80px; align-items: center; gap: 8px; border: 1px solid #eee; border-radius: 6px; padding: 8px; }
+.row { display: grid; grid-template-columns: 40px 60px 1fr 120px 80px; align-items: center; gap: 8px; border: 1px solid var(--du-border); border-radius: 10px; padding: 10px; background: var(--du-card); box-shadow: var(--du-shadow); }
 .muted { color: #888; font-size: 0.85em; }
-.drop { border: 1px dashed #bbb; border-radius: 6px; padding: 12px; display: grid; place-items: center; }
+.drop { border: 1px dashed #c7c7c7; border-radius: 10px; padding: 12px; display: grid; place-items: center; background: #fcfcfc; }
 .hint { color: #777; font-size: 0.9em; }
-.pianoroll { background: #f7f7f7; border-radius: 4px; padding: 6px; font-size: 0.9em; height: 48px; display: flex; align-items: center; }
+.pianoroll { background: #f7f7f7; border-radius: 8px; padding: 6px; font-size: 0.9em; height: 48px; display: flex; align-items: center; }
 input[type="file"] { width: 100%; }
 
 /* Modal reused styles */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 1000; padding: 12px; }
-.modal { background: white; border-radius: 8px; border: 1px solid #ddd; width: min(800px, 90vw); max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
+.modal { background: white; border-radius: 12px; border: 1px solid var(--du-border); width: min(800px, 90vw); max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--du-shadow); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #eee; }
 .modal-header .title { font-weight: 600; }
 .modal-body { padding: 0; }
 .modal-body.padded { padding: 12px; display:flex; flex-direction:column; gap:8px; }
 .modal-actions { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid #eee; }
 .json-input { width: 100%; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
-.error { color:#b00020; background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:4px; }
+.error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:6px; }
 </style>
