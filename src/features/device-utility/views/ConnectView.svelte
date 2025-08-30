@@ -54,7 +54,7 @@
         <DeviceBluetoothBrowsers />
       {:else}
         <button
-          class="btn btn-primary"
+          class="connect-btn"
           disabled={bluetoothState.connectionState === 'connecting'}
           onclick={handleConnectClick}>
           <img src={bluetoothImg.src} alt="bluetooth logo" height="15px" />
@@ -75,8 +75,16 @@
   </div>
 
   <style>
-    button {
+    .connect-btn {
       background-color: #0082FC;
-      color: white;
+      color: #fff;
+      border: 1px solid #005ECB;
+      border-radius: var(--du-radius);
+      padding: 8px 12px;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
+    .connect-btn:disabled { opacity: .7; cursor: not-allowed; }
   </style>

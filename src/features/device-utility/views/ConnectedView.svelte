@@ -12,8 +12,12 @@
     import { sampleState } from '~/features/device-utility/stores/samples.svelte';
     import { deviceUtilityView, DeviceUtilityView, initDeviceUtilityView } from '~/features/device-utility/stores/view.svelte';
 
-    onMount(() => {
+    onMount(async () => {
         initDeviceUtilityView();
+
+        isLoading = true;
+        await waitForInitialData();
+        isLoading = false;
     });
 
     // Loading overlay while fetching initial device info
@@ -34,20 +38,21 @@
         return false; // timeout
     }
 
-    $effect(async() => {
-        if (bluetoothState.connectionState === 'connected') {
-            isLoading = true;
-            await waitForInitialData();
-            isLoading = false;
-        } else {
-            isLoading = false;
-        }
-    });
+    // $effect(async() => {
+    //     if (bluetoothState.connectionState === 'connected') {
+    //         isLoading = true;
+    //         await waitForInitialData();
+    //         isLoading = false;
+    //     } else {
+    //         isLoading = false;
+    //     }
+    // });
 </script>
 
 <div>
     {#if !isLoading}
     <nav>
+      <div class="nav-inner">
         <div>
             <button onclick={() => {bluetoothManager.disconnect(); window.location.reload()}}>
                 <i class="bi-bluetooth-disconnect"></i>
@@ -65,7 +70,7 @@
             <a href="#device-update" class={deviceUtilityView.current === DeviceUtilityView.DeviceUpdate ? 'active' : ''}>Device Update</a>
             <a 
                 href="#sample-manager" 
-                class={deviceUtilityView.current === DeviceUtilityView.SampleManager ? 'active' : ''}
+                class={`blink ${deviceUtilityView.current === DeviceUtilityView.SampleManager ? 'active' : ''}`}
                 class:disabled={!sampleState.isSupported}
                 onclick={e => sampleState.isSupported == false && e.preventDefault()}
                 title={!sampleState.isSupported ? "firmware version 1.2.0 or greater is required" : ""}
@@ -81,6 +86,7 @@
                 </a>
             {/if}
         </div>
+      </div>
     </nav>
     {/if}
     {#if isLoading}
@@ -110,15 +116,26 @@
         display: flex;
         flex-direction: row;
         align-items: center;
-        padding: 20px;
+        padding: 16px 20px;
         justify-content: space-between;
         width: 100vw;
         flex-wrap: wrap;
-        border-top: 2px solid rgba(0,0,0,0.1);
-        border-bottom: 2px solid rgba(0,0,0,0.1);
+        border-top: 1px solid var(--du-border);
+        border-bottom: 1px solid var(--du-border);
+    }
+    .nav-inner {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        max-width: var(--du-maxw, 1100px);
+        margin: 0 auto;
+        padding: 0 16px; /* match page content gutter */
+        gap: 12px;
     }
 
-    nav > div {
+    .nav-inner > div {
         display: flex;
         flex-direction: row;
         align-items: center;
@@ -129,9 +146,26 @@
         text-decoration: none;
     }
 
-    .active {
-        border-bottom: 2px solid gray;
+    nav a {
+        padding: 6px 10px;
+        color: inherit;
+        border-bottom: 3px solid transparent;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        font-size: 12px;
     }
+    nav a.active {
+        border-bottom-color: #2f313a;
+        text-decoration: none;
+    }
+    nav a.blink:not(.active):not(.disabled) {
+        animation: blink 1.5s infinite;
+    }
+    @keyframes blink {
+        0%, 100% {  }
+        50% { color: #FFB84D; transform: scale(1.05); }
+    }
+    nav a:hover:not(.active) { background: #f4f5f7; }
 
     a.disabled {
         opacity: 0.5;

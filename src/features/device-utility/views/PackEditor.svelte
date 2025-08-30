@@ -85,11 +85,24 @@
 
   // Import raw JSON dialog
   let importDialog = $state({ open: false, text: '', error: '', errors: [] });
-  function openImportDialog() {
+  async function openImportDialog() {
     importDialog.open = true;
-    importDialog.text = '';
     importDialog.error = '';
     importDialog.errors = [];
+    // Prefill with current JSON (same as View raw)
+    try {
+      if (slots[0]) {
+        importDialog.text = JSON.stringify(slots[0], null, 2);
+      } else if (sampleState.editor.id) {
+        const { getPackPageById } = await import('~/features/device-utility/stores/samples.svelte');
+        const page = await getPackPageById(sampleState.editor.id);
+        importDialog.text = JSON.stringify(page ?? {}, null, 2);
+      } else {
+        importDialog.text = '{}';
+      }
+    } catch (_) {
+      importDialog.text = '{}';
+    }
   }
   function closeImportDialog() { importDialog.open = false; }
   function normalizeLoops(input) {
@@ -152,7 +165,7 @@
       <div class="row">
         <div class="idx">{idx+1}</div>
         <div class="play">
-          <button title="Play" onclick={() => playIdx(idx)}>▶︎</button>
+          <button class="btn" title="Play" onclick={() => playIdx(idx)}>Play</button>
         </div>
         <div class="content">
           {#if slots[0]?.loops?.[idx]}
@@ -175,9 +188,9 @@
         </div>
         <div class="bytes">{bytesFor(idx)} bytes ({percentFor(idx)}%)</div>
         <div class="reorder">
-          <button onclick={() => move(idx, -1)}>↑</button>
-          <button onclick={() => move(idx, 1)}>↓</button>
-          <button onclick={() => deleteLoop(idx)} disabled={!slots[0]?.loops?.[idx]}>✕</button>
+          <button class="btn" onclick={() => move(idx, -1)}>Move up</button>
+          <button class="btn" onclick={() => move(idx, 1)}>Move down</button>
+          <button class="btn" onclick={() => deleteLoop(idx)} disabled={!slots[0]?.loops?.[idx]}>Delete</button>
         </div>
       </div>
     {/each}
@@ -213,30 +226,38 @@
 {/if}
 
 <style>
-.page { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.page { display: flex; flex-direction: column; gap: 12px; padding: 16px; max-width: var(--du-maxw, 1100px); margin: 0 auto; }
 .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--du-border); padding-bottom: 8px; }
 .header .left { display: flex; align-items: center; gap: 10px; }
-.icon { width: 36px; height: 36px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; }
+.header .left h2 { position: relative; padding-bottom: 6px; }
+.header .left h2::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; }
+.icon { width: 36px; height: 36px; border-radius: var(--du-radius); display: inline-flex; align-items: center; justify-content: center; }
 .sub { color: var(--du-muted); font-size: 0.9em; }
 .actions { display: flex; gap: 8px; }
-.button-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border:1px solid var(--du-border); border-radius:8px; background:white; color:inherit; text-decoration:none; font-size: 13px; }
-.primary { background: var(--du-accent); color: white; border: 1px solid transparent; }
+.button-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border:1px solid #2f313a; border-radius:var(--du-radius); background:#f2f3f5; color:inherit; text-decoration:none; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.primary { background: #2b2f36; color: #fff; border: 1px solid #1f2329; }
 .toolbar { display:flex; gap: 16px; align-items: center; }
-.settings { background: #fafafa; border: 1px solid var(--du-border); border-radius: 10px; padding: 10px; }
+.settings { background: #fafafa; border: 1px solid var(--du-border); border-radius: var(--du-radius); padding: 10px; }
 .namer, .kit, .bpm { display: flex; gap: 6px; align-items: center; }
 .namer .hint { color:var(--du-muted); font-size: 0.85em; }
 .meta { color: var(--du-muted); }
 .list { display: flex; flex-direction: column; gap: 8px; }
-.row { display: grid; grid-template-columns: 40px 60px 1fr 120px 80px; align-items: center; gap: 8px; border: 1px solid var(--du-border); border-radius: 10px; padding: 10px; background: var(--du-card); box-shadow: var(--du-shadow); }
+.row { display: grid; grid-template-columns: 40px 80px 1fr 120px auto; align-items: center; gap: 8px; border: 1px solid #2f313a; border-radius: var(--du-radius); padding: 10px; background: #fcfcfd; box-shadow: none; }
 .muted { color: #888; font-size: 0.85em; }
-.drop { border: 1px dashed #c7c7c7; border-radius: 10px; padding: 12px; display: grid; place-items: center; background: #fcfcfc; }
+.drop { border: 1px dashed #2f313a; border-radius: var(--du-radius); padding: 12px; display: grid; place-items: center; background: #fcfcfc; }
 .hint { color: #777; font-size: 0.9em; }
-.pianoroll { background: #f7f7f7; border-radius: 8px; padding: 6px; font-size: 0.9em; height: 48px; display: flex; align-items: center; }
+.pianoroll { background: #f7f7f7; border-radius: var(--du-radius); padding: 6px; font-size: 0.9em; height: 48px; display: flex; align-items: center; }
 input[type="file"] { width: 100%; }
+
+/* Small industrial buttons */
+.btn { border: 1px solid #2f313a; background: #f2f3f5; color: #111827; border-radius: var(--du-radius); padding: 6px 8px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.btn:hover { background: #e9ebee; }
+.reorder { display: flex; gap: 6px; justify-content: flex-end; }
+.play { display: flex; }
 
 /* Modal reused styles */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 1000; padding: 12px; }
-.modal { background: white; border-radius: 12px; border: 1px solid var(--du-border); width: min(800px, 90vw); max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--du-shadow); }
+.modal { background: white; border-radius: var(--du-radius); border: 1px solid var(--du-border); width: min(800px, 90vw); max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--du-shadow); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #eee; }
 .modal-header .title { font-weight: 600; }
 .modal-body { padding: 0; }

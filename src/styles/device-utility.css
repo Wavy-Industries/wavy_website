@@ -1,15 +1,18 @@
 :root {
-    --du-bg: #f5f5f7;
+    --du-bg: #f6f7f9;
     --du-card: #ffffff;
     --du-border: #e5e7eb;
-    --du-border-strong: #d1d5db;
+    --du-border-strong: #cfd4dc;
     --du-text: #111827;
     --du-muted: #6b7280;
     --du-success: #10b981;
     --du-danger: #b00020;
-    --du-radius: 10px;
-    --du-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.04);
-    --du-accent: var(--accent-color, #0B5FFF);
+    --du-radius: 2px; /* industrial sharp */
+    --du-shadow: 0 1px 0 rgba(0,0,0,0.03); /* minimal */
+    --du-accent: #B9BDFD; /* requested palette */
+    --du-accent-contrast: #111827; /* dark text on light accent */
+    --du-highlight: #FFFEAC; /* requested palette */
+    --du-maxw: 1100px;
 }
 
 main {
@@ -24,22 +27,24 @@ h1 { font-size: 44px; margin: 0; color: var(--du-text); }
     padding: 4px 10px !important;
 }
 button, input[type="submit"] {
-    border: 1px solid var(--du-border-strong);
-    background-color: #fff;
+    border: 1px solid #2f313a; /* darker industrial line */
+    background-color: #f2f3f5;
     color: var(--du-text);
-    border-radius: 8px;
+    border-radius: var(--du-radius);
     padding: 8px 12px;
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     line-height: 1;
-    transition: background-color .15s ease, border-color .15s ease, transform .05s ease;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: background-color .12s ease, border-color .12s ease, transform .05s ease;
 }
-button:hover, input[type="submit"]:hover { background-color: #f9fafb; }
+button:hover, input[type="submit"]:hover { background-color: #e9ebee; }
 button:active, input[type="submit"]:active { transform: translateY(1px); }
-button.primary, input[type="submit"].primary { background: var(--du-accent); color: #fff; border-color: transparent; }
+button.primary, input[type="submit"].primary { background: #2b2f36; color: #fff; border-color: #1f2329; }
 button.primary:hover, input[type="submit"].primary:hover { filter: brightness(0.97); }
 input[type="text"], input[type="email"], input[type="password"] {
     border: 1px solid var(--du-border-strong);

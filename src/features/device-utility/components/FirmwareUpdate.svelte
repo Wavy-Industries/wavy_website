@@ -10,7 +10,7 @@
         {:else if ['uploading', 'applying', 'verifying', 'done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
-        fetching new firmware
+        Preparing firmware
     </div>
     <div class="stage" class:active={stage === 'uploading'}>
         {#if stage === 'uploading'}
@@ -18,7 +18,7 @@
         {:else if ['applying', 'verifying', 'done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
-        uploading firmware {#if stage === 'uploading'}({#if uploadProgress === 0}preparing{:else}{uploadProgress}%{/if}){/if}
+        Uploading firmware {#if stage === 'uploading'}({#if uploadProgress === 0}preparing{:else}{uploadProgress}%{/if}){/if}
     </div>
     <div class="stage" class:active={stage === 'applying'}>
         {#if stage === 'applying'}
@@ -26,7 +26,7 @@
         {:else if ['verifying', 'done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
-        applying update (waiting on device)
+        Applying update (waiting on device)
     </div>
     <div class="stage" class:active={stage === 'verifying'}>
         {#if stage === 'verifying'}
@@ -34,13 +34,13 @@
         {:else if ['done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
-        verifying update {#if hasSampleProgress}(uploading samples {sampleUploadProgress}%) {/if}
+        Verifying update {#if hasSampleProgress}(uploading samples {sampleUploadProgress}%) {/if}
     </div>
     <div class="stage" class:active={stage === 'done'}>
         {#if stage === 'done'}
             <div class="checkmark">✓</div>
         {/if}
-        done!
+        Done!
     </div>
     </div>
 
