@@ -1,10 +1,10 @@
-import { generateSamplePack } from '~/lib/data/samplePack';
 import { bluetoothManager } from './bluetooth.svelte';
 import { mcumgr } from './mcumgr.svelte';
 import { SampleManager } from '~/lib/mcumgr/SampleManager';
 import { canonicalize } from '~/lib/utilities'
-import { packDisplayName, packTypeFromId, makeUserPackId, type PackType } from '../utils/packs';
+import { packDisplayName, packTypeFromId, makeUserPackId, type PackType, canonicalIdKey as canonicalIdKeyUtil, toUiId, toDeviceId, deviceIndexForDisplay, rotateForDevice } from '../utils/packs';
 import { samplesParser_decode, type Page, type SamplePack } from '~/lib/parsers/samples_parser';
+import { fetchPageByUiId, loadWebsiteIndex } from '~/features/device-utility/data/website';
 
 export const sampleManager = new SampleManager(mcumgr);
 
@@ -83,7 +83,10 @@ export async function deviceSampleUploadDefault() {
 
 // Public API: Upload specified pack IDs
 export async function deviceSamplesUpload(selectedIds: string[]) {
-    const samplePack = await generateSamplePack(selectedIds);
+    // Ensure exactly 10 entries and rotate for device order
+    const ids = [...selectedIds.slice(0, 10)];
+    while (ids.length < 10) ids.push(null as any);
+    const samplePack = await buildSamplePackFromIds(ids as any);
     sampleState.uploadPercentage = 0;
     await sampleManager.uploadSamples(samplePack, (percent) => (sampleState.uploadPercentage = Number(percent)));
     sampleState.uploadPercentage = null;
@@ -97,7 +100,9 @@ export async function deviceSamplesUpload(selectedIds: string[]) {
 
 // Public API: Compare a download with the default pack
 export async function deviceSamplesDownloadMatchesDefault(): Promise<boolean> {
-    const generated = await generateSamplePack(DEFAULT_PAGE_IDS);
+    const ids = [...DEFAULT_PAGE_IDS];
+    while (ids.length < 10) ids.push(null as any);
+    const generated = await buildSamplePackFromIds(ids as any);
     const downloaded = await sampleManager.downloadSamples();
     if (!generated || !downloaded) return false;
     const genCanonical = canonicalize(generated);
@@ -171,26 +176,7 @@ function uniqById<T extends { id: string }>(arr: T[]): T[] {
 }
 
 // Canonical id key: TYPE|BASENAME (no hyphen, no padding)
-function canonicalIdKey(id: string): string {
-  const type = (id?.[0] === 'W' || id?.[0] === 'P' || id?.[0] === 'U') ? id[0] : (id?.startsWith('W-') ? 'W' : id?.startsWith('P-') ? 'P' : id?.startsWith('U-') ? 'U' : 'U');
-  const base = (id?.startsWith('W-') || id?.startsWith('P-') || id?.startsWith('U-')) ? id.substring(2) : ((id?.[0] === 'W' || id?.[0] === 'P' || id?.[0] === 'U') ? id.substring(1).trimEnd() : id);
-  return `${type}|${(base || '').trim()}`;
-}
-
-function typeCharFromId(id: string): 'W'|'P'|'U' {
-  if (!id) return 'U';
-  const c = id[0];
-  if (c === 'W' || c === 'P' || c === 'U') return c as any;
-  if (id.startsWith('W-')) return 'W';
-  if (id.startsWith('P-')) return 'P';
-  if (id.startsWith('U-')) return 'U';
-  return 'U';
-}
-
-function canonicalKey(id: string): string {
-  const base = (id.startsWith('W-') || id.startsWith('P-') || id.startsWith('U-')) ? id.substring(2) : ((id && (id[0] === 'W' || id[0] === 'P' || id[0] === 'U')) ? id.substring(1).trimEnd() : id);
-  return `${typeCharFromId(id)}|${(base || '').trim()}`;
-}
+const canonicalIdKey = (id: string) => canonicalIdKeyUtil(id);
 
 function computeDirty() {
   const top10 = sampleState.selected.slice(0,10).map(p => canonicalIdKey(p.id));
@@ -205,32 +191,8 @@ function normalizeWebsiteId(name: string): string {
 }
 
 async function loadWebsitePacks(): Promise<PackMeta[]> {
-  try {
-    const device_name = 'MONKEY';
-    const url = `/samples/${device_name}/DRM/record.json?_=${Date.now()}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    const data = await res.json();
-    // Supported formats: ["W-MIXED", ...] OR { packs: [{id: "W-MIXED"}, ...] } OR { "W-MIXED": { id, author, created } }
-    if (Array.isArray(data)) {
-      return (data as string[]).map(name => toPackMeta(normalizeWebsiteId(name), 'website'));
-    }
-    if (Array.isArray((data as any)?.packs)) {
-      return (data as any).packs.map((p: any) => toPackMeta(normalizeWebsiteId(p.id ?? p), 'website', p.sizePercent, undefined, { author: p.author, created: p.created }));
-    }
-    if (data && typeof data === 'object') {
-      const entries: PackMeta[] = [];
-      for (const [key, val] of Object.entries(data as Record<string, any>)) {
-        if (typeof val === 'string') {
-          entries.push(toPackMeta(normalizeWebsiteId(val), 'website'));
-        } else if (val && typeof val === 'object') {
-          const id = normalizeWebsiteId(val.id ?? key);
-          entries.push(toPackMeta(id, 'website', val.sizePercent, undefined, { author: val.author, created: val.created }));
-        }
-      }
-      return entries;
-    }
-  } catch (e) {}
-  return [];
+  const items = await loadWebsiteIndex();
+  return items.map((x) => toPackMeta(x.id, 'website', x.sizePercent, undefined, { author: x.author, created: x.created }));
 }
 
 async function loadSelectedFromDevice() {
@@ -238,7 +200,8 @@ async function loadSelectedFromDevice() {
   const metas: PackMeta[] = [];
   for (const id of ids) {
     if (!id) { metas.push(null as any); continue; }
-    metas.push(toPackMeta(id, 'device_only'));
+    const uiId = toUiId(id);
+    metas.push(toPackMeta(uiId, 'device_only'));
   }
   sampleState.deviceSelected = metas.filter(Boolean);
   // Initialize selected with device order if not already set
@@ -254,7 +217,7 @@ function recomputeAvailable() {
   const map = new Map<string, PackMeta>();
   const push = (list: PackMeta[]) => {
     for (const p of list) {
-      const k = canonicalKey(p.id);
+      const k = canonicalIdKey(p.id);
       if (!map.has(k)) map.set(k, p);
     }
   };
@@ -276,7 +239,7 @@ export async function loadInitialData() {
 export function addPackToSelected(id: string) {
   const found = sampleState.available.find(p => p.id === id) || sampleState.deviceSelected.find(p=>p.id===id) || sampleState.userPacks.find(p=>p.id===id);
   if (!found) return;
-  if (sampleState.selected.find(p => p.id === id)) return; // already
+  if (sampleState.selected.find(p => canonicalIdKey(p.id) === canonicalIdKey(id))) return; // already by canonical id
   sampleState.selected = [...sampleState.selected, found];
   recomputeAvailable();
   computeDirty();
@@ -301,7 +264,6 @@ export async function uploadSelected() {
   // Build sample pack from selected using website/device/user sources
   let ids = sampleState.selected.slice(0,10).map(p => p.id);
   while (ids.length < 10) ids.push(null as any);
-  ids = rotateForDevice(ids as any);
   const pack = await buildSamplePackFromIds(ids as any);
   sampleState.uploadPercentage = 0;
   await sampleManager.uploadSamples(pack, (percent) => (sampleState.uploadPercentage = Number(percent)));
@@ -323,30 +285,25 @@ export async function revertToDevice() {
   computeDirty();
 }
 
-function rotateForDevice(ids: (string|null)[]): (string|null)[] {
-  if (ids.length !== 10) return ids;
-  const last = ids[9];
-  return [last, ...ids.slice(0,9)];
-}
-
 async function buildSamplePackFromIds(ids: (string|null)[]): Promise<SamplePack> {
+  // Rotate for device order if exactly 10
+  const devIds = ids.length === 10 ? rotateForDevice(ids) : ids;
   const pages: (Page|null)[] = [];
-  for (const id of ids) {
+  for (const id of devIds) {
     if (!id) { pages.push(null); continue; }
     // Pick content source based on id type: user-local packs (U) use local content; official/public fetch website/device
     const type = (id[0] === 'W' || id[0] === 'P' || id[0] === 'U') ? id[0] : (id.startsWith('W-') ? 'W' : id.startsWith('P-') ? 'P' : id.startsWith('U-') ? 'U' : 'W');
-    const base = (id.startsWith('W-') || id.startsWith('P-') || id.startsWith('U-')) ? id.substring(2) : ((id[0] === 'W' || id[0] === 'P' || id[0] === 'U') ? id.substring(1).trimEnd() : id);
+    const uiId = toUiId(id);
     let page: Page|null = null;
     if (type === 'U') {
-      const up = sampleState.userPacks.find(p => p.id === (id.startsWith('U-') ? id : `U-${base}`));
+      const up = sampleState.userPacks.find(p => canonicalIdKey(p.id) === canonicalIdKey(uiId));
       page = up?.loops || null;
     } else {
-      page = await fetchPackPage(id);
+      page = await fetchPackPage(uiId);
     }
     if (page) {
       // Ensure page name is device-formatted (prefix + padded to 8 chars)
-      const useType = type || 'W';
-      page.name = `${useType}${(base || '').slice(0,7).padEnd(7,' ')}`;
+      page.name = toDeviceId(uiId);
       pages.push(page);
     } else {
       pages.push(null);
@@ -374,6 +331,40 @@ export async function previewPack(id: string) {
   }
 }
 
+// --------- Debug helpers (device download + inspection) ---------
+
+export async function debugDownloadPack() {
+  try {
+    const pack = await sampleManager.downloadSamples();
+    return pack;
+  } catch (e) { return null; }
+}
+
+export async function debugDownloadPage(uiId: string) {
+  try {
+    const pack = await sampleManager.downloadSamples();
+    if (!pack) return null;
+    const devId = toDeviceId(uiId);
+    const page = (pack.pages || []).find((p:any) => p && p.name === devId) as Page | undefined;
+    if (!page) return { found: false, devId, message: 'page not found in device pack' };
+    // Summarize first loop with first 10 events for quick eyeballing
+    const loop = page.loops?.find(l => !!l) as any;
+    const totalEvents = loop?.events?.length ?? 0;
+    const firstEvents = (loop?.events || []).slice(0, 10).map((ev:any) => ({ note: ev.note, press: ev.time_ticks_press, rel: ev.time_ticks_release, vel: ev.velocity }));
+    return { found: true, devId, pageName: page.name, totalEvents, firstEvents };
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+// Expose minimal debug API in browser console (optional)
+if (typeof window !== 'undefined') {
+  (window as any).wavyDebug = {
+    debugDownloadPack,
+    debugDownloadPage,
+  };
+}
+
 export function stopPreview() { sampleState.preview.isPlaying = false; }
 
 async function fetchPackPage(id: string): Promise<Page|null> {
@@ -384,16 +375,9 @@ async function fetchPackPage(id: string): Promise<Page|null> {
   }
   // Website fetch: filenames now include prefix (e.g., W-MIXED.json)
   try {
-    let fetchId = id;
-    if (id && !(id.startsWith('W-') || id.startsWith('P-') || id.startsWith('U-'))) {
-      // Convert device-style or raw prefixed id (e.g., WOG_____) to W-OG
-      if (id[0] === 'W' || id[0] === 'P' || id[0] === 'U') {
-        const base = id.substring(1).trim();
-        fetchId = `${id[0]}-${base}`;
-      }
-    }
-    const res = await fetch(`/samples/MONKEY/DRM/${fetchId}.json`, { cache: 'no-store' });
-    if (res.ok) return await res.json();
+    const uiId = toUiId(id);
+    const page = await fetchPageByUiId(uiId);
+    if (page) return page;
   } catch {}
   // Fallback: device download and extract by name
   try {
@@ -511,7 +495,8 @@ function loadUserPacks() {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) { sampleState.userPacks = []; return; }
     const arr = JSON.parse(raw) as Array<{ id: string; page: Page }>;
-    sampleState.userPacks = arr.map(x => toPackMeta(x.id, 'user_local', undefined, x.page));
+    // Normalize ids to UI format (handles legacy stored ids without hyphen)
+    sampleState.userPacks = arr.map(x => toPackMeta(toUiId(x.id), 'user_local', undefined, x.page));
   } catch { sampleState.userPacks = []; }
 }
 

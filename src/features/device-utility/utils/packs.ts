@@ -29,19 +29,62 @@ export function toWebsiteIdFromBase(name: string, type: PackType = 'official'): 
   return `${t}-${name}`;
 }
 
-export function toDeviceIdFromAny(id: string): string {
-  // Convert UI/website id (e.g., W-UNDRGND) or raw device id to device 8-char ID (e.g., WUNDRGND)
+/** Convert any id to a device 8-char ID (e.g., W-UNDRGND -> WUNDRGND). */
+export function toDeviceId(id: string): string {
   const type = packTypeFromId(id);
-  const base = idToBaseName(id).slice(0,7).padEnd(7,' ');
+  const base = idToBaseName(id).slice(0, 7).padEnd(7, ' ');
   const t = type === 'public' ? 'P' : type === 'private' ? 'U' : 'W';
   return `${t}${base}`;
 }
 
+export function idType(id: string): 'W'|'P'|'U' {
+  const t = packTypeFromId(id);
+  return t === 'public' ? 'P' : t === 'private' ? 'U' : 'W';
+}
+
+export function canonicalIdKey(id: string): string {
+  return `${idType(id)}|${idToBaseName(id).trim()}`;
+}
+
+/** Make a UI id for a user pack: U-<BASE> (no padding). */
 export function makeUserPackId(userName7: string): string {
-  const name = (userName7 || '').slice(0, 7).padEnd(7, ' ');
-  return `U${name}`; // Reserve first char for type
+  const base = (userName7 || '').slice(0, 7);
+  return `U-${base}`;
 }
 
 export function isSamePackId(a?: string|null, b?: string|null): boolean {
   return (a || null) === (b || null);
+}
+
+/** Convert a device ID (e.g., "WUNDRGND") or any variant to UI ID "W-UNDRGND". */
+export function toUiId(id: string): string {
+  if (!id) return id;
+  // Already UI format
+  if (id.startsWith('W-') || id.startsWith('P-') || id.startsWith('U-')) return id;
+  const first = id[0];
+  if (first === 'W' || first === 'P' || first === 'U') {
+    return `${first}-${id.substring(1).trimEnd()}`;
+  }
+  return id;
+}
+
+/** Device slot index corresponding to a display index (1..9,0 mapping).
+ *  Display index i maps to device index (i+1) % 10.
+ */
+export function deviceIndexForDisplay(displayIndex: number): number {
+  return (displayIndex + 1) % 10;
+}
+
+/** Rotate display-ordered IDs to device order (index 0 moves to the end). */
+export function rotateForDevice<T>(arr: T[]): T[] {
+  if (!arr || arr.length !== 10) return arr;
+  const last = arr[9];
+  return [last, ...arr.slice(0, 9)];
+}
+
+/** Rotate device-ordered IDs back to display order. */
+export function rotateForDisplay<T>(arr: T[]): T[] {
+  if (!arr || arr.length !== 10) return arr;
+  const first = arr[0];
+  return [...arr.slice(1, 10), first];
 }

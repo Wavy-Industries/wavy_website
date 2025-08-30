@@ -61,36 +61,38 @@ export function parseMidiToLoop(data: ArrayBuffer): { loop: LoopData } {
   raw.sort((a,b) => a.t - b.t);
   const scale = TICKS_PER_BEAT / (ppqn || 480);
   const events: any[] = [];
-  const ongoing: Record<number, number|undefined> = {};
+  const ongoing: Record<number, { press: number; vel: number } | undefined> = {};
   let maxTick = 0;
   for (const ev of raw) {
     const t = Math.round(ev.t * scale);
     if (ev.type === 'on') {
       // Close any previous unclosed event for same note
       if (ongoing[ev.note] !== undefined) {
-        const press = ongoing[ev.note]!; delete ongoing[ev.note];
+        const { press, vel } = ongoing[ev.note]!; delete ongoing[ev.note];
         const release = t <= press ? press + 1 : t;
-        events.push({ note: ev.note, time_ticks_press: press, velocity: ev.vel, time_ticks_release: release });
+        events.push({ note: ev.note, time_ticks_press: press, velocity: vel, time_ticks_release: release });
         if (release > maxTick) maxTick = release;
       }
-      ongoing[ev.note] = t;
+      ongoing[ev.note] = { press: t, vel: ev.vel };
       if (t > maxTick) maxTick = t;
     } else { // off
-      const press = ongoing[ev.note];
-      if (press !== undefined) {
+      const entry = ongoing[ev.note];
+      if (entry !== undefined) {
         delete ongoing[ev.note];
+        const press = entry.press;
         const release = t <= press ? press + 1 : t;
-        events.push({ note: ev.note, time_ticks_press: press, velocity: ev.vel, time_ticks_release: release });
+        events.push({ note: ev.note, time_ticks_press: press, velocity: entry.vel, time_ticks_release: release });
         if (release > maxTick) maxTick = release;
       }
     }
   }
   // Close any lingering notes at end
   for (const n of Object.keys(ongoing)) {
-    const press = ongoing[Number(n)];
-    if (press !== undefined) {
+    const entry = ongoing[Number(n)];
+    if (entry !== undefined) {
+      const press = entry.press;
       const release = press + 1; // at least 1 tick
-      events.push({ note: Number(n), time_ticks_press: press, velocity: 64, time_ticks_release: release });
+      events.push({ note: Number(n), time_ticks_press: press, velocity: entry.vel ?? 64, time_ticks_release: release });
       if (release > maxTick) maxTick = release;
     }
   }
@@ -107,4 +109,3 @@ export function parseMidiToLoop(data: ArrayBuffer): { loop: LoopData } {
 
   return { loop: { length_beats, events } };
 }
-

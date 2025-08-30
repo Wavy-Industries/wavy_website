@@ -3,6 +3,7 @@
   import { getPageByteSize } from '~/lib/parsers/samples_parser';
   import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
   import { SoundEngine } from '~/features/device-utility/utils/sound';
+  import { packDisplayName } from '~/features/device-utility/utils/packs';
 
   const slots = $derived(sampleState.editor.loops);
   const name7 = $derived(sampleState.editor.name7);
@@ -97,14 +98,12 @@
       <label>Name</label>
       <input maxlength="7" bind:value={sampleState.editor.name7} placeholder="MYPACK" />
     </div>
-    <div class="kit">
-      <label>Sound Pack</label>
-      <span class="kitname">808</span>
-    </div>
-    <div class="bpm">
-      <label>BPM</label>
-      <input type="number" min="60" max="200" bind:value={sampleState.editor.bpm} />
-    </div>
+    {#if sampleState.editor.id}
+      {@const meta = sampleState.available.find(p => p.id === sampleState.editor.id)}
+      {#if meta?.author || meta?.created}
+        <div class="meta">by {meta?.author}{meta?.author && meta?.created ? ' • ' : ''}{meta?.created}</div>
+      {/if}
+    {/if}
     <div class="bytes">Total: {totalBytes()} bytes ({percentTotal()}%)</div>
   </div>
   <div class="list">
@@ -155,6 +154,7 @@
 .toolbar { display:flex; gap: 16px; align-items: center; }
 .settings { background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 10px; }
 .namer, .kit, .bpm { display: flex; gap: 6px; align-items: center; }
+.meta { color: #666; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 .row { display: grid; grid-template-columns: 40px 60px 1fr 120px 80px; align-items: center; gap: 8px; border: 1px solid #eee; border-radius: 6px; padding: 8px; }
 .muted { color: #888; font-size: 0.85em; }
