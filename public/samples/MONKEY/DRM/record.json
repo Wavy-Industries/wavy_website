@@ -1,6 +1,22 @@
 {
-  "W-MIXED": { "author": "Rein", "created": "2025-01-01" },
-  "W-UNDRGND": { "author": "Reins", "created": "2025-01-01" },
-  "W-OLLI": { "author": "Olli", "created": "2025-01-01" },
-  "W-OG": { "author": "Wavy Industries", "created": "2025-01-01" }
+  "W-MIXED": {
+    "author": "Rein",
+    "created": "2025-01-01",
+    "description": "A mix and mash of various drum loops."
+  },
+  "W-UNDRGND": {
+    "author": "Reins",
+    "created": "2025-01-01",
+    "description": "Underground vibes."
+  },
+  "W-OLLI": {
+    "author": "Olli",
+    "created": "2025-01-01",
+    "description": "Olli beats."
+  },
+  "W-OG": {
+    "author": "Wavy Industries",
+    "created": "2025-01-01",
+    "description": "The original pack for MONKEY."
+  }
 }

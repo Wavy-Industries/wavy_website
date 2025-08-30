@@ -6,6 +6,7 @@ export interface WebsitePackMetaLite {
   author?: string;
   created?: string;
   sizePercent?: number;
+  description?: string;
 }
 
 function toUiId(id: string): string {
@@ -25,13 +26,13 @@ export async function loadWebsiteIndex(): Promise<WebsitePackMetaLite[]> {
       return (data as string[]).map((id) => ({ id: toUiId(id) }));
     }
     if (Array.isArray((data as any)?.packs)) {
-      return (data as any).packs.map((p: any) => ({ id: toUiId(p.id ?? p), author: p.author, created: p.created, sizePercent: p.sizePercent }));
+      return (data as any).packs.map((p: any) => ({ id: toUiId(p.id ?? p), author: p.author, created: p.created, sizePercent: p.sizePercent, description: p.description }));
     }
     if (data && typeof data === 'object') {
       const out: WebsitePackMetaLite[] = [];
       for (const [key, val] of Object.entries(data as Record<string, any>)) {
         if (typeof val === 'string') out.push({ id: toUiId(val) });
-        else if (val && typeof val === 'object') out.push({ id: toUiId((val as any).id ?? key), author: (val as any).author, created: (val as any).created, sizePercent: (val as any).sizePercent });
+        else if (val && typeof val === 'object') out.push({ id: toUiId((val as any).id ?? key), author: (val as any).author, created: (val as any).created, sizePercent: (val as any).sizePercent, description: (val as any).description });
       }
       return out;
     }
@@ -47,4 +48,3 @@ export async function fetchPageByUiId(uiId: string): Promise<Page | null> {
   } catch {}
   return null;
 }
-

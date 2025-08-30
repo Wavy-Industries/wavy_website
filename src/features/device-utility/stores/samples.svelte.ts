@@ -19,6 +19,7 @@ export interface PackMeta {
     loops?: Page; // single pack page for preview
     author?: string;
     created?: string; // ISO string or human string
+    description?: string;
 }
 
 interface SampleState {
@@ -195,7 +196,7 @@ function normalizeWebsiteId(name: string): string {
 
 async function loadWebsitePacks(): Promise<PackMeta[]> {
   const items = await loadWebsiteIndex();
-  return items.map((x) => toPackMeta(x.id, 'website', x.sizePercent, undefined, { author: x.author, created: x.created }));
+  return items.map((x) => toPackMeta(x.id, 'website', x.sizePercent, undefined, { author: x.author, created: x.created, description: x.description }));
 }
 
 async function loadSelectedFromDevice() {

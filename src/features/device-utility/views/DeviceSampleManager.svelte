@@ -22,6 +22,7 @@
         'I would like to propose a public sample pack for MONKEY.\n' +
         'Please find the details below.\n\n' +
         'Author: <your name here>\n' +
+        'Description: <one sentence about the pack>\n' +
         `Pack name (max 7 characters): ${packName}\n\n` +
         'Here is the sample pack content, cheers:\n\n' +
         pretty
@@ -143,6 +144,9 @@
               <span>{p.author}</span>
             {/if}
           </div>
+          {#if p.description}
+            <div class="desc">{p.description}</div>
+          {/if}
           <div class="actions">
             <button title="Add to selected" onclick={() => addPackToSelected(p.id)} disabled={isSelected(p.id)}>↑ add</button>
             <button title="Edit pack" onclick={() => openPackEditorFor(p.id)}>✎</button>
@@ -218,6 +222,7 @@
 .button-link { display: inline-flex; align-items: center; justify-content: center; padding: 4px 8px; border: 1px solid #ddd; border-radius:4px; text-decoration: none; color: inherit; white-space: nowrap; }
 .button-link.publish { color: #0B5FFF; border-color: #BFD6FF; }
 .button-link.publish:hover { background: #F3F8FF; }
+.desc { color:#444; font-size: 0.9em; }
 
 /* Modal */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 1000; padding: 12px; }
