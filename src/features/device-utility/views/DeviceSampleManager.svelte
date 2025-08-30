@@ -1,25 +1,32 @@
 <script>
-    import { sampleState, addPackToSelected, removeSelectedAt, moveSelected, uploadSelected, loadInitialData, previewPack, stopPreview, createUserPack, revertToDevice, deviceSampleUploadDefault } from "~/features/device-utility/stores/samples.svelte";
+    import { sampleState, addPackToSelected, removeSelectedAt, moveSelected, uploadSelected, loadInitialData, openPackEditorFor, revertToDevice, deviceSampleUploadDefault, deleteUserPackById } from "~/features/device-utility/stores/samples.svelte";
     import { packDisplayName } from "~/features/device-utility/utils/packs";
     import { onMount } from 'svelte';
+    import PackEditor from '~/features/device-utility/views/PackEditor.svelte';
 
     const storagePercentage = $derived(sampleState.storageUsed != null && sampleState.storageTotal != null ? (sampleState.storageUsed/sampleState.storageTotal * 100).toFixed(1) : "??.?")
 
     onMount(() => { loadInitialData(); });
 
-    // User pack creation state (simple form)
-    let newUserName = $state('');
-    let newUserJson = $state('');
-    function handleCreateUserPack() {
-        try {
-            const page = JSON.parse(newUserJson);
-            createUserPack(newUserName, page);
-            newUserName = '';
-            newUserJson = '';
-        } catch (e) { alert('Invalid JSON for pack page'); }
-    }
+    const typeCharFromId = (id) => {
+      if (!id) return 'U';
+      if (id.startsWith('W-')) return 'W';
+      if (id.startsWith('P-')) return 'P';
+      if (id.startsWith('U-')) return 'U';
+      const c = id[0];
+      return (c === 'W' || c === 'P' || c === 'U') ? c : 'U';
+    };
+    const baseNameFromId = (id) => {
+      if (!id) return '';
+      if (id.startsWith('W-') || id.startsWith('P-') || id.startsWith('U-')) return id.substring(2);
+      if (id[0] === 'W' || id[0] === 'P' || id[0] === 'U') return id.substring(1).trim();
+      return id;
+    };
+    const canonicalKey = (id) => `${typeCharFromId(id)}|${baseNameFromId(id)}`;
+    const isSelected = (id) => sampleState.selected.some(x => canonicalKey(x.id) === canonicalKey(id));
 </script>
 
+{#if !sampleState.editor.open}
 <div class="content">
   <div class="toolbar">
     <div class="left">
@@ -27,10 +34,10 @@
       <span class="muted">Selected packs on top; available below.</span>
     </div>
     <div class="right">
-      <button class="icon green" title="Create new pack" aria-label="Create new pack">➕</button>
-      <button class="icon" title="Sync to device" aria-label="Sync to device" onclick={revertToDevice} disabled={!sampleState.dirty}>↺</button>
+      <button class="icon green" title="Create new pack" aria-label="Create new pack" onclick={() => openPackEditorFor(null)}>➕</button>
       <button class="icon" title="Revert device samples to default" aria-label="Revert device samples to default" onclick={deviceSampleUploadDefault} disabled={sampleState.uploadPercentage != null}>⟲</button>
-      <button class="icon primary" title="Upload samples to device" aria-label="Upload" onclick={uploadSelected} disabled={!sampleState.dirty || sampleState.uploadPercentage != null}>→</button>
+      <button class="icon" title="Sync to device" aria-label="Sync to device" onclick={revertToDevice} disabled={!sampleState.dirty}>←</button>
+      <button class="icon primary" title="Upload samples to device" aria-label="Upload" onclick={uploadSelected} disabled={sampleState.uploadPercentage != null}>→</button>
     </div>
   </div>
   <div class="status">
@@ -49,11 +56,15 @@
           <span class="index">{i<9 ? i+1 : (i===9 ? 0 : '-')}</span>
           <span class="badge {p.type}">{p.type}</span>
           <span class="name">{packDisplayName(p.id)}</span>
+          {#if sampleState.storageTotal && sampleState.storagePacksUsed && i < 10}
+            {@const used = sampleState.storagePacksUsed?.[(i + 1) % 10]}
+            <span class="usage">{used != null ? ((used / sampleState.storageTotal * 100).toFixed(1) + '%') : ''}</span>
+          {/if}
           <div class="actions">
             <button title="Move up" onclick={() => moveSelected(i, -1)}>↑</button>
             <button title="Move down" onclick={() => moveSelected(i, 1)}>↓</button>
             <button title="Remove" onclick={() => removeSelectedAt(i)}>✕</button>
-            <button title="Edit pack" onclick={() => previewPack(p.id)}>✎</button>
+            <button title="Edit pack" onclick={() => openPackEditorFor(p.id)}>✎</button>
           </div>
         </div>
       {/each}
@@ -67,20 +78,25 @@
     <h3>Available Packs</h3>
     <div class="grid">
       {#each sampleState.available as p}
-        <div class="card" class:disabled={sampleState.selected.some(x => x.id === p.id)}>
+        <div class="card">
           <div class="title"><span class="badge {p.type}">{p.type}</span> {packDisplayName(p.id)}</div>
           <div class="meta">{p.source}</div>
           <div class="actions">
-            <button title="Add to selected" onclick={() => addPackToSelected(p.id)} disabled={sampleState.selected.some(x => x.id === p.id)}>↑ add</button>
-            <button title="Edit pack" onclick={() => previewPack(p.id)}>✎</button>
+            <button title="Add to selected" onclick={() => addPackToSelected(p.id)} disabled={isSelected(p.id)}>↑ add</button>
+            <button title="Edit pack" onclick={() => openPackEditorFor(p.id)}>✎</button>
+            {#if p.source === 'user_local'}
+              <button title="Delete user pack" onclick={() => deleteUserPackById(p.id)}>🗑</button>
+            {/if}
           </div>
         </div>
       {/each}
     </div>
   </div>
 
-  
 </div>
+{:else}
+  <PackEditor />
+{/if}
 
 <style>
 .content { padding: 20px; display: flex; flex-direction: column; gap: 20px; }
@@ -97,17 +113,18 @@
 .status { display:flex; gap: 12px; align-items: center; }
 .pane { display: flex; flex-direction: column; gap: 8px; }
 .selected-list { display: flex; flex-direction: column; gap: 6px; }
-.row { display: grid; grid-template-columns: 40px 80px 1fr auto; align-items: center; gap: 8px; padding: 8px; border: 1px solid #ddd; border-radius:4px; background: white; }
+	.row { display: grid; grid-template-columns: 40px 80px 1fr 90px auto; align-items: center; gap: 8px; padding: 8px; border: 1px solid #ddd; border-radius:4px; background: white; }
 .row.overflow { border-color: #ffb0b0; background: #fff3f3; }
 .index { text-align: center; opacity: 0.7; }
 .badge { padding: 2px 6px; border-radius: 3px; font-size: 0.8em; text-transform: capitalize; }
 .badge.official { background:#dff0ff; color:#0066cc; }
 .badge.public { background:#eef9e9; color:#2e7d32; }
-.badge.private { background:#f3f3f3; color:#555; }
+	.badge.private { background:#f3f3f3; color:#555; }
+	.usage { text-align: right; font-variant-numeric: tabular-nums; color: #555; }
 .actions { display: flex; gap: 6px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
 .card { border: 1px solid #ddd; border-radius:4px; background: white; padding: 10px; display:flex; flex-direction: column; gap: 6px; }
-.card.disabled { opacity: 0.5; pointer-events: none; }
+  .card.disabled { opacity: 0.5; }
 .title { font-weight: 600; }
 .footnote { opacity: 0.7; font-size: 0.9em; }
 </style>

@@ -12,8 +12,12 @@ function normalizeOfficialId(name: string): string {
 
 function idToFetchName(id: string): string {
   if (!id) return '';
-  if (id.startsWith('W-') || id.startsWith('P-') || id.startsWith('U-')) return id.substring(2).trim();
-  return hasTypePrefix(id) ? id.substring(1).trim() : id;
+  if (id.startsWith('W-') || id.startsWith('P-')) return id; // filenames include type prefix
+  if (hasTypePrefix(id)) {
+    const base = id.substring(1).trim();
+    return `${id[0]}-${base}`;
+  }
+  return id;
 }
 
 export async function generateSamplePack(ids: string[]) {

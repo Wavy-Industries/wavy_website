@@ -1,5 +1,3 @@
-// Consolidated parser (no _impl)
-// Migrated from src/js/parsers/samples_parser.ts
 export const TICKS_PER_BEAT = 24;
 export const NUM_PAGES = 10;
 export const LOOPS_PER_PAGE = 15;
