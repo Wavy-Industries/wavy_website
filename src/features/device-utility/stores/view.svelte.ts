@@ -5,6 +5,7 @@ export const DeviceUtilityView = {
   DeviceUpdate: 'device-update',
   SampleManager: 'sample-manager',
   DeviceTester: 'device-tester',
+  Playground: 'playground',
 } as const;
 
 export type DeviceUtilityViewKey = typeof DeviceUtilityView[keyof typeof DeviceUtilityView];
@@ -24,6 +25,7 @@ function getStoreValue<T>(store: { subscribe: (fn: (v: T) => void) => () => void
 function coerceViewFromHash(hash: string): DeviceUtilityViewKey {
   const v = (hash || '').replace('#', '').trim();
   if (v === DeviceUtilityView.SampleManager) return DeviceUtilityView.SampleManager;
+  if (v === DeviceUtilityView.Playground) return DeviceUtilityView.Playground;
   if (v === DeviceUtilityView.DeviceTester) {
     // Only allow if dev mode is enabled
     return getStoreValue(devMode) ? DeviceUtilityView.DeviceTester : DeviceUtilityView.DeviceUpdate;

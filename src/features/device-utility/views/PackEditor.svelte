@@ -2,12 +2,28 @@
   import { sampleState, closePackEditor, setEditorLoopData, saveEditorAsUserPack } from '~/features/device-utility/stores/samples.svelte';
   import { getPageByteSize } from '~/lib/parsers/samples_parser';
   import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
-  import { SoundEngine } from '~/features/device-utility/utils/sound';
+  import { soundBackend } from '~/lib/soundBackend';
+  import MidiEditor from '~/features/device-utility/views/midi/MidiEditor.svelte';
+  import { tempoState } from '~/features/device-utility/stores/tempo.svelte';
   import { validatePage as validatePackPage } from '~/features/device-utility/validation/packs';
   import { packDisplayName } from '~/features/device-utility/utils/packs';
+  import { computeLoopEndTicks } from '~/lib/music/loop_utils';
 
   const slots = $derived(sampleState.editor.loops);
   const name7 = $derived(sampleState.editor.name7);
+
+  // Local UI state for full-screen MIDI editor
+  let midiEditor = $state({ open: false, index: -1 });
+  function openMidiEditorFor(index) {
+    // Ensure page scaffold exists
+    let page = slots[0];
+    if (!page) page = { name: `U-${sampleState.editor.name7 || 'NONAME'}`.slice(0, 8), loops: Array(15).fill(null) };
+    // Ensure loop placeholder exists
+    if (!page.loops[index]) page.loops[index] = { length_beats: 16, events: [] };
+    setEditorLoopData(0, page);
+    midiEditor.open = true; midiEditor.index = index;
+  }
+  function closeMidiEditor() { midiEditor.open = false; midiEditor.index = -1; }
 
   function onFileChange(e, idx) {
     const file = e.target.files?.[0]; if (!file) return;
@@ -50,7 +66,7 @@
   function getBounds(loop) {
     const w = 300, h = 48;
     if (!loop || !loop.events || loop.events.length === 0) return { w, h, minN: 0, maxN: 1, rangeN: 1, minT: 0, maxT: 1, rangeT: 1 };
-    let minN = Infinity, maxN = -Infinity, minT = 0, maxT = loop.length_beats * 24;
+    let minN = Infinity, maxN = -Infinity, minT = 0, maxT = computeLoopEndTicks(loop);
     for (const ev of loop.events) { if (ev.note < minN) minN = ev.note; if (ev.note > maxN) maxN = ev.note; }
     const rangeN = Math.max(1, maxN - minN + 1);
     const rangeT = Math.max(1, maxT - minT);
@@ -58,13 +74,22 @@
   }
 
   // Playback
-  const engine = new SoundEngine();
-  let kit = '808';
+  const engine = soundBackend;
   function playIdx(idx) {
     const page = slots[0]; if (!page) return;
     const loop = page.loops[idx]; if (!loop) return;
-    engine.stopAll();
-    engine.playLoop(loop, sampleState.editor.bpm, kit);
+    engine.allNotesOff();
+    const bpm = tempoState.bpm || 120;
+    const msPerBeat = (60 / Math.max(1, Math.min(999, bpm))) * 1000;
+    const startMs = performance.now() + 20;
+    for (const ev of loop.events) {
+      const onAt = startMs + (ev.time_ticks_press / 24) * msPerBeat;
+      const offTicks = (ev.time_ticks_release ?? (ev.time_ticks_press + 1));
+      const offAt = startMs + (offTicks / 24) * msPerBeat;
+      const vel = Math.max(0, Math.min(127, ev.velocity ?? 100));
+      setTimeout(() => engine.noteOn(ev.note, vel, 9), Math.max(0, onAt - performance.now()));
+      setTimeout(() => engine.noteOff(ev.note, 0, 9), Math.max(0, offAt - performance.now()));
+    }
   }
 
   function move(idx, dir) {
@@ -85,11 +110,24 @@
 
   // Import raw JSON dialog
   let importDialog = $state({ open: false, text: '', error: '', errors: [] });
-  function openImportDialog() {
+  async function openImportDialog() {
     importDialog.open = true;
-    importDialog.text = '';
     importDialog.error = '';
     importDialog.errors = [];
+    // Prefill with current JSON (same as View raw)
+    try {
+      if (slots[0]) {
+        importDialog.text = JSON.stringify(slots[0], null, 2);
+      } else if (sampleState.editor.id) {
+        const { getPackPageById } = await import('~/features/device-utility/stores/samples.svelte');
+        const page = await getPackPageById(sampleState.editor.id);
+        importDialog.text = JSON.stringify(page ?? {}, null, 2);
+      } else {
+        importDialog.text = '{}';
+      }
+    } catch (_) {
+      importDialog.text = '{}';
+    }
   }
   function closeImportDialog() { importDialog.open = false; }
   function normalizeLoops(input) {
@@ -142,7 +180,7 @@
     {#if sampleState.editor.id}
       {@const meta = sampleState.available.find(p => p.id === sampleState.editor.id)}
       {#if meta?.author || meta?.created}
-        <div class="meta">by {meta?.author}{meta?.author && meta?.created ? ' • ' : ''}{meta?.created}</div>
+        <div class="meta">by {meta?.author}</div>
       {/if}
     {/if}
     <div class="bytes">Total: {totalBytes()} bytes ({percentTotal()}%)</div>
@@ -152,13 +190,13 @@
       <div class="row">
         <div class="idx">{idx+1}</div>
         <div class="play">
-          <button title="Play" onclick={() => playIdx(idx)}>▶︎</button>
+          <button class="btn" title="Play" onclick={() => playIdx(idx)}>Play</button>
         </div>
         <div class="content">
           {#if slots[0]?.loops?.[idx]}
             {@const loop = slots[0].loops[idx]}
             {@const bounds = getBounds(loop)}
-            <svg class="pianoroll" viewBox={`0 0 ${bounds.w} ${bounds.h}`} preserveAspectRatio="none">
+            <svg class="pianoroll clickable" viewBox={`0 0 ${bounds.w} ${bounds.h}`} preserveAspectRatio="none" onclick={() => openMidiEditorFor(idx)}>
               {#each loop.events as ev}
                 {@const x = (ev.time_ticks_press - bounds.minT) / bounds.rangeT * bounds.w}
                 {@const w = Math.max(1, (ev.time_ticks_release - ev.time_ticks_press) / bounds.rangeT * bounds.w)}
@@ -169,20 +207,24 @@
           {:else}
             <div class="drop">
               <input type="file" accept=".mid,.midi" onchange={(e)=>onFileChange(e, idx)} />
-              <div class="hint">Drop MIDI or click to choose</div>
+              <div class="hint">Drop MIDI or click to choose — or <a href="#" onclick={(e)=>{e.preventDefault(); openMidiEditorFor(idx);}}>open editor</a></div>
             </div>
           {/if}
         </div>
         <div class="bytes">{bytesFor(idx)} bytes ({percentFor(idx)}%)</div>
         <div class="reorder">
-          <button onclick={() => move(idx, -1)}>↑</button>
-          <button onclick={() => move(idx, 1)}>↓</button>
-          <button onclick={() => deleteLoop(idx)} disabled={!slots[0]?.loops?.[idx]}>✕</button>
+          <button class="btn" onclick={() => move(idx, -1)}>Move up</button>
+          <button class="btn" onclick={() => move(idx, 1)}>Move down</button>
+          <button class="btn" onclick={() => deleteLoop(idx)} disabled={!slots[0]?.loops?.[idx]}>Delete</button>
         </div>
       </div>
     {/each}
   </div>
 </div>
+
+{#if midiEditor.open}
+  <MidiEditor index={midiEditor.index} close={closeMidiEditor} onback={closeMidiEditor} />
+{/if}
 
 {#if importDialog.open}
   <div class="modal-backdrop" onclick={closeImportDialog}>
@@ -213,35 +255,45 @@
 {/if}
 
 <style>
-.page { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
-.header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+.page { display: flex; flex-direction: column; gap: 12px; padding: 16px; max-width: var(--du-maxw, 1100px); margin: 0 auto; }
+.header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--du-border); padding-bottom: 8px; }
 .header .left { display: flex; align-items: center; gap: 10px; }
-.icon { width: 36px; height: 36px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; }
-.sub { color: #777; font-size: 0.9em; }
+.header .left h2 { position: relative; padding-bottom: 6px; }
+.header .left h2::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; }
+.icon { width: 36px; height: 36px; border-radius: var(--du-radius); display: inline-flex; align-items: center; justify-content: center; }
+.sub { color: var(--du-muted); font-size: 0.9em; }
 .actions { display: flex; gap: 8px; }
-.button-link { display:inline-flex; align-items:center; justify-content:center; padding:4px 8px; border:1px solid #ddd; border-radius:4px; background:white; color:inherit; text-decoration:none; }
-.primary { background: #2ecc71; color: white; }
+.button-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border:1px solid #2f313a; border-radius:var(--du-radius); background:#f2f3f5; color:inherit; text-decoration:none; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.primary { background: #2b2f36; color: #fff; border: 1px solid #1f2329; }
 .toolbar { display:flex; gap: 16px; align-items: center; }
-.settings { background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 10px; }
+.settings { background: #fafafa; border: 1px solid var(--du-border); border-radius: var(--du-radius); padding: 10px; }
 .namer, .kit, .bpm { display: flex; gap: 6px; align-items: center; }
-.namer .hint { color:#666; font-size: 0.85em; }
-.meta { color: #666; }
+.namer .hint { color:var(--du-muted); font-size: 0.85em; }
+.meta { color: var(--du-muted); }
 .list { display: flex; flex-direction: column; gap: 8px; }
-.row { display: grid; grid-template-columns: 40px 60px 1fr 120px 80px; align-items: center; gap: 8px; border: 1px solid #eee; border-radius: 6px; padding: 8px; }
+.row { display: grid; grid-template-columns: 40px 80px 1fr 120px auto; align-items: center; gap: 8px; border: 1px solid #2f313a; border-radius: var(--du-radius); padding: 10px; background: #fcfcfd; box-shadow: none; }
 .muted { color: #888; font-size: 0.85em; }
-.drop { border: 1px dashed #bbb; border-radius: 6px; padding: 12px; display: grid; place-items: center; }
+.drop { border: 1px dashed #2f313a; border-radius: var(--du-radius); padding: 12px; display: grid; place-items: center; background: #fcfcfc; }
 .hint { color: #777; font-size: 0.9em; }
-.pianoroll { background: #f7f7f7; border-radius: 4px; padding: 6px; font-size: 0.9em; height: 48px; display: flex; align-items: center; }
+.content { min-height: 120px; display: flex; }
+.pianoroll { background: #f7f7f7; border-radius: var(--du-radius); padding: 6px; font-size: 0.9em; height: 100%; width: 100%; display: flex; align-items: center; }
+.pianoroll.clickable { cursor: pointer; }
 input[type="file"] { width: 100%; }
+
+/* Small industrial buttons */
+.btn { border: 1px solid #2f313a; background: #f2f3f5; color: #111827; border-radius: var(--du-radius); padding: 6px 8px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.btn:hover { background: #e9ebee; }
+.reorder { display: flex; gap: 6px; justify-content: flex-end; }
+.play { display: flex; }
 
 /* Modal reused styles */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 1000; padding: 12px; }
-.modal { background: white; border-radius: 8px; border: 1px solid #ddd; width: min(800px, 90vw); max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
+.modal { background: white; border-radius: var(--du-radius); border: 1px solid var(--du-border); width: min(800px, 90vw); max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--du-shadow); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #eee; }
 .modal-header .title { font-weight: 600; }
 .modal-body { padding: 0; }
 .modal-body.padded { padding: 12px; display:flex; flex-direction:column; gap:8px; }
 .modal-actions { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid #eee; }
 .json-input { width: 100%; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
-.error { color:#b00020; background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:4px; }
+.error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:6px; }
 </style>

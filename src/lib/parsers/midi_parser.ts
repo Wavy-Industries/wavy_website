@@ -1,4 +1,5 @@
 import { TICKS_PER_BEAT, type LoopData } from '~/lib/parsers/samples_parser';
+import { computeLoopLengthBeatsFromEvents } from '~/lib/music/loop_utils';
 
 // Minimal MIDI SMF parser → LoopData
 // - Supports format 0/1, running status, VLQ deltas, note on/off (note_on vel 0 treated as off)
@@ -97,10 +98,8 @@ export function parseMidiToLoop(data: ArrayBuffer): { loop: LoopData } {
     }
   }
 
-  // Compute loop length in beats (power-of-two measure as in python script)
-  const ticks = Math.max(1, maxTick);
-  const beats = ticks / (4 * TICKS_PER_BEAT);
-  const length_beats = Math.max(4, Math.pow(2, Math.ceil(Math.log2(beats))) * 4);
+  // Compute loop length in beats using shared utility (clamped to device limits)
+  const length_beats = computeLoopLengthBeatsFromEvents(events, { minBeats: 4, maxBeats: 16, ticksPerBeat: TICKS_PER_BEAT });
 
   // Ensure any zero-length events are 1 tick
   for (const ev of events) {

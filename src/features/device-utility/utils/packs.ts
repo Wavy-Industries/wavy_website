@@ -1,11 +1,11 @@
-export type PackType = 'official' | 'public' | 'private';
+export type PackType = 'official' | 'public' | 'local';
 
 export function packTypeFromId(id: string): PackType {
-  if (!id) return 'private';
+  if (!id) return 'local';
   if (id.startsWith('W-') || id[0] === 'W') return 'official';
   if (id.startsWith('P-') || id[0] === 'P') return 'public';
-  if (id.startsWith('U-') || id[0] === 'U') return 'private';
-  return 'private';
+  if (id.startsWith('U-') || id[0] === 'U') return 'local';
+  return 'local';
 }
 
 export function packDisplayName(id: string): string {
@@ -25,7 +25,7 @@ export function idToBaseName(id: string): string {
 }
 
 export function toWebsiteIdFromBase(name: string, type: PackType = 'official'): string {
-  const t = type === 'public' ? 'P' : type === 'private' ? 'U' : 'W';
+  const t = type === 'public' ? 'P' : type === 'local' ? 'U' : 'W';
   return `${t}-${name}`;
 }
 
@@ -33,13 +33,13 @@ export function toWebsiteIdFromBase(name: string, type: PackType = 'official'): 
 export function toDeviceId(id: string): string {
   const type = packTypeFromId(id);
   const base = idToBaseName(id).slice(0, 7).padEnd(7, ' ');
-  const t = type === 'public' ? 'P' : type === 'private' ? 'U' : 'W';
+  const t = type === 'public' ? 'P' : type === 'local' ? 'U' : 'W';
   return `${t}${base}`;
 }
 
 export function idType(id: string): 'W'|'P'|'U' {
   const t = packTypeFromId(id);
-  return t === 'public' ? 'P' : t === 'private' ? 'U' : 'W';
+  return t === 'public' ? 'P' : t === 'local' ? 'U' : 'W';
 }
 
 export function canonicalIdKey(id: string): string {

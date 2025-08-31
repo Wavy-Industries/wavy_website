@@ -9,11 +9,11 @@
 </script>
 
 <div class="toggle-container">
-    <label class="switch">
-        <input type="checkbox" bind:checked={on} />
-        <span class="slider"></span>
-    </label>
-    </div>
+  <label class="switch" aria-label="toggle">
+    <input type="checkbox" bind:checked={on} />
+    <span class="track"><span class="knob"></span></span>
+  </label>
+</div>
 
 <style>
     .toggle-container {
@@ -22,12 +22,7 @@
         gap: 10px;
     }
 
-    .switch {
-        position: relative;
-        display: inline-block;
-        width: 50px;
-        height: 26px;
-    }
+    .switch { position: relative; display: inline-block; width: 48px; height: 22px; }
 
     .switch input {
         opacity: 0;
@@ -35,35 +30,8 @@
         height: 0;
     }
 
-    .slider {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: #ccc;
-        transition: 0.4s;
-        border-radius: 13px;
-    }
-
-    .slider:before {
-        position: absolute;
-        content: "";
-        height: 18px;
-        width: 18px;
-        left: 4px;
-        bottom: 4px;
-        background-color: white;
-        transition: 0.4s;
-        border-radius: 50%;
-    }
-
-    input:checked + .slider {
-        background-color: #f39c21;
-    }
-
-    input:checked + .slider:before {
-        transform: translateX(24px);
-    }
+    .track { position: absolute; inset: 0; background: #f2f3f5; border: 1px solid #2f313a; border-radius: var(--du-radius); display: inline-block; transition: background-color .12s ease, border-color .12s ease; }
+    .knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: #fff; border: 1px solid #2f313a; border-radius: var(--du-radius); transition: transform .12s ease, border-color .12s ease, background-color .12s ease; }
+    input:checked + .track { background: var(--du-success); border-color: #1f2329; }
+    input:checked + .track .knob { transform: translateX(26px); border-color: #12202a; }
 </style>

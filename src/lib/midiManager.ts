@@ -2,6 +2,7 @@ import { BluetoothManager } from './bluetoothManager';
 
 export class MIDIManager {
     private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
+    private _boundCharHandler: ((event: Event) => void) | null = null;
     private _onMIDIMessage = new Set<(data: Uint8Array) => void>();
     private _onNoteOn = new Set<(note: number, velocity: number, channel: number) => void>();
     private _onNoteOff = new Set<(note: number, velocity: number, channel: number) => void>();
@@ -16,6 +17,9 @@ export class MIDIManager {
         this.bluetoothManager.onConnectionReestablished(() => {
             this.characteristic = null; this.midiInitPromise = null; this.initialize();
         });
+        this.bluetoothManager.onConnect(() => {
+            this.characteristic = null; this.midiInitPromise = null; this.initialize();
+        });
     }
 
     public onMIDIMessage(callback: (data: Uint8Array) => void) { this._onMIDIMessage.add(callback); }
@@ -27,10 +31,16 @@ export class MIDIManager {
         if (this.midiInitPromise) { await this.midiInitPromise; return this.characteristic !== null; }
         this.midiInitPromise = new Promise<void>(async (resolve, reject) => {
             try {
+                // Remove old listener if any
+                if (this.characteristic && this._boundCharHandler) {
+                    try { this.characteristic.removeEventListener('characteristicvaluechanged', this._boundCharHandler); } catch {}
+                }
                 this.characteristic = await this.bluetoothManager.getCharacteristic(this.MIDI_SERVICE_UUID, this.MIDI_CHARACTERISTIC_UUID);
                 if (!this.characteristic) { reject(new Error('Failed to get MIDI characteristic')); return; }
                 await this.characteristic.startNotifications();
-                this.characteristic.addEventListener('characteristicvaluechanged', this._handleMIDIMessage.bind(this));
+                // Bind a stable handler and add exactly once
+                if (!this._boundCharHandler) this._boundCharHandler = this._handleMIDIMessage.bind(this);
+                this.characteristic.addEventListener('characteristicvaluechanged', this._boundCharHandler);
                 resolve();
             } catch (error) { reject(error); } finally { this.midiInitPromise = null; }
         });
