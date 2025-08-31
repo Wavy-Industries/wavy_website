@@ -1,5 +1,6 @@
 <script>
-  import { sampleState, closePackEditor, setEditorLoopData, saveEditorAsUserPack } from '~/features/device-utility/stores/samples.svelte';
+  import { sampleState } from '~/features/device-utility/stores/samples.svelte';
+  import { editState, closePackEditor, setEditorLoopData, saveEditor, saveEditorAsNew } from '~/features/device-utility/stores/edits.svelte';
   import { getPageByteSize } from '~/lib/parsers/samples_parser';
   import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
   import { soundBackend } from '~/lib/soundBackend';
@@ -9,15 +10,16 @@
   import { packDisplayName } from '~/features/device-utility/utils/packs';
   import { computeLoopEndTicks } from '~/lib/music/loop_utils';
 
-  const slots = $derived(sampleState.editor.loops);
-  const name7 = $derived(sampleState.editor.name7);
+  const slots = $derived(editState.loops);
+  const name7 = $derived(editState.name7);
+  const context = $derived(editState.context);
 
   // Local UI state for full-screen MIDI editor
   let midiEditor = $state({ open: false, index: -1 });
   function openMidiEditorFor(index) {
     // Ensure page scaffold exists
     let page = slots[0];
-    if (!page) page = { name: `U-${sampleState.editor.name7 || 'NONAME'}`.slice(0, 8), loops: Array(15).fill(null) };
+    if (!page) page = { name: `U-${editState.name7 || 'NONAME'}`.slice(0, 8), loops: Array(15).fill(null) };
     // Ensure loop placeholder exists
     if (!page.loops[index]) page.loops[index] = { length_beats: 16, events: [] };
     setEditorLoopData(0, page);
@@ -32,7 +34,7 @@
         const { loop } = parseMidiToLoop(buf);
         // Build a Page container if missing at slot 0
         let page = slots[0];
-        if (!page) page = { name: `U-${sampleState.editor.name7}`, loops: Array(15).fill(null) };
+        if (!page) page = { name: `U-${editState.name7}`, loops: Array(15).fill(null) };
         page.loops[idx] = loop;
         setEditorLoopData(0, page);
       } catch (err) { alert('Failed to parse MIDI'); }
@@ -118,9 +120,9 @@
     try {
       if (slots[0]) {
         importDialog.text = JSON.stringify(slots[0], null, 2);
-      } else if (sampleState.editor.id) {
+      } else if (editState.id) {
         const { getPackPageById } = await import('~/features/device-utility/stores/samples.svelte');
-        const page = await getPackPageById(sampleState.editor.id);
+        const page = await getPackPageById(editState.id);
         importDialog.text = JSON.stringify(page ?? {}, null, 2);
       } else {
         importDialog.text = '{}';
@@ -143,10 +145,10 @@
       const obj = JSON.parse(importDialog.text || '');
       const loops = Array.isArray(obj) ? obj : (Array.isArray(obj?.loops) ? obj.loops : null);
       if (!loops) throw new Error('Expected an array of loops or an object with a "loops" array');
-      const currentName = slots[0]?.name || `U-${sampleState.editor.name7}`;
+      const currentName = slots[0]?.name || `U-${editState.name7}`;
       const page = { name: currentName, loops: normalizeLoops(loops) };
       // Validate using central validator
-      const uiId = sampleState.editor.id ?? `U-${(sampleState.editor.name7 || 'NONAME').slice(0,7)}`;
+      const uiId = editState.id ?? `U-${(editState.name7 || 'NONAME').slice(0,7)}`;
       const errs = validatePackPage(uiId, page) || [];
       if (errs.length > 0) {
         importDialog.errors = errs;
@@ -164,21 +166,38 @@
   <div class="header">
     <div class="left">
       <button class="icon" title="Back" aria-label="Back" onclick={closePackEditor}>←</button>
-      <h2>{sampleState.editor.id ? 'Edit Pack' : 'Create Pack'}</h2>
+      <h2>{editState.id ? 'Edit Pack' : 'Create Pack'}</h2>
+      {#if editState.id}
+        <span class="type-badge">{editState.id.startsWith('U-') ? 'Local' : (editState.id.startsWith('P-') ? 'Public' : 'Official')}</span>
+      {/if}
     </div>
     <div class="actions">
       <button class="button-link" onclick={openImportDialog}>Import raw</button>
-      <button onclick={saveEditorAsUserPack} class="primary">Save</button>
+      {#if editState.id && editState.id.startsWith('U-')}
+        <button onclick={saveEditor} class="primary">Save</button>
+      {:else}
+        <button onclick={saveEditorAsNew} class="primary">Save As New Pack</button>
+      {/if}
     </div>
   </div>
+  {#if editState.unsaved}
+    <div class="unsaved">You have unsaved changes</div>
+  {/if}
+  {#if editState.errors?.length}
+    <div class="errors">
+      {#each editState.errors as e}
+        <div class="error">{e}</div>
+      {/each}
+    </div>
+  {/if}
   <div class="toolbar settings">
     <div class="namer">
       <label>Name</label>
-      <input maxlength="7" bind:value={sampleState.editor.name7} placeholder="MYPACK" oninput={(e)=>{ const v=e.target.value||''; if (/[^\x20-\x7E]/.test(v)) { e.target.value = v.replace(/[^\x20-\x7E]/g,''); sampleState.editor.name7 = e.target.value; } }} />
+      <input maxlength="7" bind:value={editState.name7} placeholder="MYPACK" oninput={(e)=>{ const v=e.target.value||''; if (/[^\x20-\x7E]/.test(v)) { e.target.value = v.replace(/[^\x20-\x7E]/g,''); editState.name7 = e.target.value; } }} />
       <span class="hint">ASCII, up to 7 characters</span>
     </div>
-    {#if sampleState.editor.id}
-      {@const meta = sampleState.available.find(p => p.id === sampleState.editor.id)}
+    {#if editState.id}
+      {@const meta = sampleState.available.find(p => p.id === editState.id)}
       {#if meta?.author || meta?.created}
         <div class="meta">by {meta?.author}</div>
       {/if}
@@ -260,9 +279,11 @@
 .header .left { display: flex; align-items: center; gap: 10px; }
 .header .left h2 { position: relative; padding-bottom: 6px; }
 .header .left h2::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; }
+.type-badge { font-size: 12px; padding: 2px 6px; border: 1px solid var(--du-border); border-radius: 4px; text-transform: uppercase; color:#444; }
 .icon { width: 36px; height: 36px; border-radius: var(--du-radius); display: inline-flex; align-items: center; justify-content: center; }
 .sub { color: var(--du-muted); font-size: 0.9em; }
 .actions { display: flex; gap: 8px; }
+.unsaved { margin-top: 8px; background: repeating-linear-gradient(45deg, #FFFEAC, #FFFEAC 6px, #f1ea7d 6px, #f1ea7d 12px); color: #3a3200; border: 1px solid #b3ac5a; padding: 6px 8px; border-radius: var(--du-radius); font-weight: 700; }
 .button-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border:1px solid #2f313a; border-radius:var(--du-radius); background:#f2f3f5; color:inherit; text-decoration:none; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
 .primary { background: #2b2f36; color: #fff; border: 1px solid #1f2329; }
 .toolbar { display:flex; gap: 16px; align-items: center; }
@@ -296,4 +317,5 @@ input[type="file"] { width: 100%; }
 .modal-actions { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid #eee; }
 .json-input { width: 100%; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
 .error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:6px; }
+.errors { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 </style>

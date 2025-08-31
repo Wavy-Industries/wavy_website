@@ -42,9 +42,21 @@ export async function loadWebsiteIndex(): Promise<WebsitePackMetaLite[]> {
 
 export async function fetchPageByUiId(uiId: string): Promise<Page | null> {
   try {
-    // uiId is W-/P-/U- format, files are named with hyphen
+    // Local user packs (U-) are stored in localStorage, not on the website
+    if (uiId && (uiId.startsWith('U-') || uiId[0] === 'U')) {
+      try {
+        const raw = localStorage.getItem('wavy_user_packs');
+        if (raw) {
+          const arr = JSON.parse(raw) as Array<{ id: string; page: Page }>;
+          const found = arr.find(x => toUiId(x.id) === toUiId(uiId));
+          if (found?.page) return found.page as Page;
+        }
+      } catch {}
+      return null;
+    }
     const res = await fetch(`/samples/${DEVICE_NAME}/DRM/${uiId}.json`, { cache: 'no-store' });
     if (res.ok) return await res.json();
   } catch {}
   return null;
 }
+

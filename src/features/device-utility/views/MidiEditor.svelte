@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
-  import { sampleState, setEditorLoopData } from '~/features/device-utility/stores/samples.svelte';
+  import { editState, setEditorLoopData } from '~/features/device-utility/stores/edits.svelte';
   import { tempoState } from '~/features/device-utility/stores/tempo.svelte';
   import { TICKS_PER_BEAT, type Page, type LoopData } from '~/lib/parsers/samples_parser';
   import { soundBackend } from '~/lib/soundBackend';
@@ -36,14 +36,14 @@
   let playing = $state(false);
 
   // Local copy of the loop; edits do not affect store until Save is pressed
-  function currentPage(): Page | null { return sampleState.editor.loops[0]; }
+  function currentPage(): Page | null { return editState.loops[0]; }
   function storeLoop(): LoopData | null { return currentPage()?.loops?.[index] as any ?? null; }
   let localLoop: LoopData = $state({ length_beats: 16, events: [] } as any);
   let originalLoop: LoopData = $state({ length_beats: 16, events: [] } as any);
   let pageName: string = $state('');
   onMount(() => {
     const page = currentPage();
-    pageName = page?.name || `U-${(sampleState.editor.name7 || 'NONAME').slice(0,8)}`;
+    pageName = page?.name || `U-${(editState.name7 || 'NONAME').slice(0,8)}`;
     const l = storeLoop();
     localLoop = JSON.parse(JSON.stringify(l ?? { length_beats: 16, events: [] }));
     originalLoop = JSON.parse(JSON.stringify(l ?? { length_beats: 16, events: [] }));

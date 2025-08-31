@@ -1,59 +1,89 @@
-# Device Utility — Sample Manager v2
+## Sample Manager — concise spec
 
 Goals
-- Reorder and curate packs for upload (top 10 slots).
-- Add/remove packs via a unified “Selected (top)” + “Available (bottom)” layout.
-- Allow arrow reordering; upload and revert then sync with device so UI reflects reality.
-- Show overflow (>10) as selected but out-of-range (red, not included).
-- Include unknown packs found on device (user-made) in the lists.
-- Distinguish types by first char: W=official, P=public, U=private; hide the prefix in the UI and show a badge.
-- Local storage user packs: save named packs (7 chars + U prefix) and show in Available.
+- Curate top 10 slots (1..9,0). Reorder, add/remove from Available.
+- Stage content changes locally; explicit Upload to apply to device.
+- Clear and correct sync status between local (website/user) and device.
 
-Data Model
-- PackMeta
-  - id: string (prefixed with W-/P-/U- in JS; device page names use prefix without '-')
-  - type: official|public|private (derived from prefix)
-  - displayName: computed (id without prefix)
-  - source: website|device_only|user_local
-  - sizePercent?: number (derived in view)
-  - loops?: LoopData (only for user_local or when loaded)
-  - author?: string (from record.json)
-  - created?: string (from record.json)
-- SampleState additions
-  - selected: PackMeta[]
-  - available: PackMeta[]
-  - deviceSelected: PackMeta[]
-  - dirty: boolean
-  - preview: { packId: string|null; bpm: number; isPlaying: boolean }
-  - userPacks: PackMeta[] (from localStorage)
+Identity
+- UI IDs: `W-<NAME7>`, `P-<NAME7>`, `U-<NAME7>`; device page names: `<W|P|U><NAME7 padded>`.
+- Canonical key: `TYPE|BASENAME7` for comparisons and diffs.
 
-Sources
-- Website:
-  - Filenames: `/samples/MONKEY/DRM/W-<NAME>.json` (prefix included).
-  - Index: `/samples/MONKEY/DRM/record.json` is a map keyed by W-<NAME> with metadata, e.g. `{ "W-MIXED": { author, created } }`.
-- Device: `SampleManager.getIDs()` + storage usage arrays; device page names use prefix without hyphen and padded base.
-- Device content: `SampleManager.downloadSamples()`; match against device-formatted name.
-- User local storage: `localStorage['wavy_user_packs']` as array of `{ id: 'U-<NAME>', page }`.
+Data sources
+- Website JSON for official/public packs.
+- Device: IDs/space; single-flight download of current pack pages.
+- Local user packs in `localStorage`.
 
-Interactions
-- Add: card → Selected append (card remains visible; only the Add button is disabled if selected).
-- Remove: selected row → card Add re‑enabled in Available; Edit/Delete always enabled.
-- Reorder: up/down arrows; overflow rows highlighted.
-- Upload: icon-only arrow; enabled even if no detected changes; after upload, reload device state and reflect IDs.
-- Revert: icon-only left arrow; reload device state and reflect IDs.
-- Selected indices: 1..9 then 0; extra items show index “-” and are not uploaded.
-- Edit: opens full-page editor; saving user packs writes to local storage.
-- Delete (user packs): removes from local storage and Selected, recomputes dirty.
+State
+- `selected`, `deviceSelected`, `available`, `userPacks`.
+- `stagedDeviceContent`, `diffs`, `dirty` (IDs differ or `contentDirty`).
 
-ID & Content Rules
-- JS IDs use hyphen-prefixed strings (W-/P-/U-). Display hides the prefix with a badge.
-- Device page names are prefix + 7-char padded base without hyphen.
-- Upload content source:
-  - W-/P-: website/device content.
-  - U-: user-local content.
-- Dirty flag: computed on canonical ID equality (TYPE|BASENAME) and content edits of selected packs.
-- After upload/revert: refresh from device → set Selected = deviceSelected → clear contentDirty.
+Single-flight downloads
+- Guard device downloads to prevent concurrent calls; force refresh after Upload/Revert.
 
-Usage & Percentages
-- Selected list: device usage % shown for top 10 (aligned to display order 1..9,0); user packs show estimated % from encoded size.
-- Available list: optional display of author/created from record.json.
+Editing
+- Editor uses a dedicated store. Always “Save As New Pack” for non-user packs; saving from Selected stages to device (no write to local unless Save As).
+- In Selected list, replace “Edit”/“Push down” with a single “Mutate” action.
+
+Sync semantics
+- Diff compares canonicalized loops only (15 slots). Status: `in_sync`, `local_newer`, `device_newer`, `diverged`.
+- After Reset to default or Upload/Revert, recompute diffs using fresh device pages.
+
+Validation
+- Name: 1–7 ASCII chars. Validate content and storage fit before upload.
+
+Error handling
+- Show validation errors; prevent concurrent device downloads; update `dirty` correctly.
+
+Validation & Errors
+- Validate name: 1–7 chars, enforce acceptable charset; normalize to uppercase.
+- Validate content: `validatePage`/`validatePack`, including storage limits.
+- Errors: name collision on Save As New; invalid loops; storage overflow; missing content for selected IDs prior to upload.
+
+Data Layer Restructure
+- Replace ad‑hoc `website.ts` usage with a structured data module:
+  - `data/sources/website.ts`: load website index and fetch page by `W-/P-` ID.
+  - `data/sources/device.ts`: get IDs/space and download current `SamplePack`.
+  - `data/sources/local.ts`: read/write `localStorage` packs; enforce uniqueness; provide canonicalized content for comparisons.
+  - `data/index.ts`: orchestrates loading sequences and diff computation.
+- `stores/samples.svelte.ts` focuses on state and actions; it should not embed network/storage specifics beyond calling the sources layer.
+
+Practical Implementation Plan
+- State
+  - Add `editor.unsaved` and `diffs` map; add helpers for canonical key and hash.
+  - Add a `stagedDeviceContent` map keyed by canonical key to hold temporary device‑side edits prior to upload.
+- Editor
+  - Stop auto‑saving in `setEditorLoopData`; instead set `editor.unsaved=true` and update a local `editor.stagedPage` (slot 0).
+  - Save → persist local U‑pack; Save As → create new U‑pack; ensure uniqueness.
+  - When editing from Selected, Save only updates `stagedDeviceContent` and sets `contentDirty=true` (does not write to local packs unless user chooses Save As).
+- Sync actions
+  - Selected: “Sync from local” copies from local U-/W-/P- source into `stagedDeviceContent`; “Sync to local” writes device content into a U‑pack (creating if needed).
+  - Available: mirror the two directions; operate on local storage and `stagedDeviceContent` accordingly.
+- Load sequence
+  - On connect: ensure samples, refresh IDs/space, download once, compute device hashes, then load website index and user packs, and compute diffs.
+- Performance
+  - Lazy fetch website content only when needed for diff or preview; cache in memory for the session.
+
+UI Details
+- Selected list
+  - Show slot indices 1..9,0; overflow rows have index “–” and red styling.
+  - For out‑of‑sync items: show a compact status and two small buttons for sync directions; disable actions during upload.
+  - Edit button opens editor in “device context” (staging device changes).
+- Available list
+  - Show metadata (author • created) when available.
+  - Edit uses “local context” (no device staging); W-/P- forces “Save As New Pack”.
+- Global banners
+  - “Unsaved changes” in editor when `editor.unsaved`.
+  - “You have unapplied changes to device” in Sample Manager when `dirty`.
+
+Testing Checklist
+- Load without device packs → default uploaded once, lists populate, no diffs.
+- Edit W‑pack from Available → Save As New enforced; name collision error works.
+- Edit U‑pack from Available → Save applies locally; selected dirty toggles when selected includes the edited pack.
+- Edit from Selected → Save updates staged device content; dirty and contentDirty toggle; Upload applies and clears.
+- Sync buttons apply correct direction and update diffs without side effects.
+- Revert restores selected from device and clears contentDirty.
+
+Notes
+- We intentionally allow a local U‑pack with the same 7‑char name as a W/P pack; we disambiguate by prefix and source, and compare via canonical key.
+- All hashing ignores name formatting differences (hyphen/padding) to focus on content equivalence.

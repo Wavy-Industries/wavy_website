@@ -1,5 +1,6 @@
 <script>
-    import { sampleState, addPackToSelected, removeSelectedAt, moveSelected, uploadSelected, loadInitialData, openPackEditorFor, revertToDevice, deviceSampleUploadDefault, deleteUserPackById } from "~/features/device-utility/stores/samples.svelte";
+    import { sampleState, addPackToSelected, removeSelectedAt, moveSelected, uploadSelected, loadInitialData, revertToDevice, deviceSampleUploadDefault, deleteUserPackById, syncToDevice, syncFromDevice } from "~/features/device-utility/stores/samples.svelte";
+    import { editState, openPackEditorFor } from "~/features/device-utility/stores/edits.svelte";
     import { packDisplayName, canonicalIdKey, deviceIndexForDisplay } from "~/features/device-utility/utils/packs";
     import { getPageByteSize } from "~/lib/parsers/samples_parser";
     import { onMount } from 'svelte';
@@ -10,6 +11,7 @@
     onMount(() => { loadInitialData(); });
 
     const isSelected = (id) => sampleState.selected.some(x => x && canonicalIdKey(x.id) === canonicalIdKey(id));
+    const diffFor = (id) => sampleState.diffs[canonicalIdKey(id)];
 
     function mailtoForUserPack(id) {
       const meta = sampleState.userPacks.find(p => p.id === id);
@@ -78,7 +80,7 @@
     }
 </script>
 
-{#if !sampleState.editor.open}
+{#if !editState.open}
 <div class="content">
   <div class="beta-banner">
     <span class="beta-badge">BETA</span>
@@ -122,13 +124,18 @@
           <div class="row">
             <span class="index">{i<9 ? i+1 : 0}</span>
             <span class="badge {sampleState.selected[i].type}">{sampleState.selected[i].type}</span>
-            <span class="name" title={(sampleState.selected[i].author || sampleState.selected[i].created) ? `${sampleState.selected[i].author ?? ''}${sampleState.selected[i].author && sampleState.selected[i].created ? ' • ' : ''}${sampleState.selected[i].created ?? ''}` : ''}>{packDisplayName(sampleState.selected[i].id)}</span>
+            <span class="name" title={(sampleState.selected[i].author || sampleState.selected[i].created) ? `${sampleState.selected[i].author ?? ''}${sampleState.selected[i].author && sampleState.selected[i].created ? ' • ' : ''}${sampleState.selected[i].created ?? ''}` : ''}>{packDisplayName(sampleState.selected[i].id)} {#if diffFor(sampleState.selected[i].id)?.status && diffFor(sampleState.selected[i].id).status !== 'in_sync'}<span class="outofsync">Out of sync</span>{/if}</span>
             <span class="usage">{usagePercentFor(sampleState.selected[i], i)}</span>
             <div class="actions">
               <button class="btn" title="Move up" onclick={() => moveSelected(i, -1)}>Move up</button>
               <button class="btn" title="Move down" onclick={() => moveSelected(i, 1)}>Move down</button>
               <button class="btn" title="Remove" onclick={() => removeSelectedAt(i)}>Remove</button>
-              <button class="btn" title="Edit pack" onclick={() => openPackEditorFor(sampleState.selected[i].id)}>Edit</button>
+              {#if sampleState.selected[i].source === 'user_local'}
+                <button class="btn" title="Edit user pack" onclick={() => openPackEditorFor(sampleState.selected[i].id, 'selected')}>Edit</button>
+                <button class="btn" title="Sync device → local" onclick={() => syncFromDevice(sampleState.selected[i].id)} disabled={sampleState.uploadPercentage != null}>Push down</button>
+              {:else}
+                <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorFor(sampleState.selected[i].id, 'selected')}>Mutate</button>
+              {/if}
             </div>
           </div>
         {:else}
@@ -154,7 +161,7 @@
               <span class="usage"></span>
               <div class="actions">
                 <button class="btn" title="Remove" onclick={() => removeSelectedAt(10 + k)}>Remove</button>
-                <button class="btn" title="Edit pack" onclick={() => openPackEditorFor(p.id)}>Edit</button>
+                <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorFor(p.id, 'selected')}>Mutate</button>
               </div>
             </div>
           {/if}
@@ -181,13 +188,22 @@
             {#if p.author || p.created}
               <span>{p.author}</span>
             {/if}
+            {#if diffFor(p.id)?.status && diffFor(p.id).status !== 'in_sync'}
+              <span class="outofsync">Out of sync</span>
+            {/if}
           </div>
           {#if p.description}
             <div class="desc">{p.description}</div>
           {/if}
           <div class="card-actions">
             <button class="btn primary" title="Add to selected" onclick={() => addPackToSelected(p.id)} disabled={p?.disabled || isSelected(p.id)}>Add</button>
-            <button class="btn" title="Edit pack" onclick={() => openPackEditorFor(p.id)} disabled={p?.disabled}>Edit</button>
+            {#if p.source === 'user_local'}
+              <button class="btn" title="Edit user pack" onclick={() => openPackEditorFor(p.id, 'available')} disabled={p?.disabled}>Edit</button>
+              <button class="btn" title="Sync device → local (disabled for official/public)" disabled>Push down</button>
+            {:else}
+              <button class="btn" title="Mutate pack (clone to local)" onclick={() => openPackEditorFor(p.id, 'available')} disabled={p?.disabled}>Mutate</button>
+            {/if}
+            <button class="btn" title="Sync local → device" onclick={() => syncToDevice(p.id)} disabled={sampleState.uploadPercentage != null}>Push up</button>
             {#if p.source === 'user_local'}
               <button class="btn danger" title="Delete user pack" onclick={() => deleteUserPackById(p.id)} disabled={p?.disabled}>Delete</button>
               <button class="btn success" title="Publish pack via email" onclick={() => (window.location.href = mailtoForUserPack(p.id))} disabled={p?.disabled}>Publish</button>
@@ -287,6 +303,7 @@
 .footnote { color: var(--du-muted); font-size: 0.9em; }
 .button-link { display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border: 1px solid var(--du-border); border-radius: var(--du-radius); text-decoration: none; color: inherit; white-space: nowrap; background: #fff; font-size: 13px; }
 .desc { color:#444; font-size: 0.9em; }
+.outofsync { margin-left: 8px; color: #a40000; font-weight: 600; font-size: 0.85em; }
 
 /* Modal */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 1000; padding: 12px; }

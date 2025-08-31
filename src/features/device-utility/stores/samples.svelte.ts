@@ -2,9 +2,11 @@ import { bluetoothManager } from './bluetooth.svelte';
 import { mcumgr } from './mcumgr.svelte';
 import { SampleManager } from '~/lib/bluetooth/mcumgr/SampleManager';
 import { canonicalize } from '~/lib/utilities'
-import { packTypeFromId, makeUserPackId, type PackType, canonicalIdKey as canonicalIdKeyUtil, toUiId, toDeviceId, rotateForDevice, rotateForDisplay, validatePack, validatePage } from '../utils/packs';
+import { packTypeFromId, makeUserPackId, type PackType, canonicalIdKey as canonicalIdKeyUtil, toUiId, toDeviceId, rotateForDevice, rotateForDisplay, validatePack, validatePage, idToBaseName } from '../utils/packs';
 import { type Page, type SamplePack } from '~/lib/parsers/samples_parser';
-import { fetchPageByUiId, loadWebsiteIndex } from '~/features/device-utility/data/website';
+import { buildSamplePackFromIds as buildPack, validatePackForDevice as validatePackLogic, computeDevicePages as computeDevicePagesLogic, computeLocalPageForId as computeLocalForId, computeDiffs as computeDiffsLogic, canonicalPageContent } from '~/features/device-utility/logic/samples';
+import { fetchPageByUiId, loadWebsiteIndex } from '~/features/device-utility/data/packs';
+import { readAllUserPacks, upsertUserPack, deleteUserPack as deleteUserPackLocal } from '~/features/device-utility/data/local';
 
 export const sampleManager = new SampleManager(mcumgr);
 
@@ -41,15 +43,9 @@ interface SampleState {
     dirty: boolean;
     preview: { packId: string|null; bpm: number; isPlaying: boolean };
     userPacks: PackMeta[];
-    contentDirty: boolean;
-    editor: {
-        open: boolean;
-        id: string|null;
-        name7: string;
-        bpm: number;
-        loops: (Page|null)[]; // we will store a single Page shape per pack, but here use per-slot (15)
-        loading: boolean;
-    };
+    // Device-content staging and diffs
+    stagedDeviceContent: Record<string, Page | undefined>; // key = canonicalIdKey
+    diffs: Record<string, { local?: Page|null; device?: Page|null; status: 'in_sync'|'local_newer'|'device_newer'|'diverged' } | undefined>;
     errors: string[];
 }
 
@@ -68,8 +64,8 @@ export const sampleState = $state<SampleState>({
     dirty: false,
     preview: { packId: null, bpm: 120, isPlaying: false },
     userPacks: [],
-    contentDirty: false,
-    editor: { open: false, id: null, name7: '', bpm: 120, loops: Array(15).fill(null), loading: false },
+    stagedDeviceContent: {},
+    diffs: {},
     errors: [],
 });
 
@@ -97,7 +93,6 @@ export async function deviceSamplesUpload(selectedIds: string[]) {
     await refreshDeviceSamples();
     await loadSelectedFromDevice();
     sampleState.selected = [...sampleState.deviceSelected];
-    sampleState.contentDirty = false;
     computeDirty();
 }
 
@@ -181,12 +176,21 @@ function uniqById<T extends { id: string }>(arr: T[]): T[] {
 // Canonical id key: TYPE|BASENAME (no hyphen, no padding)
 const canonicalIdKey = (id: string) => canonicalIdKeyUtil(id);
 
-function computeDirty() {
+export function computeDirty() {
   const key = (p: PackMeta|null) => p ? canonicalIdKey(p.id) : null;
   const top10 = sampleState.selected.slice(0,10).map(key);
   const dev10 = sampleState.deviceSelected.slice(0,10).map(key);
   const idsChanged = JSON.stringify(top10) !== JSON.stringify(dev10);
-  sampleState.dirty = idsChanged || sampleState.contentDirty;
+  // Derive content dirty by comparing staged device content vs current device pages
+  let stagedChanged = false;
+  for (const k of Object.keys(sampleState.stagedDeviceContent)) {
+    const staged = sampleState.stagedDeviceContent[k];
+    const dev = (devicePagesByKey as any)[k] || null;
+    if (JSON.stringify(canonicalPageContent(staged as any)) !== JSON.stringify(canonicalPageContent(dev as any))) {
+      stagedChanged = true; break;
+    }
+  }
+  sampleState.dirty = idsChanged || stagedChanged;
 }
 
 function normalizeWebsiteId(name: string): string {
@@ -242,6 +246,8 @@ export async function loadInitialData() {
   await loadSelectedFromDevice();
   loadUserPacks();
   recomputeAvailable();
+  await computeDevicePages();
+  await computeDiffs();
 }
 
 export function addPackToSelected(id: string) {
@@ -294,60 +300,40 @@ export async function uploadSelected() {
   sampleState.uploadPercentage = null;
   // Uploaded current selection content; sync with device and clear content-dirty
   await refreshDeviceSamples();
+  await computeDevicePages(true);
   await loadSelectedFromDevice();
   sampleState.selected = [...sampleState.deviceSelected];
-  sampleState.contentDirty = false;
+  sampleState.stagedDeviceContent = {};
+  await computeDiffs();
   computeDirty();
 }
 
 export async function revertToDevice() {
   // Re-sync from device and reflect IDs displayed
   await refreshDeviceSamples();
+  await computeDevicePages(true);
   await loadSelectedFromDevice();
   sampleState.selected = [...sampleState.deviceSelected];
-  sampleState.contentDirty = false;
+  sampleState.stagedDeviceContent = {};
+  await computeDiffs();
   computeDirty();
 }
 
 async function buildSamplePackFromIds(ids: (string|null)[]): Promise<SamplePack> {
-  // Rotate for device order if exactly 10
-  const devIds = ids.length === 10 ? rotateForDevice(ids) : ids;
-  const pages: (Page|null)[] = [];
-  for (const id of devIds) {
-    if (!id) { pages.push(null); continue; }
-    // Pick content source based on id type: user-local packs (U) use local content; official/public fetch website/device
-    const type = (id[0] === 'W' || id[0] === 'P' || id[0] === 'U') ? id[0] : (id.startsWith('W-') ? 'W' : id.startsWith('P-') ? 'P' : id.startsWith('U-') ? 'U' : 'W');
-    const uiId = toUiId(id);
-    let page: Page|null = null;
-    if (type === 'U') {
-      const up = sampleState.userPacks.find(p => canonicalIdKey(p.id) === canonicalIdKey(uiId));
-      page = up?.loops || null;
-    } else {
-      page = await fetchPackPage(uiId);
-    }
-    if (page) {
-      // Ensure page name is device-formatted (prefix + padded to 8 chars)
-      page.name = toDeviceId(uiId);
-      pages.push(page);
-    } else {
-      pages.push(null);
-    }
-  }
-  return {
-    reserved0: 0xFFFFFFFF,
-    reserved1: 0xFFFFFFFF,
-    reserved2: 0xFFFFFFFF,
-    reserved3: 0xFFFFFFFF,
-    pages,
-  } as SamplePack;
+  return await buildPack(ids, {
+    userPacks: sampleState.userPacks.map(p => ({ id: p.id, loops: p.loops })),
+    stagedDeviceContent: sampleState.stagedDeviceContent,
+    canonicalIdKey: (id: string) => canonicalIdKey(id),
+    fetchPackPage: (id: string) => fetchPackPage(id),
+  });
 }
 
 // --------- Validation ---------
 
 async function validatePackForDevice(pack: SamplePack): Promise<boolean> {
-  const errs = validatePack(pack, { storageTotal: sampleState.storageTotal ?? undefined });
-  sampleState.errors = errs;
-  return errs.length === 0;
+  const { ok, errors } = validatePackLogic(pack, sampleState.storageTotal);
+  sampleState.errors = errors;
+  return ok;
 }
 
 export function validatePageForUi(uiId: string, page: Page): string[] { return validatePage(uiId, page); }
@@ -439,110 +425,19 @@ export async function getPackPageById(id: string): Promise<Page|null> {
 
 // --------- Pack Editor API ---------
 
-export async function openPackEditorFor(id: string | null = null) {
-  sampleState.editor.open = true;
-  sampleState.editor.id = id;
-  sampleState.editor.bpm = 120;
-  sampleState.editor.loading = !!id; // show loading if fetching existing pack
-  if (id) {
-    const page = await fetchPackPage(id);
-    const name = id.startsWith('W-') || id.startsWith('P-') || id.startsWith('U-') ? id.substring(2) : (id[0]==='W'||id[0]==='P'||id[0]==='U' ? id.substring(1).trimEnd() : id);
-    sampleState.editor.name7 = (name || '').slice(0,7);
-    const slots: (Page|null)[] = Array(15).fill(null);
-    if (page) {
-      const editable: Page = { name: page.name, loops: (page as any).loops } as any;
-      slots[0] = editable;
-    }
-    sampleState.editor.loops = slots;
-    sampleState.editor.loading = false;
-  } else {
-    sampleState.editor.name7 = '';
-    sampleState.editor.loops = Array(15).fill(null);
-    sampleState.editor.loading = false;
-  }
-}
-
-export function closePackEditor() {
-  sampleState.editor.open = false;
-}
-
-export function setEditorLoopData(slot: number, page: Page) {
-  const arr = [...sampleState.editor.loops];
-  arr[slot] = page;
-  sampleState.editor.loops = arr;
-  // Auto-save into user pack if we have a name, so uploads reflect latest changes
-  if (sampleState.editor.name7) {
-    const name7 = sampleState.editor.name7.slice(0,7);
-    const id = `U-${name7}`;
-    let loops = Array(15).fill(null) as any[];
-    const slot0 = sampleState.editor.loops[0];
-    if (slot0 && (slot0 as any).loops) loops = (slot0 as any).loops;
-    const pg: Page = { name: id, loops } as any;
-    createUserPack(name7, pg);
-  }
-  // If the (edited) pack id is selected, mark contentDirty
-  const targetId = currentEditorTargetId();
-  if (targetId && sampleState.selected.some(p => p && p.id === targetId)) {
-    sampleState.contentDirty = true;
-    computeDirty();
-  }
-}
-
-export function saveEditorAsUserPack() {
-  // Build a Page from editor state
-  const name7 = sampleState.editor.name7.slice(0,7);
-  const id = `U-${name7}`;
-  const prevId = sampleState.editor.id;
-  // Merge loops from first non-null slot (editor uses slot 0 to hold the page structure)
-  let loops = Array(15).fill(null) as any[];
-  // If slot 0 holds a Page, reuse its loops; otherwise, combine from individual slots if set
-  const slot0 = sampleState.editor.loops[0];
-  if (slot0 && (slot0 as any).loops) {
-    loops = (slot0 as any).loops;
-  }
-  const page: Page = { name: id, loops } as any;
-  createUserPack(name7, page);
-  // If editing replaced a different id and it's selected, swap selection to new user pack id
-  if (prevId && prevId !== id) {
-    const idx = sampleState.selected.findIndex(p => p && p.id === prevId);
-    if (idx >= 0) {
-      sampleState.selected[idx] = toPackMeta(id, 'user_local', undefined, page);
-    }
-  }
-  // If the resulting pack id is selected, mark contentDirty
-  if (sampleState.selected.some(p => p && p.id === id)) {
-    sampleState.contentDirty = true;
-  }
-  computeDirty();
-  closePackEditor();
-}
-
-// helper to determine current editor target id (existing or prospective user id)
-function currentEditorTargetId(): string | null {
-  if (sampleState.editor.id) return sampleState.editor.id;
-  if (sampleState.editor.name7) return `U-${sampleState.editor.name7.slice(0,7)}`;
-  return null;
-}
+// Editor-related state and actions have moved to stores/edits.svelte.ts
 
 // --------- User packs (localStorage) ---------
 
-const LS_KEY = 'wavy_user_packs';
-
 function loadUserPacks() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) { sampleState.userPacks = []; return; }
-    const arr = JSON.parse(raw) as Array<{ id: string; page: Page }>;
-    // Normalize ids to UI format (handles legacy stored ids without hyphen)
-    sampleState.userPacks = arr.map(x => toPackMeta(toUiId(x.id), 'user_local', undefined, x.page));
-  } catch { sampleState.userPacks = []; }
+  const arr = readAllUserPacks();
+  sampleState.userPacks = arr.map(x => toPackMeta(toUiId(x.id), 'user_local', undefined, x.page));
 }
 
 function saveUserPacks() {
-  try {
-    const arr = sampleState.userPacks.map(x => ({ id: x.id, page: x.loops }));
-    localStorage.setItem(LS_KEY, JSON.stringify(arr));
-  } catch {}
+  const arr = sampleState.userPacks.map(x => ({ id: x.id, page: x.loops as any }));
+  // writeAllUserPacks wants concrete pages; use upsert for each to keep compatibility
+  for (const rec of arr) upsertUserPack(rec.id, rec.page);
 }
 
 export function createUserPack(userName7: string, page: Page) {
@@ -555,10 +450,20 @@ export function createUserPack(userName7: string, page: Page) {
   recomputeAvailable();
 }
 
+export function createOrReplaceUserPack(userName7: string, page: Page) {
+  // Helper for internal saves where replacement is allowed
+  const id = makeUserPackId(userName7);
+  const meta = toPackMeta(id, 'user_local', undefined, page);
+  const idx = sampleState.userPacks.findIndex(p => p.id === id);
+  if (idx >= 0) sampleState.userPacks[idx] = meta; else sampleState.userPacks.push(meta);
+  saveUserPacks();
+  recomputeAvailable();
+}
+
 export function deleteUserPackById(id: string) {
   // Remove from user packs
   sampleState.userPacks = sampleState.userPacks.filter(p => p.id !== id);
-  saveUserPacks();
+  deleteUserPackLocal(id);
   // If selected, remove from selection
   const selIdx = sampleState.selected.findIndex(p => p && p.id === id);
   if (selIdx >= 0) {
@@ -566,4 +471,76 @@ export function deleteUserPackById(id: string) {
   }
   recomputeAvailable();
   computeDirty();
+  computeDiffs();
+}
+
+// --------- Diffing & Sync ---------
+
+let devicePagesByKey: Record<string, Page | undefined> = {};
+let ongoingDevicePackDownload: Promise<SamplePack | null> | null = null;
+
+async function downloadSamplesSingleFlight(force = false): Promise<SamplePack | null> {
+  if (!force && ongoingDevicePackDownload) return ongoingDevicePackDownload;
+  const p = sampleManager.downloadSamples();
+  ongoingDevicePackDownload = p;
+  try {
+    const res = await p;
+    return res;
+  } finally {
+    if (ongoingDevicePackDownload === p) ongoingDevicePackDownload = null;
+  }
+}
+
+async function computeDevicePages(force = false) {
+  devicePagesByKey = await computeDevicePagesLogic(() => downloadSamplesSingleFlight(force));
+}
+
+async function computeLocalPageForId(id: string): Promise<Page | null> {
+  return await computeLocalForId(id, { userPacks: sampleState.userPacks.map(p => ({ id: p.id, loops: p.loops })), fetchPageByUiId });
+}
+
+export async function computeDiffs() {
+  const keysSet = new Set<string>();
+  for (const p of sampleState.selected) if (p) keysSet.add(canonicalIdKey(p.id));
+  // For Available, prefer local user packs over originals to avoid marking originals out-of-sync when a local clone is in use
+  const preferredKeys = new Set<string>();
+  for (const p of sampleState.userPacks) preferredKeys.add(canonicalIdKey(p.id));
+  for (const p of sampleState.available) if (p && !preferredKeys.has(canonicalIdKey(p.id))) keysSet.add(canonicalIdKey(p.id));
+  const keys = Array.from(keysSet);
+  sampleState.diffs = await computeDiffsLogic(keys, devicePagesByKey, { computeLocalPageForId });
+}
+
+export function syncToDevice(id: string) {
+  // Copy local content into staged device content (requires Upload to apply)
+  const key = canonicalIdKey(id);
+  const uiId = toUiId(id);
+  // Resolve local content page
+  let page: Page | null = null;
+  const up = sampleState.userPacks.find(p => canonicalIdKey(p.id) === key);
+  if (up?.loops) page = { name: toDeviceId(uiId), loops: ((up.loops as any).loops ?? []) } as any;
+  // If not user-local, we need to fetch website content; this is async — defer staging until fetch completes
+  if (!page) {
+    fetchPackPage(uiId).then((p) => {
+      if (!p) return;
+      sampleState.stagedDeviceContent[key] = { name: toDeviceId(uiId), loops: (p as any).loops } as any;
+      computeDirty();
+    });
+    return;
+  }
+  sampleState.stagedDeviceContent[key] = page;
+  computeDirty();
+}
+
+export function syncFromDevice(id: string) {
+  // Copy device page into a local U-pack (create or replace)
+  const key = canonicalIdKey(id);
+  const page = devicePagesByKey[key];
+  if (!page) return;
+  const base = idToBaseName(toUiId(id)).slice(0,7);
+  const uid = makeUserPackId(base);
+  const loops = (page as any).loops || [];
+  const localPage: Page = { name: uid, loops } as any;
+  createOrReplaceUserPack(base, localPage);
+  // Recompute diffs since local changed
+  computeDiffs();
 }
