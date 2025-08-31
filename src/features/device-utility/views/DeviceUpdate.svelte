@@ -89,7 +89,7 @@
     <div class="toolbar">
         <div class="left">
             <h1>Device Update</h1>
-            <span class="muted">Manage firmware and view changelog</span>
+            <span class="muted">Update device firmware</span>
         </div>
         <div class="right">
             <div class="subhead">Update Actions</div>
