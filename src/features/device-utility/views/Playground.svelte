@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { midiControlState } from '~/features/device-utility/stores/midiControl.svelte';
+  import { midiControlState, initMidiControl } from '~/features/device-utility/stores/midiControl.svelte';
   import { tempoState, setTempo } from '~/features/device-utility/stores/tempo.svelte';
   import SynthChannelEditor from '~/features/device-utility/components/SynthChannelEditor.svelte';
+  import { onMount } from 'svelte';
 
   const chNames = Array.from({ length: 10 }, (_, i) => (i === 9 ? 'Ch 10 (Drums)' : `Ch ${i+1}`));
   function fmtTime(ts: number) { const d = new Date(ts); return d.toLocaleTimeString(); }
@@ -83,6 +84,11 @@
     raf = requestAnimationFrame(drawLoop);
   }
   $effect(() => () => { if (raf) cancelAnimationFrame(raf); });
+
+  onMount(() => {
+    // Attach MIDI logging to control panel
+    initMidiControl();
+  });
 </script>
 
 <div class="content">
@@ -94,7 +100,7 @@
   <div class="toolbar">
     <div class="left">
       <h1>Playground</h1>
-      <span class="muted">Use your MONKEY!</span>
+      <span class="muted">Go ahead, play on your MONKEY.</span>
     </div>
     <!-- <div class="right">
       <div class="subhead">GLOBAL</div>
@@ -115,7 +121,12 @@
             class={`label btn-chan ${ch === 9 ? 'disabled' : ''}`}
             title={ch === 9 ? 'Drums channel — no synth editor' : 'Edit synth'}
             onclick={() => { if (ch !== 9) selected.ch = ch; }}
-          >{chNames[ch]}</button>
+          >
+            <span class="chan-text">{chNames[ch]}</span>
+            {#if ch !== 9}
+              <span class="gear" aria-hidden="true">⚙</span>
+            {/if}
+          </button>
           <div class="events">
             <canvas use:modCanvas={ch} class="mod-canvas-overlay"></canvas>
             <div class="strip">
@@ -169,9 +180,10 @@
   .list { display: flex; flex-direction: column; gap: 6px; }
   .row { display: grid; grid-template-columns: 180px 1fr; align-items: center; gap: 8px; padding: 10px; border: 1px solid #2f313a; border-radius: var(--du-radius); background: #fcfcfd; box-shadow: none; }
   .label { font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--du-text); border-right: 1px solid black; text-align:left; }
-  .btn-chan { background:#fff; padding:6px 8px; cursor:pointer; border:1px solid black; }
+  .btn-chan { background:#fff; padding:6px 8px; cursor:pointer; border:1px solid black; display:flex; align-items:center; gap:6px; width: 100%; justify-content: flex-start; }
   .btn-chan:hover { background:#f9fafb; }
   .btn-chan.disabled { opacity: 0.6; cursor: default; }
+  .btn-chan .gear { margin-left: auto; font-size: 18px; color: #000; line-height: 1; }
   .actions .btn { border: 1px solid var(--du-border); background: #fff; color: var(--du-text); padding: 6px 10px; font-size: 13px; line-height: 1; border-radius: var(--du-radius); }
   .actions .btn:hover { background: #f9fafb; }
 

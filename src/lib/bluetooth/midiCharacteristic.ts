@@ -1,6 +1,6 @@
 import { BluetoothManager } from './bluetoothManager';
 
-export class MIDIManager {
+export class MIDICharacteristic {
     private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
     private _boundCharHandler: ((event: Event) => void) | null = null;
     private _onMIDIMessage = new Set<(data: Uint8Array) => void>();
@@ -81,3 +81,4 @@ export class MIDIManager {
     private _buildNoteOffMessage(note: number, velocity: number, channel: number): Uint8Array { const ts = new Uint8Array([0,0]); const status = 0x80 | (channel & 0x0F); return new Uint8Array([...ts, status, note, velocity]); }
     private _buildControlChangeMessage(controller: number, value: number, channel: number): Uint8Array { const ts = new Uint8Array([0,0]); const status = 0xB0 | (channel & 0x0F); return new Uint8Array([...ts, status, controller, value]); }
 }
+

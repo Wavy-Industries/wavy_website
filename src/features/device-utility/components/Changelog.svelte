@@ -1,7 +1,7 @@
 <script>
-    import { imageState } from "~/features/device-utility/stores/image.svelte";
+    import { firmwareState } from "~/features/device-utility/stores/firmware.svelte";
 
-    const changelog = $derived(imageState.changelog);
+    const changelog = $derived(firmwareState.changelog);
 
     const { beta } = $props();
 </script>

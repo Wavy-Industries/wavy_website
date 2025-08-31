@@ -1,12 +1,13 @@
 import { mcumgr } from './mcumgr.svelte';
-import { ImageFirmwareVersion, ImageManager } from '~/lib/mcumgr/ImageManager';
-import { bluetoothManager, bluetoothState } from './bluetooth.svelte';
+import { FirmwareManager } from '~/lib/bluetooth/mcumgr/FirmwareManager';
+import { bluetoothManager } from './bluetooth.svelte';
 import { parseChangelog } from '~/lib/parsers/changelog_parser';
-export const imageManager = new ImageManager(mcumgr);
 
-export const imageState = $state({
-    firmwareVersion: null,
-    changelog: null,
+export const firmwareManager = new FirmwareManager(mcumgr);
+
+export const firmwareState = $state({
+    firmwareVersion: null as any,
+    changelog: null as any,
 })
 
 bluetoothManager.onConnect(() => {
@@ -19,25 +20,22 @@ bluetoothManager.onConnectionReestablished(() => {
 });
 
 bluetoothManager.onDisconnect(() => {
-    imageState.firmwareVersion = null;
+    firmwareState.firmwareVersion = null;
 });
 bluetoothManager.onConnectionLoss(() => {
-    imageState.firmwareVersion = null;
+    firmwareState.firmwareVersion = null;
 });
 
 const updateChangelog = async () => {
     const device_name = "MONKEY"; // TODO: use DIS instead to get the ID of the device
-    // Prevent caching by using no-store and a cache-busting query param
     const url = `/firmware/${device_name}/changelog.md?_=${Date.now()}`;
     const response = await fetch(url, { cache: 'no-store' });
     const data = await response.text();
     const changelog = parseChangelog(data);
-    console.log(changelog)
-    imageState.changelog = changelog;
+    firmwareState.changelog = changelog;
 }
 
 const updateFirmwareVersion = async () => {
-    const fw = await imageManager.getFirmwareVersion();
-    console.log('Firmware version:', fw.versionString);
-    imageState.firmwareVersion = fw;
+    const fw = await firmwareManager.getFirmwareVersion();
+    firmwareState.firmwareVersion = fw;
 }

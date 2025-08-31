@@ -1,7 +1,7 @@
 <script>
     import { onMount } from 'svelte';
     import { bluetoothState, bluetoothManager } from '~/features/device-utility/stores/bluetooth.svelte';
-    import { midiManager, deviceTesterState, clearDeviceTesterState } from '~/features/device-utility/stores/midi.svelte';
+    import { midiManager, deviceTesterState, clearDeviceTesterState, initDeviceTesterRouting } from '~/features/device-utility/stores/midiTester.svelte';
 
     // Both SMP and MIDI services work at the same level:
     // - SMP service: Used by DeviceUpdate, SampleManager, etc.
@@ -110,6 +110,8 @@
     // Initialize keybed on mount
     onMount(() => {
         renderKeybed();
+        // Attach MIDI → tester routing (idempotent/HMR-safe)
+        initDeviceTesterRouting();
     });
 
     // Initialize MIDI when connected

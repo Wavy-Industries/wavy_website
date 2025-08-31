@@ -4,7 +4,8 @@
     import DeviceUpdate from '~/features/device-utility/views/DeviceUpdate.svelte';
     import DeviceSampleManager from '~/features/device-utility/views/DeviceSampleManager.svelte';
     import DeviceTester from '~/features/device-utility/views/DeviceTester.svelte';
-    import { imageState } from '~/features/device-utility/stores/image.svelte';
+    import { firmwareState } from '~/features/device-utility/stores/firmware.svelte';
+    import { firmwareRhsIsNewer } from '~/lib/bluetooth/mcumgr/FirmwareManager';
     import { devMode } from '~/features/device-utility/stores/devmode.svelte';
     import { onMount } from 'svelte';
     import { fade } from 'svelte/transition';
@@ -29,7 +30,7 @@
         const start = Date.now();
         // Ready when firmware known AND (samples unsupported OR basic sample info fetched)
         while (Date.now() - start < timeoutMs) {
-            const fwReady = imageState?.firmwareVersion != null;
+            const fwReady = firmwareState?.firmwareVersion != null;
             const samplesUnsupported = sampleState.isSupported === false && sampleState.isset === null && sampleState.names === null;
             const samplesReady = sampleState.isSupported === true && sampleState.names != null && sampleState.storageUsed != null && sampleState.storageTotal != null;
             if (fwReady && (samplesUnsupported || samplesReady)) return true;
@@ -37,6 +38,23 @@
         }
         return false; // timeout
     }
+
+    // Indicators for upgrade/downgrade availability
+    const upgradeAvailable = $derived.by(() => {
+        const fw = firmwareState?.firmwareVersion;
+        const rel = firmwareState?.changelog?.release;
+        if (!fw || !rel) return false;
+        return firmwareRhsIsNewer(fw, rel);
+    });
+    const downgradeAvailable = $derived.by(() => {
+        const fw = firmwareState?.firmwareVersion;
+        const rel = firmwareState?.changelog?.release;
+        if (!fw || !rel) return false;
+        // fw > rel → downgrade available
+        return firmwareRhsIsNewer(rel, fw);
+    });
+    const needsUpdateAttention = $derived(upgradeAvailable || downgradeAvailable);
+    const isUpdateTabActive = $derived(deviceUtilityView.current === DeviceUtilityView.DeviceUpdate);
 
     // $effect(async() => {
     //     if (bluetoothState.connectionState === 'connected') {
@@ -60,14 +78,27 @@
             </button>
             <span>{bluetoothState.deviceName}</span>
             <ConnectionStatus />
-                <span>v{imageState?.firmwareVersion?.versionString ?? '?.?.?'}</span>
+                <span>v{firmwareState?.firmwareVersion?.versionString ?? '?.?.?'}</span>
             <ActionStatus />
             {#if $devMode}
                 <span class="dev-indicator" title="Dev mode active - type 'disable dev mode' in console to disable">🔧</span>
             {/if}
         </div>
         <div>
-            <a href="#device-update" class={deviceUtilityView.current === DeviceUtilityView.DeviceUpdate ? 'active' : ''}>Device Update</a>
+            <a 
+                href="#playground" 
+                class={deviceUtilityView.current === DeviceUtilityView.Playground ? 'active' : ''}
+            >
+                Playground
+            </a>
+            <span class={`tab-with-badge ${needsUpdateAttention && !isUpdateTabActive ? 'blink-update' : ''}`}>
+              <a href="#device-update" class={deviceUtilityView.current === DeviceUtilityView.DeviceUpdate ? 'active' : ''}>
+                  Device Update
+              </a>
+              {#if needsUpdateAttention}
+                  <span class="alert-dot" title={upgradeAvailable ? 'Upgrade available' : 'Downgrade available'}>!</span>
+              {/if}
+            </span>
             <a 
                 href="#sample-manager" 
                 class={`blink ${deviceUtilityView.current === DeviceUtilityView.SampleManager ? 'active' : ''}`}
@@ -76,12 +107,6 @@
                 title={!sampleState.isSupported ? "firmware version 1.2.0 or greater is required" : ""}
             >
                 Sample Manager
-            </a>
-            <a 
-                href="#playground" 
-                class={deviceUtilityView.current === DeviceUtilityView.Playground ? 'active' : ''}
-            >
-                Playground
             </a>
             {#if $devMode}
                 <a 
@@ -115,7 +140,8 @@
     {:else if deviceUtilityView.current === DeviceUtilityView.Playground}
         <div in:fade={{ duration: 200 }}>
             {#await import('~/features/device-utility/views/Playground.svelte') then Mod}
-              <svelte:component this={Mod.default} />
+              {@const Comp = Mod.default}
+              <Comp />
             {/await}
         </div>
     {/if}
@@ -154,6 +180,9 @@
         gap: 20px;
     }
 
+    /* Keep badge tight and centered with the tab text */
+    .tab-with-badge { display: inline-flex; align-items: center; gap: 3px; }
+
     nav a:hover {
         text-decoration: none;
     }
@@ -173,9 +202,15 @@
     nav a.blink:not(.active):not(.disabled) {
         animation: blink 1.5s infinite;
     }
+    nav a.blink-update:not(.active):not(.disabled) { animation: blink-update 1.5s infinite; }
+    .tab-with-badge.blink-update { animation: blink-update 1.5s infinite; }
     @keyframes blink {
         0%, 100% {  }
         50% { color: #FFB84D; transform: scale(1.05); }
+    }
+    @keyframes blink-update {
+        0%, 100% { }
+        50% { color: var(--du-success, #16a34a); transform: scale(1.05); }
     }
     nav a:hover:not(.active) { background: #f4f5f7; }
 
@@ -189,6 +224,23 @@
         font-size: 1.2em;
         opacity: 0.7;
         cursor: help;
+    }
+
+    /* Simple alert icon next to Device Update */
+    .alert-dot {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--du-success, #16a34a);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 14px; /* visually center inside circle */
+        vertical-align: middle; /* align with text baseline */
+        transform: translateY(-1px); /* optical alignment with tab text */
     }
 
     .loading {

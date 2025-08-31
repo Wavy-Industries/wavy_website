@@ -1,10 +1,9 @@
 import { bluetoothManager } from './bluetooth.svelte';
 import { mcumgr } from './mcumgr.svelte';
-import { SampleManager } from '~/lib/mcumgr/SampleManager';
+import { SampleManager } from '~/lib/bluetooth/mcumgr/SampleManager';
 import { canonicalize } from '~/lib/utilities'
-import { packDisplayName, packTypeFromId, makeUserPackId, type PackType, canonicalIdKey as canonicalIdKeyUtil, toUiId, toDeviceId, deviceIndexForDisplay, rotateForDevice } from '../utils/packs';
-import { samplesParser_decode, samplesParser_encode, type Page, type SamplePack } from '~/lib/parsers/samples_parser';
-import { validatePack, validatePage as validatePageStandalone } from '~/features/device-utility/validation/packs';
+import { packTypeFromId, makeUserPackId, type PackType, canonicalIdKey as canonicalIdKeyUtil, toUiId, toDeviceId, rotateForDevice, rotateForDisplay, validatePack, validatePage } from '../utils/packs';
+import { type Page, type SamplePack } from '~/lib/parsers/samples_parser';
 import { fetchPageByUiId, loadWebsiteIndex } from '~/features/device-utility/data/website';
 
 export const sampleManager = new SampleManager(mcumgr);
@@ -36,9 +35,9 @@ interface SampleState {
     // Upload progress when uploading
     uploadPercentage: Nullable<number>;
     // New UI state
-    selected: PackMeta[];
+    selected: (PackMeta|null)[];
     available: PackMeta[];
-    deviceSelected: PackMeta[];
+    deviceSelected: (PackMeta|null)[];
     dirty: boolean;
     preview: { packId: string|null; bpm: number; isPlaying: boolean };
     userPacks: PackMeta[];
@@ -63,9 +62,9 @@ export const sampleState = $state<SampleState>({
     storagePacksUsed: null,
     names: null,
     uploadPercentage: null,
-    selected: [],
+    selected: Array(10).fill(null),
     available: [],
-    deviceSelected: [],
+    deviceSelected: Array(10).fill(null),
     dirty: false,
     preview: { packId: null, bpm: 120, isPlaying: false },
     userPacks: [],
@@ -183,8 +182,9 @@ function uniqById<T extends { id: string }>(arr: T[]): T[] {
 const canonicalIdKey = (id: string) => canonicalIdKeyUtil(id);
 
 function computeDirty() {
-  const top10 = sampleState.selected.slice(0,10).map(p => canonicalIdKey(p.id));
-  const dev10 = sampleState.deviceSelected.slice(0,10).map(p => canonicalIdKey(p.id));
+  const key = (p: PackMeta|null) => p ? canonicalIdKey(p.id) : null;
+  const top10 = sampleState.selected.slice(0,10).map(key);
+  const dev10 = sampleState.deviceSelected.slice(0,10).map(key);
   const idsChanged = JSON.stringify(top10) !== JSON.stringify(dev10);
   sampleState.dirty = idsChanged || sampleState.contentDirty;
 }
@@ -201,15 +201,19 @@ async function loadWebsitePacks(): Promise<PackMeta[]> {
 
 async function loadSelectedFromDevice() {
   const ids = sampleState.names || [];
-  const metas: PackMeta[] = [];
-  for (const id of ids) {
-    if (!id) { metas.push(null as any); continue; }
+  // Device reports IDs in device slot order; rotate to display order (1..9,0)
+  const dispIds = rotateForDisplay(ids.length === 10 ? [...ids] : [...ids].slice(0,10));
+  const metas: (PackMeta|null)[] = [];
+  for (const id of dispIds) {
+    if (!id) { metas.push(null); continue; }
     const uiId = toUiId(id);
     metas.push(toPackMeta(uiId, 'device_only'));
   }
-  sampleState.deviceSelected = metas.filter(Boolean);
-  // Initialize selected with device order if not already set
-  if (sampleState.selected.length === 0) sampleState.selected = [...sampleState.deviceSelected];
+  while (metas.length < 10) metas.push(null);
+  sampleState.deviceSelected = metas;
+  // Initialize selected with device order if not already set (or all-null)
+  const allNull = sampleState.selected.length === 0 || sampleState.selected.slice(0,10).every(x => !x);
+  if (allNull) sampleState.selected = [...sampleState.deviceSelected];
   computeDirty();
 }
 
@@ -217,7 +221,7 @@ function recomputeAvailable() {
   // Merge by canonical key, preferring website > user_local > device_only
   const website = sampleState.available.filter(p=>p.source==='website');
   const user = sampleState.userPacks;
-  const deviceOnly = sampleState.deviceSelected.filter(p=>p.source==='device_only');
+  const deviceOnly = sampleState.deviceSelected.filter(p=>p && p.source==='device_only') as PackMeta[];
   const map = new Map<string, PackMeta>();
   const push = (list: PackMeta[]) => {
     for (const p of list) {
@@ -241,16 +245,26 @@ export async function loadInitialData() {
 }
 
 export function addPackToSelected(id: string) {
-  const found = sampleState.available.find(p => p.id === id) || sampleState.deviceSelected.find(p=>p.id===id) || sampleState.userPacks.find(p=>p.id===id);
+  const found = sampleState.available.find(p => p.id === id) || sampleState.deviceSelected.find(p=>p && p.id===id) || sampleState.userPacks.find(p=>p.id===id);
   if (!found) return;
-  if (sampleState.selected.find(p => canonicalIdKey(p.id) === canonicalIdKey(id))) return; // already by canonical id
-  sampleState.selected = [...sampleState.selected, found];
+  if (sampleState.selected.find(p => p && canonicalIdKey(p.id) === canonicalIdKey(id))) return; // already by canonical id
+  // Place into first empty slot within top 10; otherwise push to overflow
+  const idx = sampleState.selected.slice(0,10).findIndex(p => !p);
+  if (idx >= 0) {
+    const next = [...sampleState.selected];
+    next[idx] = found;
+    sampleState.selected = next;
+  } else {
+    sampleState.selected = [...sampleState.selected, found];
+  }
   recomputeAvailable();
   computeDirty();
 }
 
 export function removeSelectedAt(index: number) {
-  sampleState.selected = sampleState.selected.filter((_, i) => i !== index);
+  const next = [...sampleState.selected];
+  if (index < 10) next[index] = null; else next.splice(index, 1);
+  sampleState.selected = next;
   recomputeAvailable();
   computeDirty();
 }
@@ -258,7 +272,9 @@ export function removeSelectedAt(index: number) {
 export function moveSelected(index: number, dir: -1 | 1) {
   const arr = [...sampleState.selected];
   const j = index + dir;
-  if (j < 0 || j >= arr.length) return;
+  // Restrict movement within the first 10 slots to keep overflow separate
+  const maxIdx = Math.min(arr.length - 1, 9);
+  if (index < 0 || j < 0 || index > maxIdx || j > maxIdx) return;
   const tmp = arr[index]; arr[index] = arr[j]; arr[j] = tmp;
   sampleState.selected = arr;
   computeDirty();
@@ -267,7 +283,7 @@ export function moveSelected(index: number, dir: -1 | 1) {
 export async function uploadSelected() {
   sampleState.errors = [];
   // Build sample pack from selected using website/device/user sources
-  let ids = sampleState.selected.slice(0,10).map(p => p.id);
+  let ids = sampleState.selected.slice(0,10).map(p => p ? p.id : null);
   while (ids.length < 10) ids.push(null as any);
   const pack = await buildSamplePackFromIds(ids as any);
   // Validate pack before upload
@@ -334,14 +350,14 @@ async function validatePackForDevice(pack: SamplePack): Promise<boolean> {
   return errs.length === 0;
 }
 
-export function validatePageForUi(uiId: string, page: Page): string[] { return validatePageStandalone(uiId, page); }
+export function validatePageForUi(uiId: string, page: Page): string[] { return validatePage(uiId, page); }
 
 // --------- Preview (simple) ---------
 
 export async function previewPack(id: string) {
   sampleState.preview.packId = id;
   // If loops missing, try website JSON, else from device download
-  const existing = sampleState.selected.find(p=>p.id===id) || sampleState.available.find(p=>p.id===id) || sampleState.deviceSelected.find(p=>p.id===id) || sampleState.userPacks.find(p=>p.id===id);
+  const existing = sampleState.selected.find(p=>p && p.id===id) || sampleState.available.find(p=>p.id===id) || sampleState.deviceSelected.find(p=>p && p.id===id) || sampleState.userPacks.find(p=>p.id===id);
   if (!existing) return;
   if (!existing.loops) {
     const page = await fetchPackPage(id);
@@ -466,7 +482,7 @@ export function setEditorLoopData(slot: number, page: Page) {
   }
   // If the (edited) pack id is selected, mark contentDirty
   const targetId = currentEditorTargetId();
-  if (targetId && sampleState.selected.some(p => p.id === targetId)) {
+  if (targetId && sampleState.selected.some(p => p && p.id === targetId)) {
     sampleState.contentDirty = true;
     computeDirty();
   }
@@ -488,13 +504,13 @@ export function saveEditorAsUserPack() {
   createUserPack(name7, page);
   // If editing replaced a different id and it's selected, swap selection to new user pack id
   if (prevId && prevId !== id) {
-    const idx = sampleState.selected.findIndex(p => p.id === prevId);
+    const idx = sampleState.selected.findIndex(p => p && p.id === prevId);
     if (idx >= 0) {
       sampleState.selected[idx] = toPackMeta(id, 'user_local', undefined, page);
     }
   }
   // If the resulting pack id is selected, mark contentDirty
-  if (sampleState.selected.some(p => p.id === id)) {
+  if (sampleState.selected.some(p => p && p.id === id)) {
     sampleState.contentDirty = true;
   }
   computeDirty();
@@ -544,7 +560,7 @@ export function deleteUserPackById(id: string) {
   sampleState.userPacks = sampleState.userPacks.filter(p => p.id !== id);
   saveUserPacks();
   // If selected, remove from selection
-  const selIdx = sampleState.selected.findIndex(p => p.id === id);
+  const selIdx = sampleState.selected.findIndex(p => p && p.id === id);
   if (selIdx >= 0) {
     sampleState.selected.splice(selIdx, 1);
   }

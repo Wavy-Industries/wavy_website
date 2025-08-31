@@ -1,4 +1,4 @@
-import { midiManager } from '~/features/device-utility/stores/midi.svelte';
+import { midiManager } from '~/features/device-utility/stores/midiTester.svelte';
 
 type MidiEvt =
   | { id: number; kind: 'noteon'; note: number; velocity: number; channel: number; ts: number }
@@ -23,16 +23,20 @@ function pushEvent(evt: MidiEvt) {
   midiControlState.events = [...midiControlState.events];
 }
 
-// Attach once (persist across HMR)
-const G: any = (globalThis as any);
-if (!G.__wavy_midi_control_attached) {
-  G.__wavy_midi_control_attached = true;
-  G.__wavy_midi_control_onNoteOn ||= ((note: number, velocity: number, channel: number) => pushEvent({ kind: 'noteon', note, velocity, channel, ts: Date.now() }));
-  G.__wavy_midi_control_onNoteOff ||= ((note: number, velocity: number, channel: number) => pushEvent({ kind: 'noteoff', note, velocity, channel, ts: Date.now() }));
-  G.__wavy_midi_control_onCC ||= ((controller: number, value: number, channel: number) => pushEvent({ kind: 'cc', controller, value, channel, ts: Date.now() }));
-  midiManager.onNoteOn(G.__wavy_midi_control_onNoteOn);
-  midiManager.onNoteOff(G.__wavy_midi_control_onNoteOff);
-  midiManager.onControlChange(G.__wavy_midi_control_onCC);
+// Declarative: exported init to attach once, HMR-safe without globalThis
+const H = (import.meta as any).hot;
+const DATA: any = H?.data || (H ? (H.data = {}) : {});
+
+export function initMidiControl() {
+  if (DATA.__wavy_midi_control_attached) return;
+  DATA.__wavy_midi_control_attached = true;
+  const onNoteOn = (note: number, velocity: number, channel: number) => pushEvent({ kind: 'noteon', note, velocity, channel, ts: Date.now() });
+  const onNoteOff = (note: number, velocity: number, channel: number) => pushEvent({ kind: 'noteoff', note, velocity, channel, ts: Date.now() });
+  const onCC = (controller: number, value: number, channel: number) => pushEvent({ kind: 'cc', controller, value, channel, ts: Date.now() });
+  DATA.__wavy_midi_control_handlers = { onNoteOn, onNoteOff, onCC };
+  midiManager.onNoteOn(onNoteOn);
+  midiManager.onNoteOff(onNoteOff);
+  midiManager.onControlChange(onCC);
 }
 
 export function setBpm(bpm: number) {

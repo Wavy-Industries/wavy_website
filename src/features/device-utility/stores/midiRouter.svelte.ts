@@ -1,23 +1,30 @@
 // Global MIDI → sound router. Always delivers incoming MIDI to the sound backend.
 import { soundBackend } from '~/lib/soundBackend';
-import { midiManager } from '~/features/device-utility/stores/midi.svelte';
+import { midiManager } from '~/features/device-utility/stores/midiTester.svelte';
 
-// Attach exactly once per app lifetime (persists across HMR)
-const G: any = (globalThis as any);
-if (!G.__wavy_midi_router_attached) {
-  G.__wavy_midi_router_attached = true;
-  G.__wavy_midi_router_onNoteOn ||= ((note: number, velocity: number, channel: number) => {
+// Declarative: exported init to attach once, HMR-safe without globalThis
+const H = (import.meta as any).hot;
+const DATA: any = H?.data || (H ? (H.data = {}) : {});
+
+export function initMidiRouter() {
+  if (DATA.__wavy_midi_router_attached) return;
+  DATA.__wavy_midi_router_attached = true;
+
+  const onNoteOn = (note: number, velocity: number, channel: number) => {
     try { soundBackend.resume?.(); } catch {}
     soundBackend.noteOn(note, velocity, channel);
-  });
-  G.__wavy_midi_router_onNoteOff ||= ((note: number, velocity: number, channel: number) => {
+  };
+  const onNoteOff = (note: number, velocity: number, channel: number) => {
     soundBackend.noteOff(note, velocity, channel);
-  });
-  G.__wavy_midi_router_onCC ||= ((_controller: number, _value: number, _channel: number) => {
+  };
+  const onCC = (_controller: number, _value: number, _channel: number) => {
     // Placeholder for CC → sound mapping if needed later.
-  });
+  };
 
-  midiManager.onNoteOn(G.__wavy_midi_router_onNoteOn);
-  midiManager.onNoteOff(G.__wavy_midi_router_onNoteOff);
-  midiManager.onControlChange(G.__wavy_midi_router_onCC);
+  DATA.__wavy_midi_router_handlers = { onNoteOn, onNoteOff, onCC };
+  midiManager.onNoteOn(onNoteOn);
+  midiManager.onNoteOff(onNoteOff);
+  midiManager.onControlChange(onCC);
 }
+
+H?.accept?.(() => {});

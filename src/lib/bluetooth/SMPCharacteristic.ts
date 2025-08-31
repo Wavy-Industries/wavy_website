@@ -1,8 +1,7 @@
-// MCUManager.ts
-
+// SMPCharacteristic.ts (renamed from MCUManager)
 import { assert, Log } from '../utilities';
-import CBOR from './cbor';
-import { BluetoothManager } from '../bluetoothManager';
+import CBOR from './mcumgr/cbor';
+import { BluetoothManager } from './bluetoothManager';
 
 let log = new Log('mcumgr', Log.LEVEL_DEBUG);
 
@@ -44,7 +43,7 @@ export const MGMT_OP = { READ: 0, READ_RSP: 1, WRITE: 2, WRITE_RSP: 3 };
 export interface ResponseError { rc: number; }
 interface ResponseResolver { resolve: (data: any) => void; reject: (error: any) => void; }
 
-export class MCUManager {
+export class SMPCharacteristic {
     private smpSequenceNumber: number = 0;
     private responseResolvers: { [sequenceNumber: number]: ResponseResolver } = {};
     private readonly SMP_HEADER_SIZE: number = 8;
@@ -115,7 +114,9 @@ export class MCUManager {
     }
 
     private async _handleSMPMessage(event: Event): Promise<void> {
-        const characteristic = event.target as BluetoothRemoteGATTCharacteristic; const value = new Uint8Array(characteristic.value!.buffer);
+        const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
+        const dv = characteristic.value!;
+        const value = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
         this.smpBuffer = new Uint8Array([...this.smpBuffer, ...value]);
         while (this.smpBuffer.length >= this.SMP_HEADER_SIZE) {
             const length = (this.smpBuffer[2] << 8) | this.smpBuffer[3]; const totalLength = this.SMP_HEADER_SIZE + length;
@@ -125,7 +126,9 @@ export class MCUManager {
 
     private async _processMessage(message: Uint8Array): Promise<void> {
         const payload = message.slice(this.SMP_HEADER_SIZE);
-        let data; try { data = CBOR.decode(payload.buffer); } catch (error) { log.error('Error decoding CBOR:', error); return; }
+        // Ensure we pass a tightly sliced ArrayBuffer to the decoder
+        const ab = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength);
+        let data; try { data = CBOR.decode(ab); } catch (error) { log.error('Error decoding CBOR:', error); return; }
         const seq = message[this.SMP_HEADER_SEQ_IDX]; const resolver = this.responseResolvers[seq]; if (resolver) { resolver.resolve(data); delete this.responseResolvers[seq]; }
     }
 }

@@ -3,9 +3,9 @@
   import { getPageByteSize } from '~/lib/parsers/samples_parser';
   import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
   import { soundBackend } from '~/lib/soundBackend';
-  import MidiEditor from '~/features/device-utility/views/midi/MidiEditor.svelte';
+  import MidiEditor from '~/features/device-utility/views/MidiEditor.svelte';
   import { tempoState } from '~/features/device-utility/stores/tempo.svelte';
-  import { validatePage as validatePackPage } from '~/features/device-utility/validation/packs';
+  import { validatePage as validatePackPage } from '~/features/device-utility/utils/packs';
   import { packDisplayName } from '~/features/device-utility/utils/packs';
   import { computeLoopEndTicks } from '~/lib/music/loop_utils';
 

@@ -1,7 +1,7 @@
 <script>
-    import { imageState } from "~/features/device-utility/stores/image.svelte";
-    import { imageRhsIsNewer } from '~/lib/mcumgr/ImageManager';
-    import { imageManager } from '~/features/device-utility/stores/image.svelte'
+    import { firmwareState } from "~/features/device-utility/stores/firmware.svelte";
+    import { firmwareRhsIsNewer } from '~/lib/bluetooth/mcumgr/FirmwareManager';
+    import { firmwareManager } from '~/features/device-utility/stores/firmware.svelte'
     import Changelog from "~/features/device-utility/components/Changelog.svelte";
     import ToggleSwitch from "~/features/device-utility/components/ToggleSwitch.svelte";
     import FirmwareUpdate from "~/features/device-utility/components/FirmwareUpdate.svelte";
@@ -14,18 +14,18 @@
 
     const betaChanged = (value) => beta = value;
 
-    const newestAvailableFirmware = $derived(beta ? imageState.changelog?.dev.versionString : imageState.changelog?.release.versionString)
+    const newestAvailableFirmware = $derived(beta ? firmwareState.changelog?.dev.versionString : firmwareState.changelog?.release.versionString)
 
     let updateState = $derived.by(() => {
-        if (imageState.firmwareVersion == null || imageState.changelog == null)
+        if (firmwareState.firmwareVersion == null || firmwareState.changelog == null)
             return null;
 
-        const fw = imageState.firmwareVersion;
-        const availableNewest = beta ? imageState.changelog.dev : imageState.changelog.release;
+        const fw = firmwareState.firmwareVersion;
+        const availableNewest = beta ? firmwareState.changelog.dev : firmwareState.changelog.release;
 
         if (availableNewest.versionString == fw.versionString) {
             return 'up-to-date';
-        } else if (imageRhsIsNewer(fw, availableNewest)) {
+        } else if (firmwareRhsIsNewer(fw, availableNewest)) {
             return 'upgrade';
         } else {
             return 'downgrade';
@@ -35,13 +35,13 @@
     async function startUpdate() {
         try {
             updateStage = 'fetching';
-            const firmwareVersion = beta ? imageState.changelog.dev.versionString : imageState.changelog.release.versionString;
+            const firmwareVersion = beta ? firmwareState.changelog.dev.versionString : firmwareState.changelog.release.versionString;
             
             updateStage = 'uploading';
             const image = await fetch(`/firmware/MONKEY/app_update_${firmwareVersion}.bin`)
                 .then(res => res.arrayBuffer());
 
-            const success = await imageManager.uploadImage(image, (percent) => {
+            const success = await firmwareManager.uploadImage(image, (percent) => {
                 uploadProgress = percent;
             });
             if (!success) {
@@ -56,7 +56,7 @@
             });
             
             updateStage = 'verifying';
-            const newFirmware = await imageManager.getFirmwareVersion();
+            const newFirmware = await firmwareManager.getFirmwareVersion();
             if (newFirmware.versionString !== firmwareVersion) {
                 throw new Error(`Update failed: Device firmware version is ${newFirmware.versionString} but expected ${firmwareVersion}`);
             }
@@ -133,11 +133,7 @@
 </div>
 
 <style>
-    .content {
-        padding: 20px;
-        max-width: var(--du-maxw, 1100px);
-        margin: 0 auto;
-    }
+    .content { padding: 16px; max-width: var(--du-maxw, 1100px); margin: 0 auto; }
     .top-bar {
         display: flex;
         flex-direction: row;
@@ -174,8 +170,10 @@
     .toolbar { display: flex; gap: 12px; align-items: flex-end; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--du-border); }
     .toolbar .left { display: flex; flex-direction: column; }
     .toolbar .left .muted { color: var(--du-muted); font-size: 0.9em; }
-    .toolbar .right { display: flex; gap: 6px; align-items: flex-start; flex-direction: column; }
+    .toolbar .left h1 { position: relative; display: inline-block; padding-bottom: 6px; margin: 0; }
+    .toolbar .left h1::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; border-radius: 0; }
+    .toolbar .right { display: flex; gap: 6px; align-items: flex-end; flex-direction: column; }
     .toolbar .right .actions-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .toolbar .right .subhead { position: relative; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #111827; padding-bottom: 6px; align-self: flex-start; }
-    .toolbar .right .subhead::after { content: ""; position: absolute; left: 0; bottom: 0; width: 140px; height: 3px; background: #2f313a; }
+    .toolbar .right .subhead { position: relative; font-size: 12px; font-weight: 800; letter-spacing: .08em; color: #111827; text-transform: uppercase; padding-bottom: 6px; align-self: flex-end; }
+    .toolbar .right .subhead::after { content: ""; position: absolute; right: 0; bottom: 0; width: 140px; height: 3px; background: #2f313a; }
 </style>

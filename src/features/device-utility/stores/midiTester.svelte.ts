@@ -1,10 +1,11 @@
-import { MIDIManager } from '~/lib/midiManager';
+import { MIDICharacteristic } from '~/lib/bluetooth/midiCharacteristic';
 import { bluetoothManager } from './bluetooth.svelte';
 import { deviceUtilityView, DeviceUtilityView } from './view.svelte';
 
-// Singleton MIDIManager across HMR and page entries
-const G: any = (globalThis as any);
-export const midiManager: MIDIManager = G.__wavy_midi_manager ||= new MIDIManager(bluetoothManager);
+// Singleton MIDIManager across HMR and page entries (no globalThis)
+const H = (import.meta as any).hot;
+const DATA: any = H?.data || (H ? (H.data = {}) : {});
+export const midiManager: MIDICharacteristic = DATA.__wavy_midi_manager ||= new MIDICharacteristic(bluetoothManager);
 
 // DeviceTester state - persists across component mounts
 export const deviceTesterState = $state({
@@ -148,26 +149,31 @@ function playCCSound() {
     oscillator.stop(audioCtx.currentTime + 0.05);
 }
 
-// Set up MIDI event handlers once (persist across HMR)
-// Reuse the same global object as above
-if (!G.__wavy_device_tester_attached) {
-    G.__wavy_device_tester_attached = true;
+// Declarative: call to wire Device Tester routing (idempotent, HMR-safe)
+export function initDeviceTesterRouting() {
+    if (DATA.__wavy_device_tester_attached) return;
+    DATA.__wavy_device_tester_attached = true;
     const isActive = () => deviceUtilityView.current === DeviceUtilityView.DeviceTester;
-    G.__wavy_device_tester_onNoteOn ||= ((note: number, velocity: number, channel: number) => {
+
+    const onNoteOn = (note: number, velocity: number, channel: number) => {
         if (!isActive()) return;
         markKeyActive(note);
         addPressedKey(note);
-    });
-    G.__wavy_device_tester_onNoteOff ||= ((note: number, velocity: number, channel: number) => {
+    };
+    const onNoteOff = (note: number, velocity: number, channel: number) => {
         if (!isActive()) return;
         removePressedKey(note);
-    });
-    G.__wavy_device_tester_onCC ||= ((controller: number, value: number, channel: number) => {
+    };
+    const onCC = (controller: number, value: number, channel: number) => {
         if (!isActive()) return;
         handleControlChange(controller, value);
-    });
+    };
 
-    midiManager.onNoteOn(G.__wavy_device_tester_onNoteOn);
-    midiManager.onNoteOff(G.__wavy_device_tester_onNoteOff);
-    midiManager.onControlChange(G.__wavy_device_tester_onCC);
+    DATA.__wavy_device_tester_handlers = { onNoteOn, onNoteOff, onCC };
+    midiManager.onNoteOn(onNoteOn);
+    midiManager.onNoteOff(onNoteOff);
+    midiManager.onControlChange(onCC);
 }
+
+// Keep module hot-acceptable without re-wiring
+H?.accept?.(() => {});

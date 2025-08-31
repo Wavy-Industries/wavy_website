@@ -18,7 +18,7 @@
         {:else if ['applying', 'verifying', 'done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
-        Uploading firmware {#if stage === 'uploading'}({#if uploadProgress === 0}preparing{:else}{uploadProgress}%{/if}){/if}
+        Uploading firmware {#if stage === 'uploading'}({#if uploadProgress === 0}preparing device{:else}{uploadProgress}%{/if}){/if}
     </div>
     <div class="stage" class:active={stage === 'applying'}>
         {#if stage === 'applying'}

@@ -9,7 +9,7 @@
 
     onMount(() => { loadInitialData(); });
 
-    const isSelected = (id) => sampleState.selected.some(x => canonicalIdKey(x.id) === canonicalIdKey(id));
+    const isSelected = (id) => sampleState.selected.some(x => x && canonicalIdKey(x.id) === canonicalIdKey(id));
 
     function mailtoForUserPack(id) {
       const meta = sampleState.userPacks.find(p => p.id === id);
@@ -34,6 +34,7 @@
       if (!(i < 10)) return '';
       const total = sampleState.storageTotal || 0;
       if (!total) return '';
+      if (!p) return '';
       // For user-local packs, estimate from encoded page size
       if (p?.source === 'user_local') {
         const page = p.loops || sampleState.userPacks.find(x => x.id === p.id)?.loops;
@@ -116,32 +117,50 @@
   <div class="pane">
     <div class="pane-header"><h3>Selected Packs</h3></div>
     <div class="selected-list">
-      {#each sampleState.selected as p, i}
-        <div class="row" class:overflow={i>=10}>
-          <span class="index">{i<9 ? i+1 : (i===9 ? 0 : '-')}</span>
-          <span class="badge {p.type}">{p.type}</span>
-          <span class="name" title={(p.author || p.created) ? `${p.author ?? ''}${p.author && p.created ? ' • ' : ''}${p.created ?? ''}` : ''}>{packDisplayName(p.id)}</span>
-          <span class="usage">{usagePercentFor(p, i)}</span>
-          <div class="actions">
-            <button class="btn" title="Move up" onclick={() => moveSelected(i, -1)}>Move up</button>
-            <button class="btn" title="Move down" onclick={() => moveSelected(i, 1)}>Move down</button>
-            <button class="btn" title="Remove" onclick={() => removeSelectedAt(i)}>Remove</button>
-            <button class="btn" title="Edit pack" onclick={() => openPackEditorFor(p.id)}>Edit</button>
+      {#each Array(10) as _, i}
+        {#if sampleState.selected[i]}
+          <div class="row">
+            <span class="index">{i<9 ? i+1 : 0}</span>
+            <span class="badge {sampleState.selected[i].type}">{sampleState.selected[i].type}</span>
+            <span class="name" title={(sampleState.selected[i].author || sampleState.selected[i].created) ? `${sampleState.selected[i].author ?? ''}${sampleState.selected[i].author && sampleState.selected[i].created ? ' • ' : ''}${sampleState.selected[i].created ?? ''}` : ''}>{packDisplayName(sampleState.selected[i].id)}</span>
+            <span class="usage">{usagePercentFor(sampleState.selected[i], i)}</span>
+            <div class="actions">
+              <button class="btn" title="Move up" onclick={() => moveSelected(i, -1)}>Move up</button>
+              <button class="btn" title="Move down" onclick={() => moveSelected(i, 1)}>Move down</button>
+              <button class="btn" title="Remove" onclick={() => removeSelectedAt(i)}>Remove</button>
+              <button class="btn" title="Edit pack" onclick={() => openPackEditorFor(sampleState.selected[i].id)}>Edit</button>
+            </div>
           </div>
-        </div>
-      {/each}
-      {#if sampleState.selected.length < 10}
-        {#each Array(Math.max(0, 10 - Math.min(10, sampleState.selected.length))) as _, k}
+        {:else}
           <div class="row empty">
-            <span class="index">{((sampleState.selected.length + k) < 9) ? (sampleState.selected.length + k + 1) : 0}</span>
+            <span class="index">{i<9 ? i+1 : 0}</span>
             <span class="badge">empty</span>
             <span class="name muted">Empty slot</span>
             <span class="usage"></span>
-            <div class="actions"></div>
+            <div class="actions">
+              <button class="btn" title="Move up" onclick={() => moveSelected(i, -1)}>Move up</button>
+              <button class="btn" title="Move down" onclick={() => moveSelected(i, 1)}>Move down</button>
+            </div>
           </div>
+        {/if}
+      {/each}
+      {#if sampleState.selected.length > 10}
+        {#each sampleState.selected.slice(10) as p, k}
+          {#if p}
+            <div class="row overflow">
+              <span class="index">-</span>
+              <span class="badge {p.type}">{p.type}</span>
+              <span class="name" title={(p.author || p.created) ? `${p.author ?? ''}${p.author && p.created ? ' • ' : ''}${p.created ?? ''}` : ''}>{packDisplayName(p.id)}</span>
+              <span class="usage"></span>
+              <div class="actions">
+                <button class="btn" title="Remove" onclick={() => removeSelectedAt(10 + k)}>Remove</button>
+                <button class="btn" title="Edit pack" onclick={() => openPackEditorFor(p.id)}>Edit</button>
+              </div>
+            </div>
+          {/if}
         {/each}
       {/if}
-      {#if sampleState.selected.length === 0}
+      {#if sampleState.selected.slice(0,10).every(x => !x) && sampleState.selected.length <= 10}
         <div class="hint">No packs selected — add from below.</div>
       {/if}
     </div>

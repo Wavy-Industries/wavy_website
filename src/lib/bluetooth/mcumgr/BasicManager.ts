@@ -1,5 +1,5 @@
-import { MCUManager, MGMT_OP } from './mcumgr';
-import { Log } from '../utilities';
+import { SMPCharacteristic, MGMT_OP } from '../SMPCharacteristic';
+import { Log } from '../../utilities';
 
 let log = new Log('basic_mgr', Log.LEVEL_DEBUG);
 
@@ -9,9 +9,9 @@ enum _MGMT_ID {
 
 export class BasicManager {
     private readonly GROUP_ID = 101;
-    private mcumgr: MCUManager;
+    private mcumgr: SMPCharacteristic;
 
-    constructor(mcumgr: MCUManager) {
+    constructor(mcumgr: SMPCharacteristic) {
         this.mcumgr = mcumgr;
     }
 

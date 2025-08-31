@@ -150,8 +150,6 @@ class WebAudioBackend implements ISoundBackend {
     this.activeNotes.clear();
   }
 
-  // No timing API exposed; only immediate note on/off
-
   setDrumSample(note: number, buffer: AudioBuffer | null) {
     if (!buffer) this.drumSamples.delete(note); else this.drumSamples.set(note, buffer);
   }

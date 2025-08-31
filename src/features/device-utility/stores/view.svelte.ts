@@ -26,11 +26,14 @@ function coerceViewFromHash(hash: string): DeviceUtilityViewKey {
   const v = (hash || '').replace('#', '').trim();
   if (v === DeviceUtilityView.SampleManager) return DeviceUtilityView.SampleManager;
   if (v === DeviceUtilityView.Playground) return DeviceUtilityView.Playground;
+  if (v === DeviceUtilityView.DeviceUpdate) return DeviceUtilityView.DeviceUpdate;
   if (v === DeviceUtilityView.DeviceTester) {
     // Only allow if dev mode is enabled
     return getStoreValue(devMode) ? DeviceUtilityView.DeviceTester : DeviceUtilityView.DeviceUpdate;
   }
-  return DeviceUtilityView.DeviceUpdate;
+
+  // Default view
+  return DeviceUtilityView.Playground;
 }
 
 export function setDeviceUtilityView(view: DeviceUtilityViewKey) {

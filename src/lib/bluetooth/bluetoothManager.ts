@@ -1,4 +1,4 @@
-import { Log } from './utilities';
+import { Log } from '../utilities';
 
 let log = new Log('bluetooth', Log.LEVEL_INFO);
 
@@ -72,14 +72,35 @@ export class BluetoothManager {
 
     private async _connectDevice(): Promise<void> {
         if (!this.device) { console.error('No device to connect to'); return; }
-        try {
-            await this.device.gatt!.connect();
-            if (this.state.type === 'connecting' || this.state.type === 'connectionLoss') {
-                if (this.state.type === 'connectionLoss') this._onConnectionReestablished.forEach(cb => cb());
-                else this._onConnect.forEach(cb => cb());
-                this.state = { type: 'connected' };
+        // Already connected; normalize state and fire events
+        if (this.device.gatt?.connected) {
+            if (this.state.type === 'connectionLoss') this._onConnectionReestablished.forEach(cb => cb());
+            else this._onConnect.forEach(cb => cb());
+            this.state = { type: 'connected' };
+            return;
+        }
+        // Exponential backoff retry
+        const MAX_ATTEMPTS = 20; // configurable upper bound
+        const BASE_DELAY = 300;   // ms
+        const MAX_DELAY = 5000;   // ms
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                await this.device.gatt!.connect();
+                if (this.state.type === 'connecting' || this.state.type === 'connectionLoss') {
+                    if (this.state.type === 'connectionLoss') this._onConnectionReestablished.forEach(cb => cb());
+                    else this._onConnect.forEach(cb => cb());
+                    this.state = { type: 'connected' };
+                }
+                return;
+            } catch (error) {
+                // If state changed to disconnecting, abort
+                if (this.state.type === 'disconnecting') break;
+                const delay = Math.min(MAX_DELAY, BASE_DELAY * Math.pow(2, attempt - 1));
+                await new Promise(r => setTimeout(r, delay));
             }
-        } catch (error) { console.error('Error during connection:', error); await this._handleDisconnected(); }
+        }
+        // Failed after attempts
+        await this._handleDisconnected();
     }
 
     public disconnect(): void {
@@ -93,8 +114,9 @@ export class BluetoothManager {
         else if (this.state.type === 'disconnecting') { await this._handleDisconnected(); }
     }
 
-    private async _reconnect(): Promise<void> { try { await new Promise(r => setTimeout(r, 1000)); await this._connectDevice(); } catch (e) { console.error('Reconnection error:', e); } }
+    private async _reconnect(): Promise<void> { try { await this._connectDevice(); } catch (e) { console.error('Reconnection error:', e); } }
     private async _handleDisconnected(): Promise<void> { this.state = { type: 'disconnected' }; this._onDisconnect.forEach(cb => cb()); this.device = null; }
     public get name(): string | undefined { return this.device?.name; }
     public get maxPayloadSize(): number { const MTU_OVERHEAD = 3; return this.mtu - MTU_OVERHEAD - 8; }
 }
+

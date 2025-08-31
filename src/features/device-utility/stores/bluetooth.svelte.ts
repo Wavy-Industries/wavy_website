@@ -1,9 +1,10 @@
 // bluetoothManager.svelte.js
-import { BluetoothManager } from '~/lib/bluetoothManager';
+import { BluetoothManager } from '~/lib/bluetooth/bluetoothManager';
 
-// Singleton BluetoothManager across HMR and page entries
-const G: any = (globalThis as any);
-export const bluetoothManager: BluetoothManager = G.__wavy_bt_manager ||= new BluetoothManager();
+// Singleton BluetoothManager across HMR and page entries (no globalThis)
+const H = (import.meta as any).hot;
+const DATA: any = H?.data || (H ? (H.data = {}) : {});
+export const bluetoothManager: BluetoothManager = DATA.__wavy_bluetooth_manager ||= new BluetoothManager();
 
 // Reactive state object
 export const bluetoothState = $state({
@@ -11,24 +12,37 @@ export const bluetoothState = $state({
   deviceName: 'unknown device name'
 });
 
-// Setup event handlers once to update reactive state properties
-if (!G.__wavy_bt_handlers_attached) {
-  G.__wavy_bt_handlers_attached = true;
-  bluetoothManager.onConnect(() => {
+// Declarative: call once to wire store to manager lifecycle
+export function initBluetoothStore() {
+  if (DATA.__wavy_bt_store_attached) return;
+  DATA.__wavy_bt_store_attached = true;
+
+  const onConnect = () => {
     bluetoothState.connectionState = 'connected';
     bluetoothState.deviceName = bluetoothManager.name || 'unknown device name';
-  });
-  bluetoothManager.onConnecting(() => {
+  };
+  const onConnecting = () => {
     bluetoothState.connectionState = 'connecting';
-  });
-  bluetoothManager.onDisconnect(() => {
-    // bluetoothState.connectionState = 'disconnected';
-    window.location.reload();
-  });
-  bluetoothManager.onConnectionLoss(() => {
+  };
+  const onDisconnect = () => {
+    bluetoothState.connectionState = 'disconnected';
+  };
+  const onLoss = () => {
     bluetoothState.connectionState = 'connectionLoss';
-  });
-  bluetoothManager.onConnectionReestablished(() => {
+  };
+  const onReestablished = () => {
     bluetoothState.connectionState = 'connected';
-  });
+  };
+
+  // Save handlers so HMR can re-use or detach later if we add off()-APIs
+  DATA.__wavy_bt_handlers = { onConnect, onConnecting, onDisconnect, onLoss, onReestablished };
+
+  bluetoothManager.onConnect(onConnect);
+  bluetoothManager.onConnecting(onConnecting);
+  bluetoothManager.onDisconnect(onDisconnect);
+  bluetoothManager.onConnectionLoss(onLoss);
+  bluetoothManager.onConnectionReestablished(onReestablished);
 }
+
+// During HMR, keep state wiring intact; cleanup hooks can be added if .off() exists
+H?.accept?.(() => {});

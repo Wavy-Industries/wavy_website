@@ -5,7 +5,6 @@
     import ConnectedView from '~/features/device-utility/views/ConnectedView.svelte';
     import { onMount } from 'svelte';
     import { bluetoothManager, bluetoothState } from '~/features/device-utility/stores/bluetooth.svelte';
-    import { routes } from '~/routes';
     import DeviceBluetoothBrowsers from '~/features/device-utility/components/DeviceBluetoothBrowsers.svelte';
     
     // The device advertises the MIDI service, so we use that for discovery
