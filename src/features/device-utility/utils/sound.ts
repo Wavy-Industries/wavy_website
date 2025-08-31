@@ -16,13 +16,13 @@ export class SoundEngine {
     this.playing.clear();
   }
 
-  private kick(ctx: AudioContext, t: number) {
+  private kick(ctx: AudioContext, t: number, v: number) {
     const o = ctx.createOscillator();
     const g = ctx.createGain();
     o.type = 'sine';
     o.frequency.setValueAtTime(120, t);
     o.frequency.exponentialRampToValueAtTime(40, t + 0.1);
-    g.gain.setValueAtTime(0.8, t);
+    g.gain.setValueAtTime(0.8 * v, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
     o.connect(g).connect(ctx.destination);
     o.start(t); o.stop(t + 0.3);
@@ -32,13 +32,13 @@ export class SoundEngine {
     return voice;
   }
 
-  private snare(ctx: AudioContext, t: number) {
+  private snare(ctx: AudioContext, t: number, v: number) {
     const bufferSize = 2 * ctx.sampleRate;
     const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const output = noiseBuffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
     const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
-    const g = ctx.createGain(); g.gain.setValueAtTime(0.7, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.7 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
     noise.connect(g).connect(ctx.destination);
     noise.start(t); noise.stop(t + 0.2);
     const voice: Voice = { stop: () => { try { noise.stop(); } catch {} } };
@@ -47,9 +47,9 @@ export class SoundEngine {
     return voice;
   }
 
-  private hat(ctx: AudioContext, t: number) {
+  private hat(ctx: AudioContext, t: number, v: number) {
     const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(8000, t);
-    const g = ctx.createGain(); g.gain.setValueAtTime(0.2, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.2 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
     o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.07);
     const voice: Voice = { stop: () => { try { o.stop(); } catch {} } };
     this.playing.add(voice);
@@ -64,7 +64,7 @@ export class SoundEngine {
     return 'hat';
   }
 
-  playLoop(loop: { length_beats: number; events: Array<{ note: number; time_ticks_press: number }> }, bpm: number, kit: Kit) {
+  playLoop(loop: { length_beats: number; events: Array<{ note: number; time_ticks_press: number; velocity?: number }> }, bpm: number, kit: Kit) {
     const ctx = this.ensureCtx();
     const start = ctx.currentTime + 0.05;
     const secPerBeat = 60 / Math.max(30, Math.min(240, bpm));
@@ -72,10 +72,10 @@ export class SoundEngine {
     for (const ev of loop.events) {
       const when = start + (ev.time_ticks_press / ticksPerBeat) * secPerBeat;
       const drum = this.mapNoteToDrum(ev.note, kit);
-      if (drum === 'kick') this.kick(ctx, when);
-      else if (drum === 'snare') this.snare(ctx, when);
-      else this.hat(ctx, when);
+      const v = Math.max(0.05, Math.min(1, (ev.velocity ?? 100) / 127));
+      if (drum === 'kick') this.kick(ctx, when, v);
+      else if (drum === 'snare') this.snare(ctx, when, v);
+      else this.hat(ctx, when, v);
     }
   }
 }
-

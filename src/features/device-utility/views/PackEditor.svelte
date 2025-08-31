@@ -3,11 +3,26 @@
   import { getPageByteSize } from '~/lib/parsers/samples_parser';
   import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
   import { SoundEngine } from '~/features/device-utility/utils/sound';
+  import MidiEditor from '~/features/device-utility/views/midi/MidiEditor.svelte';
   import { validatePage as validatePackPage } from '~/features/device-utility/validation/packs';
   import { packDisplayName } from '~/features/device-utility/utils/packs';
+  import { computeLoopEndTicks } from '~/lib/music/loop_utils';
 
   const slots = $derived(sampleState.editor.loops);
   const name7 = $derived(sampleState.editor.name7);
+
+  // Local UI state for full-screen MIDI editor
+  let midiEditor = $state({ open: false, index: -1 });
+  function openMidiEditorFor(index) {
+    // Ensure page scaffold exists
+    let page = slots[0];
+    if (!page) page = { name: `U-${sampleState.editor.name7 || 'NONAME'}`.slice(0, 8), loops: Array(15).fill(null) };
+    // Ensure loop placeholder exists
+    if (!page.loops[index]) page.loops[index] = { length_beats: 16, events: [] };
+    setEditorLoopData(0, page);
+    midiEditor.open = true; midiEditor.index = index;
+  }
+  function closeMidiEditor() { midiEditor.open = false; midiEditor.index = -1; }
 
   function onFileChange(e, idx) {
     const file = e.target.files?.[0]; if (!file) return;
@@ -50,7 +65,7 @@
   function getBounds(loop) {
     const w = 300, h = 48;
     if (!loop || !loop.events || loop.events.length === 0) return { w, h, minN: 0, maxN: 1, rangeN: 1, minT: 0, maxT: 1, rangeT: 1 };
-    let minN = Infinity, maxN = -Infinity, minT = 0, maxT = loop.length_beats * 24;
+    let minN = Infinity, maxN = -Infinity, minT = 0, maxT = computeLoopEndTicks(loop);
     for (const ev of loop.events) { if (ev.note < minN) minN = ev.note; if (ev.note > maxN) maxN = ev.note; }
     const rangeN = Math.max(1, maxN - minN + 1);
     const rangeT = Math.max(1, maxT - minT);
@@ -171,7 +186,7 @@
           {#if slots[0]?.loops?.[idx]}
             {@const loop = slots[0].loops[idx]}
             {@const bounds = getBounds(loop)}
-            <svg class="pianoroll" viewBox={`0 0 ${bounds.w} ${bounds.h}`} preserveAspectRatio="none">
+            <svg class="pianoroll clickable" viewBox={`0 0 ${bounds.w} ${bounds.h}`} preserveAspectRatio="none" onclick={() => openMidiEditorFor(idx)}>
               {#each loop.events as ev}
                 {@const x = (ev.time_ticks_press - bounds.minT) / bounds.rangeT * bounds.w}
                 {@const w = Math.max(1, (ev.time_ticks_release - ev.time_ticks_press) / bounds.rangeT * bounds.w)}
@@ -182,7 +197,7 @@
           {:else}
             <div class="drop">
               <input type="file" accept=".mid,.midi" onchange={(e)=>onFileChange(e, idx)} />
-              <div class="hint">Drop MIDI or click to choose</div>
+              <div class="hint">Drop MIDI or click to choose — or <a href="#" onclick={(e)=>{e.preventDefault(); openMidiEditorFor(idx);}}>open editor</a></div>
             </div>
           {/if}
         </div>
@@ -196,6 +211,10 @@
     {/each}
   </div>
 </div>
+
+{#if midiEditor.open}
+  <MidiEditor index={midiEditor.index} close={closeMidiEditor} onback={closeMidiEditor} />
+{/if}
 
 {#if importDialog.open}
   <div class="modal-backdrop" onclick={closeImportDialog}>
@@ -246,7 +265,9 @@
 .muted { color: #888; font-size: 0.85em; }
 .drop { border: 1px dashed #2f313a; border-radius: var(--du-radius); padding: 12px; display: grid; place-items: center; background: #fcfcfc; }
 .hint { color: #777; font-size: 0.9em; }
-.pianoroll { background: #f7f7f7; border-radius: var(--du-radius); padding: 6px; font-size: 0.9em; height: 48px; display: flex; align-items: center; }
+.content { min-height: 120px; display: flex; }
+.pianoroll { background: #f7f7f7; border-radius: var(--du-radius); padding: 6px; font-size: 0.9em; height: 100%; width: 100%; display: flex; align-items: center; }
+.pianoroll.clickable { cursor: pointer; }
 input[type="file"] { width: 100%; }
 
 /* Small industrial buttons */
