@@ -77,6 +77,12 @@
             >
                 Sample Manager
             </a>
+            <a 
+                href="#playground" 
+                class={deviceUtilityView.current === DeviceUtilityView.Playground ? 'active' : ''}
+            >
+                Playground
+            </a>
             {#if $devMode}
                 <a 
                     href="#device-tester" 
@@ -105,6 +111,12 @@
     {:else if deviceUtilityView.current === DeviceUtilityView.DeviceTester}
         <div in:fade={{ duration: 200 }}>
             <DeviceTester />
+        </div>
+    {:else if deviceUtilityView.current === DeviceUtilityView.Playground}
+        <div in:fade={{ duration: 200 }}>
+            {#await import('~/features/device-utility/views/Playground.svelte') then Mod}
+              <svelte:component this={Mod.default} />
+            {/await}
         </div>
     {/if}
 </div>

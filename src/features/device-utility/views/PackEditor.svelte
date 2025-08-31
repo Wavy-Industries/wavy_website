@@ -2,8 +2,9 @@
   import { sampleState, closePackEditor, setEditorLoopData, saveEditorAsUserPack } from '~/features/device-utility/stores/samples.svelte';
   import { getPageByteSize } from '~/lib/parsers/samples_parser';
   import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
-  import { SoundEngine } from '~/features/device-utility/utils/sound';
+  import { soundBackend } from '~/lib/soundBackend';
   import MidiEditor from '~/features/device-utility/views/midi/MidiEditor.svelte';
+  import { tempoState } from '~/features/device-utility/stores/tempo.svelte';
   import { validatePage as validatePackPage } from '~/features/device-utility/validation/packs';
   import { packDisplayName } from '~/features/device-utility/utils/packs';
   import { computeLoopEndTicks } from '~/lib/music/loop_utils';
@@ -73,13 +74,22 @@
   }
 
   // Playback
-  const engine = new SoundEngine();
-  let kit = '808';
+  const engine = soundBackend;
   function playIdx(idx) {
     const page = slots[0]; if (!page) return;
     const loop = page.loops[idx]; if (!loop) return;
-    engine.stopAll();
-    engine.playLoop(loop, sampleState.editor.bpm, kit);
+    engine.allNotesOff();
+    const bpm = tempoState.bpm || 120;
+    const msPerBeat = (60 / Math.max(1, Math.min(999, bpm))) * 1000;
+    const startMs = performance.now() + 20;
+    for (const ev of loop.events) {
+      const onAt = startMs + (ev.time_ticks_press / 24) * msPerBeat;
+      const offTicks = (ev.time_ticks_release ?? (ev.time_ticks_press + 1));
+      const offAt = startMs + (offTicks / 24) * msPerBeat;
+      const vel = Math.max(0, Math.min(127, ev.velocity ?? 100));
+      setTimeout(() => engine.noteOn(ev.note, vel, 9), Math.max(0, onAt - performance.now()));
+      setTimeout(() => engine.noteOff(ev.note, 0, 9), Math.max(0, offAt - performance.now()));
+    }
   }
 
   function move(idx, dir) {

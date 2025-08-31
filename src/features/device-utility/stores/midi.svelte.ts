@@ -1,7 +1,10 @@
 import { MIDIManager } from '~/lib/midiManager';
 import { bluetoothManager } from './bluetooth.svelte';
+import { deviceUtilityView, DeviceUtilityView } from './view.svelte';
 
-export const midiManager = new MIDIManager(bluetoothManager);
+// Singleton MIDIManager across HMR and page entries
+const G: any = (globalThis as any);
+export const midiManager: MIDIManager = G.__wavy_midi_manager ||= new MIDIManager(bluetoothManager);
 
 // DeviceTester state - persists across component mounts
 export const deviceTesterState = $state({
@@ -145,18 +148,26 @@ function playCCSound() {
     oscillator.stop(audioCtx.currentTime + 0.05);
 }
 
-// Set up MIDI event handlers once
-midiManager.onNoteOn((note, velocity, channel) => {
-    markKeyActive(note);
-    console.log('Note On received:', note, 'velocity:', velocity, 'channel:', channel);
-    addPressedKey(note);
-});
+// Set up MIDI event handlers once (persist across HMR)
+// Reuse the same global object as above
+if (!G.__wavy_device_tester_attached) {
+    G.__wavy_device_tester_attached = true;
+    const isActive = () => deviceUtilityView.current === DeviceUtilityView.DeviceTester;
+    G.__wavy_device_tester_onNoteOn ||= ((note: number, velocity: number, channel: number) => {
+        if (!isActive()) return;
+        markKeyActive(note);
+        addPressedKey(note);
+    });
+    G.__wavy_device_tester_onNoteOff ||= ((note: number, velocity: number, channel: number) => {
+        if (!isActive()) return;
+        removePressedKey(note);
+    });
+    G.__wavy_device_tester_onCC ||= ((controller: number, value: number, channel: number) => {
+        if (!isActive()) return;
+        handleControlChange(controller, value);
+    });
 
-midiManager.onNoteOff((note, velocity, channel) => {
-    console.log('Note Off received:', note, 'velocity:', velocity, 'channel:', channel);
-    removePressedKey(note);
-});
-
-midiManager.onControlChange((controller, value, channel) => {
-    handleControlChange(controller, value);
-}); 
+    midiManager.onNoteOn(G.__wavy_device_tester_onNoteOn);
+    midiManager.onNoteOff(G.__wavy_device_tester_onNoteOff);
+    midiManager.onControlChange(G.__wavy_device_tester_onCC);
+}

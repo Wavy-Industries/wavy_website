@@ -1,8 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
   import { sampleState, setEditorLoopData } from '~/features/device-utility/stores/samples.svelte';
+  import { tempoState } from '~/features/device-utility/stores/tempo.svelte';
   import { TICKS_PER_BEAT, type Page, type LoopData } from '~/lib/parsers/samples_parser';
-  import { SoundEngine } from '~/features/device-utility/utils/sound';
+  import { soundBackend } from '~/lib/soundBackend';
 
   let { index, close } = $props<{ index: number, close?: () => void }>(); // loop index within page slot 0
   const dispatch = createEventDispatcher();
@@ -31,19 +32,24 @@
   function gridStep() { return Math.max(1, Math.round(TICKS_PER_BEAT / gridSubdiv)); }
   function snapTick(t: number): number { const s = gridStep(); return Math.round(t / s) * s; }
 
-  const engine = new SoundEngine();
+  const engine = soundBackend; // backend interface
   let playing = $state(false);
 
+  // Local copy of the loop; edits do not affect store until Save is pressed
   function currentPage(): Page | null { return sampleState.editor.loops[0]; }
-  function currentLoop(): LoopData | null { return currentPage()?.loops?.[index] as any ?? null; }
-  function ensurePageLoop(): { page: Page; loop: LoopData } {
-    let page = currentPage();
-    if (!page) page = { name: `U-${sampleState.editor.name7 || 'NONAME'}`.slice(0, 8), loops: Array(15).fill(null) };
-    let loop = currentLoop();
-    if (!loop) loop = { length_beats: 16, events: [] };
-    recalcViewport(loop);
-    return { page, loop };
-  }
+  function storeLoop(): LoopData | null { return currentPage()?.loops?.[index] as any ?? null; }
+  let localLoop: LoopData = $state({ length_beats: 16, events: [] } as any);
+  let originalLoop: LoopData = $state({ length_beats: 16, events: [] } as any);
+  let pageName: string = $state('');
+  onMount(() => {
+    const page = currentPage();
+    pageName = page?.name || `U-${(sampleState.editor.name7 || 'NONAME').slice(0,8)}`;
+    const l = storeLoop();
+    localLoop = JSON.parse(JSON.stringify(l ?? { length_beats: 16, events: [] }));
+    originalLoop = JSON.parse(JSON.stringify(l ?? { length_beats: 16, events: [] }));
+    recalcViewport(localLoop as any);
+  });
+  const isDirty = $derived(JSON.stringify(localLoop) !== JSON.stringify(originalLoop));
 
   function recalcViewport(loop: LoopData) {
     // Recompute viewport to include all notes and a bit of headroom
@@ -67,13 +73,7 @@
     return Math.max(loop.length_beats * TICKS_PER_BEAT, last);
   }
 
-  function saveLoop(loop: LoopData) {
-    const { page } = ensurePageLoop();
-    const loops = [...page.loops];
-    loops[index] = loop;
-    setEditorLoopData(0, { ...page, loops });
-    recalcViewport(loop);
-  }
+  function setLocalLoop(loop: LoopData) { localLoop = loop; recalcViewport(loop); }
 
   function tickToX(t: number): number { return t * tickWidthPx; }
   function xToTick(x: number, snap = true): number {
@@ -112,9 +112,9 @@
   }
 
   function previewNote(n: number, velocity: number = 100) {
-    const bpm = sampleState.editor.bpm || 120;
-    const loop = { length_beats: 1, events: [{ note: n, time_ticks_press: 0, velocity: Math.max(0, Math.min(127, velocity|0)), time_ticks_release: 1 }] } as any;
-    engine.playLoop(loop, bpm, '808');
+    const vel = Math.max(0, Math.min(127, velocity|0));
+    engine.noteOn(n, vel, 9);
+    setTimeout(() => engine.noteOff(n, 0, 9), 120);
   }
 
   function updateGridRect() {
@@ -142,32 +142,45 @@
 
   // Playback
   let playheadTick = $state(0);
-  let _raf = 0; let _start = 0; let _loopTicks = 0; let _secPerBeat = 0; let _repeater: any = null;
+  let _raf = 0; let _startMs = 0; let _loopTicks = 0; let _msPerBeat = 0; let _repeater: any = null; let _timers: number[] = [];
+  function clearTimers() { _timers.forEach(id => clearTimeout(id)); _timers = []; }
   function stopPlay() {
-    engine.stopAll(); playing = false; playheadTick = 0; if (_raf) cancelAnimationFrame(_raf); _raf = 0; if (_repeater) { clearTimeout(_repeater); _repeater = null; }
+    engine.allNotesOff(); playing = false; playheadTick = 0; if (_raf) cancelAnimationFrame(_raf); _raf = 0; if (_repeater) { clearTimeout(_repeater); _repeater = null; } clearTimers();
   }
   function animate() {
-    const ctxNow = (engine as any).ctx?.currentTime || 0;
-    const elapsed = Math.max(0, ctxNow - _start);
-    const ticks = (elapsed / _secPerBeat) * TICKS_PER_BEAT;
+    const nowMs = performance.now();
+    const elapsedMs = Math.max(0, nowMs - _startMs);
+    const ticks = (elapsedMs / (_msPerBeat)) * TICKS_PER_BEAT;
     playheadTick = _loopTicks > 0 ? (ticks % _loopTicks) : 0;
     _raf = requestAnimationFrame(animate);
   }
   function togglePlay() {
     if (playing) { stopPlay(); return; }
-    const loop = currentLoop(); if (!loop) return;
+    const loop = localLoop; if (!loop) return;
     stopPlay();
-    const bpm = sampleState.editor.bpm || 120;
-    _secPerBeat = 60 / Math.max(30, Math.min(240, bpm));
+    const bpm = tempoState.bpm || 120;
+    _msPerBeat = (60 / Math.max(1, Math.min(999, bpm))) * 1000;
     _loopTicks = Math.max(loop.length_beats * TICKS_PER_BEAT, loop.events.reduce((m, ev)=>Math.max(m, ev.time_ticks_release||0), 0));
-    (engine as any).ensureCtx?.();
-    const ctx = (engine as any).ctx || (engine as any).ensureCtx?.();
-    _start = ctx?.currentTime ? ctx.currentTime + 0.05 : 0;
-    const loopSec = (_loopTicks / TICKS_PER_BEAT) * _secPerBeat;
+    engine.resume?.();
+    _startMs = performance.now() + 50;
+    const loopMs = (_loopTicks / TICKS_PER_BEAT) * _msPerBeat;
     const schedule = () => {
-      const l = currentLoop(); if (!l || !playing) return;
-      engine.playLoop(l, bpm, '808');
-      _repeater = setTimeout(schedule, Math.max(10, loopSec * 1000));
+    const l = localLoop; if (!l || !playing) return;
+      clearTimers();
+      // Set a fresh base for each loop to avoid drift and negative delays
+      const base = performance.now() + 20;
+      _startMs = base;
+      for (const ev of l.events) {
+        const onAt = base + (ev.time_ticks_press / TICKS_PER_BEAT) * _msPerBeat;
+        const offTicks = (ev.time_ticks_release ?? (ev.time_ticks_press + 1));
+        const offAt = base + (offTicks / TICKS_PER_BEAT) * _msPerBeat;
+        const vel = Math.max(0, Math.min(127, ev.velocity ?? 100));
+        const onDelay = Math.max(0, onAt - performance.now());
+        const offDelay = Math.max(0, offAt - performance.now());
+        _timers.push(setTimeout(() => engine.noteOn(ev.note, vel, 9), onDelay) as unknown as number);
+        _timers.push(setTimeout(() => engine.noteOff(ev.note, 0, 9), offDelay) as unknown as number);
+      }
+      _repeater = setTimeout(schedule, Math.max(10, loopMs));
     };
     playing = true; playheadTick = 0; _raf = requestAnimationFrame(animate); schedule();
   }
@@ -177,7 +190,7 @@
   function sortEvents(evts) { return evts.sort((a,b) => a.time_ticks_press - b.time_ticks_press || a.note - b.note); }
 
   function hitTestNote(px: number, py: number): { idx: number; edge: 'right' | 'body' } | null {
-    const loop = currentLoop(); if (!loop) return null;
+    const loop = localLoop; if (!loop) return null;
     const events = loop.events;
     for (let i = 0; i < events.length; i++) {
       const ev = events[i];
@@ -198,7 +211,7 @@
   // Insert/select on press rather than release
   function onGridPointerDown(e: PointerEvent) {
     const px = e.clientX - gridRect.left; const py = e.clientY - gridRect.top;
-    const loop = ensurePageLoop().loop;
+    const loop = localLoop;
     const hit = hitTestNote(px, py);
     didDrag = false;
     if (e.button === 2) return; // right-click handled separately
@@ -223,19 +236,19 @@
     const snappedLen = Math.max(step, Math.round(defaultLen / step) * step);
     const newEv = { note: n, time_ticks_press: t, velocity: 100, time_ticks_release: Math.min(511, t + snappedLen) };
     const evts = sortEvents([...(loop.events || []), newEv]);
-    saveLoop({ ...loop, events: evts });
+    setLocalLoop({ ...loop, events: evts });
     selectedIdx = evts.indexOf(newEv);
     previewNote(n, newEv.velocity);
   }
 
   function onGridContext(e: MouseEvent) {
     e.preventDefault();
-    const loop = currentLoop(); if (!loop) return;
+    const loop = localLoop; if (!loop) return;
     const px = e.clientX - gridRect.left; const py = e.clientY - gridRect.top;
     const hit = hitTestNote(px, py);
     if (hit) {
       const evts = [...loop.events]; evts.splice(hit.idx, 1);
-      saveLoop({ ...loop, events: evts });
+      setLocalLoop({ ...loop, events: evts });
       selectedIdx = null;
     }
   }
@@ -243,7 +256,7 @@
   
   function onGridPointerMove(e: PointerEvent) {
     if (!isDragging || !dragMode || selectedIdx == null) return;
-    const loop = currentLoop(); if (!loop) return;
+    const loop = localLoop; if (!loop) return;
     const px = e.clientX - gridRect.left; const py = e.clientY - gridRect.top;
     const dx = px - dragStart.x; const dy = py - dragStart.y;
     if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDrag = true;
@@ -279,7 +292,7 @@
     // Re-track selected index after sort to prevent "disappearing" note effect
     const newIdx = sorted.findIndex(x => x.note === ev.note && x.time_ticks_press === ev.time_ticks_press && x.time_ticks_release === ev.time_ticks_release && x.velocity === ev.velocity);
     selectedIdx = newIdx >= 0 ? newIdx : selectedIdx;
-    saveLoop({ ...loop, events: sorted });
+    setLocalLoop({ ...loop, events: sorted });
   }
   function onGridPointerUp(e: PointerEvent) {
     if (!isDragging) return;
@@ -291,7 +304,7 @@
   let importDialog = $state({ open: false, text: '', error: '' });
   const importPlaceholder = '{"length_beats":16,"events":[{"note":36,"time_ticks_press":0,"velocity":100,"time_ticks_release":12}]}'
   function openImport() {
-    const loop = currentLoop();
+    const loop = localLoop;
     importDialog.text = JSON.stringify(loop ?? { length_beats: 16, events: [] }, null, 2);
     importDialog.error = '';
     importDialog.open = true;
@@ -307,15 +320,22 @@
         time_ticks_release: Math.max(0, Math.min(511, Number(ev.time_ticks_release) || 0)),
       }));
       const loop: LoopData = { length_beats: Math.max(1, Number(obj.length_beats) || 16), events: sortEvents(events) };
-      saveLoop(loop);
+      setLocalLoop(loop);
       importDialog.open = false;
     } catch (e) {
       importDialog.error = (e as any)?.message || 'Invalid JSON';
     }
   }
 
-  function back() { if (typeof close === 'function') close(); else dispatch('back'); }
-  function saveAndBack() { back(); }
+  function back() { stopPlay(); if (typeof close === 'function') close(); else dispatch('back'); }
+  function saveAndBack() {
+    // Commit localLoop to store
+    const page = currentPage() || { name: pageName, loops: Array(15).fill(null) } as any;
+    const loops = [...(page.loops || Array(15).fill(null))];
+    loops[index] = localLoop;
+    setEditorLoopData(0, { ...page, name: page.name || pageName, loops });
+    back();
+  }
 </script>
 
   <div class="midi-overlay">
@@ -326,13 +346,14 @@
       <h2>MIDI Editor</h2>
     </div>
     <div class="actions">
+      {#if isDirty}<span class="dirty">unsaved changes</span>{/if}
       <button class="button-link" onclick={togglePlay}>{playing ? 'Pause' : 'Play'}</button>
       <button class="button-link" onclick={openImport}>Import raw</button>
       <button class="primary" onclick={saveAndBack}>Save</button>
     </div>
   </div>
   <div class="toolbar settings">
-    <div class="meta">BPM: {sampleState.editor.bpm || 120}</div>
+    <div class="meta">BPM: {tempoState.bpm || 120}</div>
     <label class="meta">Grid:
       <select value={gridSubdiv} oninput={(e)=>{ gridSubdiv = Number((e.target as HTMLSelectElement).value || 1) }}>
         <option value={1}>1/4</option>
@@ -369,7 +390,7 @@
         {#each Array(Math.ceil(totalTicks / TICKS_PER_BEAT)) as _, b}
           <div class={`beat ${b % 4 === 0 ? 'bar' : ''}`} style={`left:${tickToX(b*TICKS_PER_BEAT)}px`}></div>
         {/each}
-        <div class="loop-end" style={`left:${tickToX(computeLoopEndTicks(currentLoop()))}px`}></div>
+        <div class="loop-end" style={`left:${tickToX(computeLoopEndTicks(localLoop))}px`}></div>
         {#each Array((maxNote - minNote + 1)) as _, r}
           <div class="row" style={`top:${r*laneHeight}px`}></div>
         {/each}
@@ -377,8 +398,8 @@
       {#if playing}
         <div class="playhead" style={`left:${tickToX(playheadTick)}px; height:${(maxNote-minNote+1)*laneHeight}px`}></div>
       {/if}
-      {#if currentLoop()}
-        {#each currentLoop().events as ev, i}
+      {#if localLoop}
+        {#each localLoop.events as ev, i}
           {@const x = tickToX(ev.time_ticks_press)}
           {@const w = Math.max(6, tickToX(ev.time_ticks_release) - x)}
           {@const y = noteToY(ev.note)}
@@ -460,4 +481,5 @@
 .json-input { width: 100%; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
 .error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:6px; }
 .icon { width: 36px; height: 36px; border-radius: var(--du-radius); display: inline-flex; align-items: center; justify-content: center; }
+.dirty { background: repeating-linear-gradient(45deg, #FFFEAC, #FFFEAC 6px, #f1ea7d 6px, #f1ea7d 12px); color: #3a3200; border: 1px solid #b3ac5a; padding: 2px 6px; border-radius: var(--du-radius); font-weight: 700; }
 </style>

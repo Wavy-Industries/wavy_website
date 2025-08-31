@@ -130,6 +130,17 @@
           </div>
         </div>
       {/each}
+      {#if sampleState.selected.length < 10}
+        {#each Array(Math.max(0, 10 - Math.min(10, sampleState.selected.length))) as _, k}
+          <div class="row empty">
+            <span class="index">{((sampleState.selected.length + k) < 9) ? (sampleState.selected.length + k + 1) : 0}</span>
+            <span class="badge">empty</span>
+            <span class="name muted">Empty slot</span>
+            <span class="usage"></span>
+            <div class="actions"></div>
+          </div>
+        {/each}
+      {/if}
       {#if sampleState.selected.length === 0}
         <div class="hint">No packs selected — add from below.</div>
       {/if}
@@ -222,11 +233,12 @@
 .selected-list { display: flex; flex-direction: column; gap: 6px; }
 .row { display: grid; grid-template-columns: 46px 80px 1fr 90px auto; align-items: center; gap: 8px; padding: 10px; border: 1px solid #2f313a; border-radius: var(--du-radius); background: #fcfcfd; box-shadow: none; }
 .row.overflow { border-color: #ffb0b0; background: #fff7f7; }
+.row.empty { opacity: 0.75; background: #f9fafb; }
 .index { text-align: center; background:#111827; color:#fff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid #000; }
 .badge { padding: 2px 8px; border-radius: var(--du-radius); font-size: 0.75em; text-transform: capitalize; border: 1px solid var(--du-border); background: #f9fafb; }
 .badge.official { background:#eef5ff; color:#1f4fd6; border-color:#cfe0ff; }
 .badge.public { background:#eef9f3; color:#1d6f3a; border-color:#cfeedd; }
-.badge.private { background:#f3f4f6; color:#4b5563; }
+.badge.local { background:#f3f4f6; color:#4b5563; }
 .usage { text-align: right; font-variant-numeric: tabular-nums; color: #555; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .actions .btn { border: 1px solid #2f313a; background: #f2f3f5; color: #111827; border-radius: var(--du-radius); padding: 6px 8px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
@@ -252,6 +264,7 @@
 .card.selected .title, .card.selected .meta { opacity: 0.7; }
 .title { font-weight: 600; color: var(--du-text); }
 .title { text-transform: uppercase; letter-spacing: .04em; }
+.name.muted { color: #9ca3af; font-style: italic; }
 .footnote { color: var(--du-muted); font-size: 0.9em; }
 .button-link { display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border: 1px solid var(--du-border); border-radius: var(--du-radius); text-decoration: none; color: inherit; white-space: nowrap; background: #fff; font-size: 13px; }
 .desc { color:#444; font-size: 0.9em; }
