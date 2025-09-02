@@ -1,17 +1,16 @@
 <script>
-    import { bluetoothManager, bluetoothState } from '~/features/device-utility/stores/bluetooth.svelte';
+    import { bluetoothManager, bluetoothState } from '~/features/device-utility/states/bluetooth.svelte';
     import ConnectionStatus from '~/features/device-utility/components/ConnectionStatus.svelte';
     import DeviceUpdate from '~/features/device-utility/views/DeviceUpdate.svelte';
     import DeviceSampleManager from '~/features/device-utility/views/DeviceSampleManager.svelte';
     import DeviceTester from '~/features/device-utility/views/DeviceTester.svelte';
-    import { firmwareState } from '~/features/device-utility/stores/firmware.svelte';
-    import { firmwareRhsIsNewer } from '~/lib/bluetooth/mcumgr/FirmwareManager';
-    import { devMode } from '~/features/device-utility/stores/devmode.svelte';
+    import { firmwareState } from '~/features/device-utility/states/firmware.svelte';
+    import { firmwareRhsIsNewer } from '~/lib/bluetooth/smp/FirmwareManager';
+    import { dev } from '~/features/device-utility/states/devmode.svelte';
     import { onMount } from 'svelte';
     import { fade } from 'svelte/transition';
-    import ActionStatus from '~/features/device-utility/components/ActionStatus.svelte';
-    import { sampleState } from '~/features/device-utility/stores/samples.svelte';
-    import { deviceUtilityView, DeviceUtilityView, initDeviceUtilityView } from '~/features/device-utility/stores/view.svelte';
+    import { sampleState } from '~/features/device-utility/states/samples.svelte';
+    import { deviceUtilityView, DeviceUtilityView, initDeviceUtilityView } from '~/features/device-utility/states/view.svelte';
 
     onMount(async () => {
         initDeviceUtilityView();
@@ -56,15 +55,6 @@
     const needsUpdateAttention = $derived(upgradeAvailable || downgradeAvailable);
     const isUpdateTabActive = $derived(deviceUtilityView.current === DeviceUtilityView.DeviceUpdate);
 
-    // $effect(async() => {
-    //     if (bluetoothState.connectionState === 'connected') {
-    //         isLoading = true;
-    //         await waitForInitialData();
-    //         isLoading = false;
-    //     } else {
-    //         isLoading = false;
-    //     }
-    // });
 </script>
 
 <div>
@@ -78,9 +68,8 @@
             </button>
             <span>{bluetoothState.deviceName}</span>
             <ConnectionStatus />
-                <span>v{firmwareState?.firmwareVersion?.versionString ?? '?.?.?'}</span>
-            <ActionStatus />
-            {#if $devMode}
+            <span>v{firmwareState?.firmwareVersion?.versionString ?? '?.?.?'}</span>
+            {#if dev.enabled}
                 <span class="dev-indicator" title="Dev mode active - type 'disable dev mode' in console to disable">🔧</span>
             {/if}
         </div>
@@ -108,7 +97,7 @@
             >
                 Sample Manager
             </a>
-            {#if $devMode}
+            {#if dev.enabled}
                 <a 
                     href="#device-tester" 
                     class={deviceUtilityView.current === DeviceUtilityView.DeviceTester ? 'active' : ''}

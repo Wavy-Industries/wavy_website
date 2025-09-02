@@ -1,18 +1,15 @@
 <script>
-  import { sampleState } from '~/features/device-utility/stores/samples.svelte';
-  import { editState, closePackEditor, setEditorLoopData, saveEditor, saveEditorAsNew } from '~/features/device-utility/stores/edits.svelte';
+  import { sampleState } from '~/features/device-utility/states/samples.svelte';
+  import { editState, closePackEditor, setEditorLoopData, saveEditor, saveEditorAsNew } from '~/features/device-utility/states/edits.svelte';
   import { getPageByteSize } from '~/lib/parsers/samples_parser';
   import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
   import { soundBackend } from '~/lib/soundBackend';
   import MidiEditor from '~/features/device-utility/views/MidiEditor.svelte';
-  import { tempoState } from '~/features/device-utility/stores/tempo.svelte';
+  import MidiPreview from '~/features/device-utility/components/MidiPreview.svelte';
+  import { tempoState } from '~/features/device-utility/states/tempo.svelte';
   import { validatePage as validatePackPage } from '~/features/device-utility/utils/packs';
-  import { packDisplayName } from '~/features/device-utility/utils/packs';
-  import { computeLoopEndTicks } from '~/lib/music/loop_utils';
 
   const slots = $derived(editState.loops);
-  const name7 = $derived(editState.name7);
-  const context = $derived(editState.context);
 
   // Local UI state for full-screen MIDI editor
   let midiEditor = $state({ open: false, index: -1 });
@@ -65,16 +62,6 @@
     return ((b / total) * 100).toFixed(1);
   }
 
-  function getBounds(loop) {
-    const w = 300, h = 48;
-    if (!loop || !loop.events || loop.events.length === 0) return { w, h, minN: 0, maxN: 1, rangeN: 1, minT: 0, maxT: 1, rangeT: 1 };
-    let minN = Infinity, maxN = -Infinity, minT = 0, maxT = computeLoopEndTicks(loop);
-    for (const ev of loop.events) { if (ev.note < minN) minN = ev.note; if (ev.note > maxN) maxN = ev.note; }
-    const rangeN = Math.max(1, maxN - minN + 1);
-    const rangeT = Math.max(1, maxT - minT);
-    return { w, h, minN, maxN, rangeN, minT, maxT, rangeT };
-  }
-
   // Playback
   const engine = soundBackend;
   function playIdx(idx) {
@@ -121,7 +108,7 @@
       if (slots[0]) {
         importDialog.text = JSON.stringify(slots[0], null, 2);
       } else if (editState.id) {
-        const { getPackPageById } = await import('~/features/device-utility/stores/samples.svelte');
+        const { getPackPageById } = await import('~/features/device-utility/states/samples.svelte');
         const page = await getPackPageById(editState.id);
         importDialog.text = JSON.stringify(page ?? {}, null, 2);
       } else {
@@ -214,15 +201,7 @@
         <div class="content">
           {#if slots[0]?.loops?.[idx]}
             {@const loop = slots[0].loops[idx]}
-            {@const bounds = getBounds(loop)}
-            <svg class="pianoroll clickable" viewBox={`0 0 ${bounds.w} ${bounds.h}`} preserveAspectRatio="none" onclick={() => openMidiEditorFor(idx)}>
-              {#each loop.events as ev}
-                {@const x = (ev.time_ticks_press - bounds.minT) / bounds.rangeT * bounds.w}
-                {@const w = Math.max(1, (ev.time_ticks_release - ev.time_ticks_press) / bounds.rangeT * bounds.w)}
-                {@const y = (bounds.maxN - ev.note) / bounds.rangeN * bounds.h}
-                <rect x={x} y={y} width={w} height={Math.max(1, bounds.h / Math.max(1,bounds.rangeN))} fill="#4a90e2" />
-              {/each}
-            </svg>
+            <MidiPreview {loop} onOpen={() => openMidiEditorFor(idx)} />
           {:else}
             <div class="drop">
               <input type="file" accept=".mid,.midi" onchange={(e)=>onFileChange(e, idx)} />
@@ -281,24 +260,20 @@
 .header .left h2::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; }
 .type-badge { font-size: 12px; padding: 2px 6px; border: 1px solid var(--du-border); border-radius: 4px; text-transform: uppercase; color:#444; }
 .icon { width: 36px; height: 36px; border-radius: var(--du-radius); display: inline-flex; align-items: center; justify-content: center; }
-.sub { color: var(--du-muted); font-size: 0.9em; }
 .actions { display: flex; gap: 8px; }
 .unsaved { margin-top: 8px; background: repeating-linear-gradient(45deg, #FFFEAC, #FFFEAC 6px, #f1ea7d 6px, #f1ea7d 12px); color: #3a3200; border: 1px solid #b3ac5a; padding: 6px 8px; border-radius: var(--du-radius); font-weight: 700; }
 .button-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border:1px solid #2f313a; border-radius:var(--du-radius); background:#f2f3f5; color:inherit; text-decoration:none; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
 .primary { background: #2b2f36; color: #fff; border: 1px solid #1f2329; }
 .toolbar { display:flex; gap: 16px; align-items: center; }
 .settings { background: #fafafa; border: 1px solid var(--du-border); border-radius: var(--du-radius); padding: 10px; }
-.namer, .kit, .bpm { display: flex; gap: 6px; align-items: center; }
+.namer { display: flex; gap: 6px; align-items: center; }
 .namer .hint { color:var(--du-muted); font-size: 0.85em; }
 .meta { color: var(--du-muted); }
 .list { display: flex; flex-direction: column; gap: 8px; }
 .row { display: grid; grid-template-columns: 40px 80px 1fr 120px auto; align-items: center; gap: 8px; border: 1px solid #2f313a; border-radius: var(--du-radius); padding: 10px; background: #fcfcfd; box-shadow: none; }
-.muted { color: #888; font-size: 0.85em; }
 .drop { border: 1px dashed #2f313a; border-radius: var(--du-radius); padding: 12px; display: grid; place-items: center; background: #fcfcfc; }
 .hint { color: #777; font-size: 0.9em; }
 .content { min-height: 120px; display: flex; }
-.pianoroll { background: #f7f7f7; border-radius: var(--du-radius); padding: 6px; font-size: 0.9em; height: 100%; width: 100%; display: flex; align-items: center; }
-.pianoroll.clickable { cursor: pointer; }
 input[type="file"] { width: 100%; }
 
 /* Small industrial buttons */

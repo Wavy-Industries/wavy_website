@@ -1,12 +1,12 @@
 <script>
-    import { firmwareState } from "~/features/device-utility/stores/firmware.svelte";
-    import { firmwareRhsIsNewer } from '~/lib/bluetooth/mcumgr/FirmwareManager';
-    import { firmwareManager } from '~/features/device-utility/stores/firmware.svelte'
+    import { firmwareState } from "~/features/device-utility/states/firmware.svelte";
+    import { firmwareRhsIsNewer } from '~/lib/bluetooth/smp/FirmwareManager';
+    import { firmwareManager } from '~/features/device-utility/states/firmware.svelte'
     import Changelog from "~/features/device-utility/components/Changelog.svelte";
     import ToggleSwitch from "~/features/device-utility/components/ToggleSwitch.svelte";
     import FirmwareUpdate from "~/features/device-utility/components/FirmwareUpdate.svelte";
-    import { bluetoothManager } from '~/features/device-utility/stores/bluetooth.svelte';
-    import { sampleManager, sampleState } from '~/features/device-utility/stores/samples.svelte';
+    import { bluetoothManager } from '~/features/device-utility/states/bluetooth.svelte';
+    import { sampleManager, sampleState } from '~/features/device-utility/states/samples.svelte';
 
     let beta = $state(false);
     let updateStage = $state('idle');

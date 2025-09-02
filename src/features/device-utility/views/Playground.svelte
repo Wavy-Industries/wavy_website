@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { midiControlState, initMidiControl } from '~/features/device-utility/stores/midiControl.svelte';
-  import { tempoState, setTempo } from '~/features/device-utility/stores/tempo.svelte';
+  import { midiControlState } from '~/features/device-utility/states/midiControl.svelte';
   import SynthChannelEditor from '~/features/device-utility/components/SynthChannelEditor.svelte';
   import { onMount } from 'svelte';
 
@@ -16,7 +15,7 @@
     if (ev.kind === 'noteoff') return `(${noteName(ev.note)})`;
     return '';
   }
-  function shouldShow(ev: any) { return ev.kind === 'noteon' || ev.kind === 'noteoff'; }
+  function eventIsNote(ev: any) { return ev.kind === 'noteon' || ev.kind === 'noteoff'; }
   function removeEvent(ch: number, id: number) {
     const list = midiControlState.events[ch];
     const idx = list.findIndex((e:any) => e.id === id);
@@ -87,7 +86,7 @@
 
   onMount(() => {
     // Attach MIDI logging to control panel
-    initMidiControl();
+    // initMidiControl();
   });
 </script>
 
@@ -102,14 +101,6 @@
       <h1>Playground</h1>
       <span class="muted">Go ahead, play on your MONKEY.</span>
     </div>
-    <!-- <div class="right">
-      <div class="subhead">GLOBAL</div>
-      <div class="actions-row">
-        <label class="field">BPM
-          <input class="input-small" type="number" min="1" max="999" step="1" value={tempoState.bpm} oninput={(e)=>setTempo(Number((e.target as HTMLInputElement).value||120))} />
-        </label>
-      </div>
-    </div> -->
   </div>
 
   <div class="pane">
@@ -131,14 +122,14 @@
             <canvas use:modCanvas={ch} class="mod-canvas-overlay"></canvas>
             <div class="strip">
               {#each midiControlState.events[ch] as ev (ev.id)}
-                {#if shouldShow(ev)}
+                {#if eventIsNote(ev)}
                   <div class="evt {ev.kind}"
                        style={`--a:${Math.max(0, Math.min(1, (ev.velocity ?? 0) / 127))}; --dur:${3000}ms;`}
                        title={fmtTime(ev.ts)}
                        onanimationend={() => removeEvent(ch, ev.id)}>{fmtEvent(ev)}</div>
                 {/if}
               {/each}
-              {#if midiControlState.events[ch].filter(shouldShow).length === 0}
+              {#if midiControlState.events[ch].filter(eventIsNote).length === 0}
                 <div class="hint">No events</div>
               {/if}
             </div>
@@ -167,10 +158,6 @@
   .toolbar { display: flex; gap: 12px; align-items: flex-end; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--du-border); }
   .toolbar .left { display: flex; flex-direction: column; }
   .toolbar .left .muted { color: var(--du-muted); font-size: 0.9em; }
-  .toolbar .right { display: flex; gap: 6px; align-items: flex-end; flex-direction: column; }
-  .toolbar .right .actions-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .toolbar .right .subhead { position: relative; font-size: 12px; font-weight: 800; letter-spacing: .08em; color: #111827; text-transform: uppercase; padding-bottom: 6px; align-self: flex-end; }
-  .toolbar .right .subhead::after { content: ""; position: absolute; right: 0; bottom: 0; width: 140px; height: 3px; background: #2f313a; }
   .toolbar .left h1 { position: relative; display: inline-block; padding-bottom: 6px; margin: 0; }
   .toolbar .left h1::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; border-radius: 0; }
   .status { display:flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--du-muted); font-size: 0.9em; }
@@ -184,11 +171,8 @@
   .btn-chan:hover { background:#f9fafb; }
   .btn-chan.disabled { opacity: 0.6; cursor: default; }
   .btn-chan .gear { margin-left: auto; font-size: 18px; color: #000; line-height: 1; }
-  .actions .btn { border: 1px solid var(--du-border); background: #fff; color: var(--du-text); padding: 6px 10px; font-size: 13px; line-height: 1; border-radius: var(--du-radius); }
-  .actions .btn:hover { background: #f9fafb; }
 
   .field { display: inline-flex; align-items: center; gap: 6px; }
-  .actions-row input[type=number] { width: 80px; padding: 6px 8px; border: 1px solid var(--du-border); border-radius: var(--du-radius); background: #fff; }
   .events { flex: 1; overflow: hidden; position: relative; height: 28px; }
   .mod-canvas-overlay { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: transparent; pointer-events: none; }
   .strip { position: absolute; inset: 0; }

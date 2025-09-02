@@ -1,5 +1,5 @@
 /*
- Copied from src/js/mcumgr/cbor.js to remove js/ dependency
+ Copied from src/js/smp/cbor.js to remove js/ dependency
 */
 
 var POW_2_24 = 5.960464477539063e-8,

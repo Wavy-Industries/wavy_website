@@ -1,9 +1,9 @@
 // SMPCharacteristic.ts (renamed from MCUManager)
-import { assert, Log } from '../utilities';
-import CBOR from './mcumgr/cbor';
+import { Log } from '../utils/Log';
 import { BluetoothManager } from './bluetoothManager';
+import CBOR from './smp/cbor';
 
-let log = new Log('mcumgr', Log.LEVEL_DEBUG);
+let log = new Log('smpBluetoothCharacteristic', Log.LEVEL_DEBUG);
 
 export const SMP_ERR_RC: { [code: number]: string } = {
     0: 'No error, OK.',
@@ -43,7 +43,7 @@ export const MGMT_OP = { READ: 0, READ_RSP: 1, WRITE: 2, WRITE_RSP: 3 };
 export interface ResponseError { rc: number; }
 interface ResponseResolver { resolve: (data: any) => void; reject: (error: any) => void; }
 
-export class SMPCharacteristic {
+export class SMPService {
     private smpSequenceNumber: number = 0;
     private responseResolvers: { [sequenceNumber: number]: ResponseResolver } = {};
     private readonly SMP_HEADER_SIZE: number = 8;
@@ -64,9 +64,16 @@ export class SMPCharacteristic {
     private smpInitPromise: Promise<void> | null = null;
     private smpWritePromise: Promise<void> | null = null;
 
-    constructor(private bluetoothManager: BluetoothManager) {
-        this.bluetoothManager.onConnect(() => { this.smpInitPromise = null; this.smpInitialized = false; this._initializeSMP(); });
-        this.bluetoothManager.onConnectionReestablished(() => { this.smpInitPromise = null; this.smpInitialized = false; this._initializeSMP(); });
+    private bluetoothManager: BluetoothManager;
+
+    public constructor(bluetoothManager: BluetoothManager) {
+        this.bluetoothManager = bluetoothManager;
+    }
+
+    public reset(): void {
+        this.smpInitPromise = null;
+        this.smpInitialized = false;
+        this._initializeSMP();
     }
 
     private async _initializeSMP(): Promise<void> {
@@ -128,7 +135,7 @@ export class SMPCharacteristic {
         const payload = message.slice(this.SMP_HEADER_SIZE);
         // Ensure we pass a tightly sliced ArrayBuffer to the decoder
         const ab = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength);
-        let data; try { data = CBOR.decode(ab); } catch (error) { log.error('Error decoding CBOR:', error); return; }
+        let data; try { data = CBOR.decode(ab); } catch (error) { log.error(`Error decoding CBOR: ${error}`); return; }
         const seq = message[this.SMP_HEADER_SEQ_IDX]; const resolver = this.responseResolvers[seq]; if (resolver) { resolver.resolve(data); delete this.responseResolvers[seq]; }
     }
 }

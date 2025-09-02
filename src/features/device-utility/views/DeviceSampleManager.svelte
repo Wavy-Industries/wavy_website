@@ -1,6 +1,6 @@
 <script>
-    import { sampleState, addPackToSelected, removeSelectedAt, moveSelected, uploadSelected, loadInitialData, revertToDevice, deviceSampleUploadDefault, deleteUserPackById, syncToDevice, syncFromDevice } from "~/features/device-utility/stores/samples.svelte";
-    import { editState, openPackEditorFor } from "~/features/device-utility/stores/edits.svelte";
+    import { sampleState, addPackToSelected, removeSelectedAt, moveSelected, uploadSelected, loadInitialData, revertToDevice, deviceSampleUploadDefault, deleteUserPackById, syncToDevice, syncFromDevice } from "~/features/device-utility/states/samples.svelte";
+    import { editState, openPackEditorFor } from "~/features/device-utility/states/edits.svelte";
     import { packDisplayName, canonicalIdKey, deviceIndexForDisplay } from "~/features/device-utility/utils/packs";
     import { getPageByteSize } from "~/lib/parsers/samples_parser";
     import { onMount } from 'svelte';
@@ -61,7 +61,7 @@
       jsonDialog.content = 'Loading…';
       jsonDialog.open = true;
       try {
-        const { getPackPageById } = await import('~/features/device-utility/stores/samples.svelte');
+        const { getPackPageById } = await import('~/features/device-utility/states/samples.svelte');
         const page = await getPackPageById(id);
         jsonDialog.content = JSON.stringify(page ?? {}, null, 2);
       } catch (_) {

@@ -1,100 +1,172 @@
-import { type Page, type SamplePack } from '~/lib/parsers/samples_parser';
-import { rotateForDevice, toDeviceId, toUiId, validatePack } from '~/features/device-utility/utils/packs';
-import { canonicalize } from '~/lib/utilities';
+import { DeviceSamples, SamplePack } from "~/lib/parsers/samples_parser";
+import { Log } from "~/lib/utils/Log";
+import { getLocalSamplePack } from "../states/samplesLocal.svelte";
+import { canonicalize } from "~/lib/utils/canonicalize";
 
-export function canonicalPageContent(page: Page | null | undefined): any {
-    if (!page) return canonicalize({ loops: [] });
-    const loops = Array(15).fill(null);
-    const src = (page.loops || []) as any[];
-    for (let i = 0; i < Math.min(15, src.length); i++) loops[i] = src[i] ?? null;
-    return canonicalize({ loops });
+const LOG_LEVEL = Log.LEVEL_INFO
+const log = new Log("samples-util", LOG_LEVEL);
+
+type PackType = 'Official' | 'User' | 'Local';
+
+export const getPackType = (id: string): PackType | null => {
+    /* asume format X-YYYYYYY and extract X from string with regex */
+    const t = id.match(/^([A-Z])-.*$/); 
+    if (t && t[1]) {
+        switch (t[1]) {
+            case 'W': return 'Official';
+            case 'P': return 'User';
+            case 'U': return 'Local';
+            default: null;
+        }   
+    }
+    return null;
 }
 
-export async function buildSamplePackFromIds(ids: (string|null)[], opts: {
-    userPacks: Array<{ id: string; loops?: Page|null }>;
-    stagedDeviceContent: Record<string, Page | undefined>;
-    canonicalIdKey: (id: string) => string;
-    fetchPackPage: (id: string) => Promise<Page|null>;
-}): Promise<SamplePack> {
-    const devIds = ids.length === 10 ? rotateForDevice(ids) : ids;
-    const pages: (Page|null)[] = [];
-    for (const id of devIds) {
-        if (!id) { pages.push(null); continue; }
-        const type = (id[0] === 'W' || id[0] === 'P' || id[0] === 'U') ? id[0] : (id.startsWith('W-') ? 'W' : id.startsWith('P-') ? 'P' : id.startsWith('U-') ? 'U' : 'W');
-        const uiId = toUiId(id);
-        const staged = opts.stagedDeviceContent[opts.canonicalIdKey(uiId)];
-        if (staged) { pages.push({ name: toDeviceId(uiId), loops: (staged as any).loops } as any); continue; }
-        let page: Page|null = null;
-        if (type === 'U') {
-            const up = opts.userPacks.find(p => opts.canonicalIdKey(p.id) === opts.canonicalIdKey(uiId));
-            page = up?.loops || null;
-        } else {
-            page = await opts.fetchPackPage(uiId);
-        }
-        if (page) { page.name = toDeviceId(uiId); pages.push(page); } else { pages.push(null); }
+export const constructSamplePacks = async (ids: string[]): Promise<DeviceSamples | null> => {
+    if (ids.length < 1 || ids.length > 10) {
+        log.error(`Number of Ids out of range (1-10): ${ids.length}`);
+        return null;
     }
-    return {
+
+    if (ids.length !== 10) {
+        log.debug("Padding sample pack IDs to length 10 with nulls.");
+        while (ids.length < 10) ids.push(null);
+    }
+
+    log.debug(`Constructing sample packs from IDs: ${ids.join(", ")}`);
+    const packs: SamplePack[] = [];
+    for (const [idx, id_str] of ids.entries()) {
+        if (!id_str) {
+            packs.push(null);
+            log.debug(`ID at ${idx} is empty, pushing null pack.`);
+            continue;
+        }
+
+        const packType = getPackType(id_str);
+        if (!packType) {
+            log.error(`Could not determine pack type for ID ${id_str}, skipping.`);
+            packs.push(null);
+            continue;
+        }
+
+        switch (packType) {
+            case 'Official':
+            case 'User': {
+                log.debug(`Fetching pack for ID ${id_str} (type: ${packType})`);
+                const pack = await fetchServerPack(id_str);
+                if (!pack) {
+                    log.error(`Failed to fetch pack for ID ${id_str}, pushing null.`);
+                    packs.push(null);
+                    continue;
+                }
+                packs.push(pack);
+                log.debug(`Successfully fetched pack for ID ${id_str}, pushing to array.`);
+                break;
+            }
+            case 'Local': {
+                log.debug(`ID ${id_str} is a local pack, pushing null (local packs not handled here).`);
+                const pack = getLocalSamplePack(id_str);
+                if (!pack) {
+                    log.error(`Failed to get local pack for ID ${id_str}, pushing null.`);
+                    packs.push(null);
+                    continue;
+                }
+                packs.push(pack);
+                log.debug(`Successfully retrieved local pack for ID ${id_str}, pushing to array.`);
+                break;
+            }
+        }
+    }
+    
+
+    const deviceSamples: DeviceSamples = {
         reserved0: 0xFFFFFFFF,
         reserved1: 0xFFFFFFFF,
         reserved2: 0xFFFFFFFF,
         reserved3: 0xFFFFFFFF,
-        pages,
-    } as SamplePack;
+        pages: packs,
+    };
+    return deviceSamples;
 }
 
-export function validatePackForDevice(pack: SamplePack, storageTotal: number | null | undefined): { ok: boolean; errors: string[] } {
-    const errors = validatePack(pack, { storageTotal: storageTotal ?? undefined });
-    return { ok: errors.length === 0, errors };
-}
+export const fetchServerPack = async (id: string): Promise<SamplePack | null> => {
+    const packType = getPackType(id);
+    if (!packType || (packType !== 'Official' && packType !== 'User')) {
+        log.error(`Invalid pack type for cloud fetch: ${packType} (ID: ${id})`);
+        return null;
+    }
 
-export async function computeDevicePages(downloadSamples: () => Promise<{ pages?: (Page|null)[] } | null>): Promise<Record<string, Page | undefined>> {
-    const out: Record<string, Page | undefined> = {};
+    const DEVICE_NAME = "MONKEY"; // TODO: fetch from device info
+
     try {
-        const pack = await downloadSamples();
-        for (const page of (pack?.pages || [])) {
-            if (!page) continue;
-            const type = page.name?.[0];
-            const base = (page.name || '').substring(1).trimEnd();
-            const key = `${type}|${base}`;
-            out[key] = page as any;
+        const res = await fetch(`/samples/${DEVICE_NAME}/DRM/${id}.json`);
+        if (res.ok) {
+            const pack = await res.json() as SamplePack;
+            log.debug(`Fetched pack ${id} from cloud successfully.`);
+            return pack;
         }
-    } catch {}
-    return out;
-}
-
-export async function computeLocalPageForId(id: string, opts: {
-    userPacks: Array<{ id: string; loops?: Page|null }>;
-    fetchPageByUiId: (uiId: string) => Promise<Page|null>;
-}): Promise<Page | null> {
-    try {
-        const uiId = toUiId(id);
-        if (uiId.startsWith('U-') || uiId[0] === 'U') {
-            const up = opts.userPacks.find(p => p.id === uiId);
-            if (up?.loops) return { name: uiId, loops: (up.loops as any) } as any;
-        }
-        const page = await opts.fetchPageByUiId(uiId);
-        if (page) return page;
-    } catch {}
+    } catch (e) {
+        log.error(`Failed to fetch pack ${id} from cloud: ${e}`);
+    }
     return null;
 }
 
-export async function computeDiffs(keys: string[], devicePagesByKey: Record<string, Page | undefined>, opts: {
-    computeLocalPageForId: (uiId: string) => Promise<Page|null>;
-}): Promise<Record<string, { local?: Page|null; device?: Page|null; status: 'in_sync'|'local_newer'|'device_newer'|'diverged' }>> {
-    const diffs: Record<string, { local?: Page|null; device?: Page|null; status: 'in_sync'|'local_newer'|'device_newer'|'diverged' }> = {};
-    await Promise.all(keys.map(async (key) => {
-        const [type, base] = key.split('|');
-        const uiId = `${type}-${base}`;
-        const device = devicePagesByKey[key] || null;
-        const local = await opts.computeLocalPageForId(uiId);
-        let status: 'in_sync'|'local_newer'|'device_newer'|'diverged' = 'in_sync';
-        if (local && device) {
-            status = JSON.stringify(canonicalPageContent(local)) === JSON.stringify(canonicalPageContent(device)) ? 'in_sync' : 'diverged';
-        } else if (local && !device) status = 'local_newer';
-        else if (!local && device) status = 'device_newer';
-        diffs[key] = { local, device, status };
-    }));
-    return diffs;
+type SamplePackDiff = {
+    areIdentical: boolean;
+    packsIdentical: (boolean | null)[],
+}
+export const compareSamplePacks = (a: SamplePack, b: SamplePack): SamplePackDiff | null => {
+    if (!a || !b) {
+        log.error("Cannot compare null sample packs.");
+        return null;
+    }
+    if (a.name !== b.name) {
+        log.error("Sample packs have different names, cannot compare.");
+        return null;
+    }
+    if (a.loops.length !== 10 || b.loops.length !== 10) {
+        log.error("Sample packs must have exactly 10 loops to compare.");
+        return null;
+    }
+
+    const packsIdentical: boolean[] = a.loops.map((loop, idx) => {
+        const otherLoop = b.loops[idx];
+        if (loop === null || otherLoop === null) return null;
+        if (canonicalize(loop) === canonicalize(otherLoop)) return true;
+        return false;
+    });
+
+    return {
+        areIdentical: packsIdentical.every(v => v === true),
+        packsIdentical,
+    };
 }
 
+type DeviceSamplesDiff = {
+    areIdentical: boolean;
+    packs: (SamplePackDiff | null)[];
+}
+export const compareDeviceSamples = (a: DeviceSamples, b: DeviceSamples): DeviceSamplesDiff | null => {
+    // we do not compare reserved fields in DeviceSamples. Might be releevant later
+    // currently, if we upload with reserved as null, we get back 0xFFFFFFFF
 
+    if (!a || !b) {
+        log.error("Cannot compare null device samples.");
+        return null;
+    }
+    if (a.pages.length !== 10 || b.pages.length !== 10) {
+        log.error("Device samples must have exactly 10 pages to compare.");
+        return null;
+    }
+
+    const packs: (SamplePackDiff | null)[] = a.pages.map((pack, idx) => {
+        const otherPack = b.pages[idx];
+        if (pack === null || otherPack === null) return null;
+        return compareSamplePacks(pack, otherPack);
+    });
+
+    return {
+        areIdentical: packs.every(v => v?.areIdentical === true),
+        packs,
+    };
+}

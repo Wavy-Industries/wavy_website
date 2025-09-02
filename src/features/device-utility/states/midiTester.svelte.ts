@@ -1,11 +1,6 @@
-import { MIDICharacteristic } from '~/lib/bluetooth/midiCharacteristic';
-import { bluetoothManager } from './bluetooth.svelte';
 import { deviceUtilityView, DeviceUtilityView } from './view.svelte';
 
-// Singleton MIDIManager across HMR and page entries (no globalThis)
-const H = (import.meta as any).hot;
-const DATA: any = H?.data || (H ? (H.data = {}) : {});
-export const midiManager: MIDICharacteristic = DATA.__wavy_midi_manager ||= new MIDICharacteristic(bluetoothManager);
+const DEVOUNCE_REQUIREMENT = 300; // ms
 
 // DeviceTester state - persists across component mounts
 export const deviceTesterState = $state({
@@ -35,7 +30,7 @@ export function markKeyActive(note: number) {
         playTickSound();
     } else {
         const diff = now - key.timestamp;
-        if (diff < 300) {
+        if (diff < DEVOUNCE_REQUIREMENT) {
             // Two presses within 300ms: mark as failed
             if (key.tested !== 'failed') {
                 key.tested = 'failed';
@@ -64,13 +59,11 @@ export function handleControlChange(controller: number, value: number) {
 
 export function addPressedKey(note: number) {
     deviceTesterState.momentaryPressedKeys.add(note);
-    // Trigger reactivity by reassigning
     deviceTesterState.momentaryPressedKeys = new Set(deviceTesterState.momentaryPressedKeys);
 }
 
 export function removePressedKey(note: number) {
     deviceTesterState.momentaryPressedKeys.delete(note);
-    // Trigger reactivity by reassigning
     deviceTesterState.momentaryPressedKeys = new Set(deviceTesterState.momentaryPressedKeys);
 }
 
@@ -149,31 +142,21 @@ function playCCSound() {
     oscillator.stop(audioCtx.currentTime + 0.05);
 }
 
-// Declarative: call to wire Device Tester routing (idempotent, HMR-safe)
-export function initDeviceTesterRouting() {
-    if (DATA.__wavy_device_tester_attached) return;
-    DATA.__wavy_device_tester_attached = true;
+export const midiTesterOnNoteOn = (note: number, velocity: number, channel: number) => {
     const isActive = () => deviceUtilityView.current === DeviceUtilityView.DeviceTester;
-
-    const onNoteOn = (note: number, velocity: number, channel: number) => {
-        if (!isActive()) return;
-        markKeyActive(note);
-        addPressedKey(note);
-    };
-    const onNoteOff = (note: number, velocity: number, channel: number) => {
-        if (!isActive()) return;
-        removePressedKey(note);
-    };
-    const onCC = (controller: number, value: number, channel: number) => {
-        if (!isActive()) return;
-        handleControlChange(controller, value);
-    };
-
-    DATA.__wavy_device_tester_handlers = { onNoteOn, onNoteOff, onCC };
-    midiManager.onNoteOn(onNoteOn);
-    midiManager.onNoteOff(onNoteOff);
-    midiManager.onControlChange(onCC);
+    if (!isActive()) return;
+    markKeyActive(note);
+    addPressedKey(note);
 }
 
-// Keep module hot-acceptable without re-wiring
-H?.accept?.(() => {});
+export const midiTesterOnNoteOff = (note: number, velocity: number, channel: number) => {
+    const isActive = () => deviceUtilityView.current === DeviceUtilityView.DeviceTester;
+    if (!isActive()) return;
+    removePressedKey(note);
+}
+
+export const midiTesterOnCC = (controller: number, value: number, channel: number) => {
+    const isActive = () => deviceUtilityView.current === DeviceUtilityView.DeviceTester;
+    if (!isActive()) return;
+    handleControlChange(controller, value);
+}

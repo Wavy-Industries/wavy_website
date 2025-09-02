@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
-  import { editState, setEditorLoopData } from '~/features/device-utility/stores/edits.svelte';
-  import { tempoState } from '~/features/device-utility/stores/tempo.svelte';
+  import { editState, setEditorLoopData } from '~/features/device-utility/states/edits.svelte';
+  import { tempoState } from '~/features/device-utility/states/tempo.svelte';
   import { TICKS_PER_BEAT, type Page, type LoopData } from '~/lib/parsers/samples_parser';
   import { soundBackend } from '~/lib/soundBackend';
 
@@ -66,14 +66,6 @@
     }
     totalTicks = Math.max(TICKS_PER_BEAT * 4, Math.min(511, Math.max(totalTicks, maxT + TICKS_PER_BEAT)));
   }
-
-  function computeLoopEndTicks(loop: LoopData | null): number {
-    if (!loop) return 16 * TICKS_PER_BEAT;
-    const last = (loop.events || []).reduce((m, ev:any) => Math.max(m, ev.time_ticks_release || 0), 0);
-    return Math.max(loop.length_beats * TICKS_PER_BEAT, last);
-  }
-
-  function setLocalLoop(loop: LoopData) { localLoop = loop; recalcViewport(loop); }
 
   function tickToX(t: number): number { return t * tickWidthPx; }
   function xToTick(x: number, snap = true): number {
@@ -154,13 +146,6 @@
         selectedIdx = null;
       }
     }
-  }
-
-  function deleteSelected() {
-    const loop = localLoop as any; const evs = loop.events as any[];
-    if (selectedIdx == null) return;
-    evs.splice(selectedIdx, 1);
-    selectedIdx = null;
   }
 
   function saveAndClose() {

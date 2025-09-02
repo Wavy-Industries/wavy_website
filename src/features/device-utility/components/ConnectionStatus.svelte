@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { bluetoothState } from '~/features/device-utility/stores/bluetooth.svelte';
+    import { bluetoothState } from '~/features/device-utility/states/bluetooth.svelte';
   </script>
   
   <div class="status-circle" class:connected={bluetoothState.connectionState === 'connected'} class:connection-loss={bluetoothState.connectionState === 'connectionLoss'}>

@@ -1,6 +1,6 @@
-import { SMPCharacteristic, MGMT_OP, MGMT_ERR, ResponseError } from '~/lib/bluetooth/SMPCharacteristic';
-import { Log } from '~/lib/utilities'; // Assuming you have an imageHash function
-import { samplesParser_encode, SamplePack, samplesParser_decode, decodeAsciiString } from '~/lib/parsers/samples_parser';
+import { SMPService, MGMT_OP, MGMT_ERR, ResponseError } from '~/lib/bluetooth/SMPService';
+import { Log } from '~/lib/utils/Log';
+import { samplesParser_encode, DeviceSamples, samplesParser_decode, decodeAsciiString } from '~/lib/parsers/samples_parser';
 
 let log = new Log('smpl_mgr', Log.LEVEL_INFO);
 
@@ -56,10 +56,10 @@ export class SampleManager {
     private readonly GROUP_ID = 100;
     private state: _STATE = _STATE.IDLE;
     private uploadWaiters: Array<() => void> = [];
-    private mcumgr: SMPCharacteristic;
+    private smpBluetoothCharacteristic: SMPService;
 
-    constructor(mcumgr: SMPCharacteristic) {
-        this.mcumgr = mcumgr;
+    constructor(smpBluetoothCharacteristic: SMPService) {
+        this.smpBluetoothCharacteristic = smpBluetoothCharacteristic;
     }
 
     isUploading(): boolean {
@@ -81,7 +81,7 @@ export class SampleManager {
 
     async isSet(): Promise<boolean> {
         log.debug('Checking if any samples are set');
-        const response = await this.mcumgr.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.ISSET) as ISSETResponse | ResponseError;
+        const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.ISSET) as ISSETResponse | ResponseError;
         if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) {
             log.error(`Error response received, rc: ${(response as ResponseError).rc}`);
             return Promise.reject((response as ResponseError).rc);
@@ -92,7 +92,7 @@ export class SampleManager {
 
     async getIDs(): Promise<string[]> {
         log.debug('Getting sample ID');
-        const response = await this.mcumgr.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.IDs) as IDResponse | ResponseError;
+        const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.IDs) as IDResponse | ResponseError;
         if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) {
             log.error(`Error response received, rc: ${(response as ResponseError).rc}`);
             return Promise.reject((response as ResponseError).rc);
@@ -138,7 +138,7 @@ export class SampleManager {
 
     async getSpaceUsed(): Promise<SpaceUsedResponse> {
         log.debug('Getting space used');
-        const response = await this.mcumgr.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.SPACE_USED) as SpaceUsedResponse | ResponseError;
+        const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.SPACE_USED) as SpaceUsedResponse | ResponseError;
         if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) {
             log.error(`Error response received, rc: ${(response as ResponseError).rc}`);
             return Promise.reject((response as ResponseError).rc);
@@ -149,7 +149,7 @@ export class SampleManager {
     }
 
     // Start the image upload process
-    async uploadSamples(image: SamplePack, uploadProgressUpdate?: (percent: Number) => void): Promise<boolean> {
+    async uploadSamples(image: DeviceSamples, uploadProgressUpdate?: (percent: Number) => void): Promise<boolean> {
         log.debug('Starting sample upload process');
         if (this.state !== _STATE.IDLE) {
             log.error('Cant start upload when not in idle state');
@@ -158,7 +158,7 @@ export class SampleManager {
 
         this.state = _STATE.UPLOADING; // start upload state
 
-        const maxPayloadSize = this.mcumgr.maxPayloadSize; // Max payload size from MCUManager
+        const maxPayloadSize = this.smpBluetoothCharacteristic.maxPayloadSize; // Max payload size from MCUManager
         const samplesBlob = samplesParser_encode(image);
         console.log("samplesBlob:")
         console.log(samplesBlob)
@@ -207,9 +207,9 @@ export class SampleManager {
             }
 
             try {
-                log.debug('Sending payload to mcumgr');
-                const response = await this.mcumgr.sendMessage(MGMT_OP.WRITE, this.GROUP_ID, _MGMT_ID.UPLOAD, payloadEncoded) as UploadResponse | ResponseError;
-                log.debug('Received response from mcumgr');
+                log.debug('Sending payload to smpBluetoothCharacteristic');
+                const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.WRITE, this.GROUP_ID, _MGMT_ID.UPLOAD, payloadEncoded) as UploadResponse | ResponseError;
+                log.debug('Received response from smpBluetoothCharacteristic');
 
                 // Check for errors in response
                 if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) {
@@ -250,7 +250,7 @@ export class SampleManager {
         return true;
     }
 
-    async downloadSamples(uploadProgressUpdate?: (percent: Number) => void): Promise<SamplePack | null> {
+    async downloadSamples(uploadProgressUpdate?: (percent: Number) => void): Promise<DeviceSamples | null> {
         log.debug('Starting sample download process');
         if (this.state !== _STATE.IDLE) {
             log.error(`Cant start download when not in idle state, state: ${this.state}`);
@@ -269,7 +269,7 @@ export class SampleManager {
         let payloadEncoded = this._payloadDownloadEncode(payload);
 
         try {
-            const response = await this.mcumgr.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.UPLOAD, payloadEncoded) as DownloadResponse | ResponseError;
+            const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.UPLOAD, payloadEncoded) as DownloadResponse | ResponseError;
             if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) {
                 log.error(`Error response received, rc: ${(response as ResponseError).rc}`);
                 this.state = _STATE.IDLE;
@@ -308,7 +308,7 @@ export class SampleManager {
             payloadEncoded = this._payloadDownloadEncode(payload);
 
             try {
-                const response = await this.mcumgr.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.UPLOAD, payloadEncoded) as DownloadResponse | ResponseError;
+                const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.UPLOAD, payloadEncoded) as DownloadResponse | ResponseError;
                 if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) {
                     log.error(`Error response received, rc: ${(response as ResponseError).rc}`);
                     this.state = _STATE.IDLE;

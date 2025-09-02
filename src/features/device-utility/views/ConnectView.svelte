@@ -2,9 +2,9 @@
     import MonkeyProgramImg from '~/assets/resources/device-tools/monkey_program.png';
     import bluetoothImg from '~/assets/icons/bluetooth.svg'
 
-    import ConnectedView from '~/features/device-utility/views/ConnectedView.svelte';
+    import ConnectedView from '~/features/device-utility/views/Dashboard.svelte';
     import { onMount } from 'svelte';
-    import { bluetoothManager, bluetoothState } from '~/features/device-utility/stores/bluetooth.svelte';
+    import { bluetoothManager, bluetoothState } from '~/features/device-utility/states/bluetooth.svelte';
     import DeviceBluetoothBrowsers from '~/features/device-utility/components/DeviceBluetoothBrowsers.svelte';
     
     // The device advertises the MIDI service, so we use that for discovery

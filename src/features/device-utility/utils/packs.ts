@@ -88,7 +88,7 @@ export function rotateForDisplay<T>(arr: T[]): T[] {
   const first = arr[0];
   return [...arr.slice(1, 10), first];
 }
-import { samplesParser_encode, type Page, type SamplePack } from '~/lib/parsers/samples_parser';
+import { samplesParser_encode, type SamplePack, type DeviceSamples } from '~/lib/parsers/samples_parser';
 
 // -------- Validation helpers (moved from validation/packs) --------
 
@@ -100,7 +100,7 @@ export function isAsciiPrintable(str: string): boolean {
   return true;
 }
 
-export function validatePage(uiId: string, page: Page): string[] {
+export function validatePage(uiId: string, page: SamplePack): string[] {
   const errs: string[] = [];
   if (!isAsciiPrintable(page.name || '')) errs.push(`Pack ${uiId}: name contains non-ASCII characters`);
   const loops = page.loops || [];
@@ -127,7 +127,7 @@ export function validatePage(uiId: string, page: Page): string[] {
   return errs;
 }
 
-export function validatePack(pack: SamplePack, opts?: { storageTotal?: number }): string[] {
+export function validatePack(pack: DeviceSamples, opts?: { storageTotal?: number }): string[] {
   const errs: string[] = [];
   (pack.pages || []).forEach((pg) => {
     if (!pg) return;

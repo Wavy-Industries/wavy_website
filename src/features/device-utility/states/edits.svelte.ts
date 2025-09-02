@@ -1,5 +1,5 @@
-import { type Page } from '~/lib/parsers/samples_parser';
-import { sampleState, addPackToSelected, createOrReplaceUserPack, computeDirty, computeDiffs, getPackPageById } from '~/features/device-utility/stores/samples.svelte';
+import { type SamplePack } from '~/lib/parsers/samples_parser';
+import { sampleState, addPackToSelected, createOrReplaceUserPack, computeDirty, computeDiffs, getPackPageById } from '~/features/device-utility/states/samples.svelte';
 import { canonicalIdKey as canonicalIdKeyUtil } from '~/features/device-utility/utils/packs';
 
 type EditContext = 'selected' | 'available';
@@ -10,7 +10,7 @@ export interface EditState {
     context: EditContext;
     name7: string;
     bpm: number;
-    loops: (Page | null)[];
+    loops: (SamplePack | null)[];
     loading: boolean;
     unsaved: boolean;
     errors: string[];
@@ -40,9 +40,9 @@ export async function openPackEditorFor(id: string | null = null, context: EditC
         const page = await getPackPageById(id);
         const name = id.startsWith('W-') || id.startsWith('P-') || id.startsWith('U-') ? id.substring(2) : (id[0]==='W'||id[0]==='P'||id[0]==='U' ? id.substring(1).trimEnd() : id);
         editState.name7 = (name || '').slice(0,7);
-        const slots: (Page|null)[] = Array(15).fill(null);
+        const slots: (SamplePack|null)[] = Array(15).fill(null);
         if (page) {
-            const editable: Page = { name: page.name, loops: (page as any).loops } as any;
+            const editable: SamplePack = { name: page.name, loops: (page as any).loops } as any;
             slots[0] = editable;
         }
         editState.loops = slots;
@@ -62,7 +62,7 @@ export function closePackEditor() {
     editState.open = false;
 }
 
-export function setEditorLoopData(slot: number, page: Page) {
+export function setEditorLoopData(slot: number, page: SamplePack) {
     const arr = [...editState.loops];
     arr[slot] = page;
     editState.loops = arr;
@@ -79,7 +79,7 @@ export function saveEditor() {
     const loopsRaw = (slot0 && (slot0 as any).loops) ? (slot0 as any).loops : Array(15).fill(null);
     const loops = normalizeAndSortLoops(loopsRaw);
     const id = `U-${name7}`;
-    const page: Page = { name: id, loops } as any;
+    const page: SamplePack = { name: id, loops } as any;
 
     if (editState.context === 'selected') {
         const targetId = prevId || id;
@@ -115,7 +115,7 @@ export function saveEditorAsNew() {
     const slot0 = editState.loops[0];
     const loopsRaw = (slot0 && (slot0 as any).loops) ? (slot0 as any).loops : Array(15).fill(null);
     const loops = normalizeAndSortLoops(loopsRaw);
-    const page: Page = { name: id, loops } as any;
+    const page: SamplePack = { name: id, loops } as any;
     createOrReplaceUserPack(name7, page);
     const prevId = editState.id;
     if (editState.context === 'selected') {
