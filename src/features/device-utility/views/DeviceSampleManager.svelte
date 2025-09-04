@@ -7,7 +7,10 @@
     import { compareSamplePack } from "~/features/device-utility/utils/samples";
 
     import { Log } from "~/lib/utils/Log";
-    import { samplesLocal } from "../states/samplesLocal.svelte";
+    import PackEditor from "./PackEditor.svelte";
+    import { openPackEditorForId, openPackEditorNew, editState } from "../states/edits.svelte";
+    import { samplesLocal, deleteLocalSamplePack } from "../states/samplesLocal.svelte";
+    import NameBoxes from "../components/NameBoxes.svelte";
     const LOG_LEVEL = Log.LEVEL_DEBUG
     const log = new Log("DeviceSampleManager", LOG_LEVEL);
 
@@ -46,9 +49,41 @@
       });
     });
 
+    // If a pack was mutated and saved-as-new in the editor, replace it in the selection
+    $effect(() => {
+      const from = editState.sourceId;
+      const to = editState.id;
+      if (!selectedPacks?.ids || !from || !to || from === to) return;
+      const idx = selectedPacks.ids.indexOf(from);
+      if (idx !== -1) {
+        selectedPacks.ids[idx] = to;
+      }
+    });
+
     const deviceStoragePercentState = $derived(deviceSamplesState.storageUsed != null && deviceSamplesState.storageTotal != null ? (deviceSamplesState.storageUsed/deviceSamplesState.storageTotal * 100).toFixed(1) : null)
     
     const availablePacks = $state(async () => fetchAvailableServerPacks());
+
+    const mailtoForLocalPack = (pack) => {
+      try {
+        const subject = encodeURIComponent('WAVY MONKEY sample pack proposal');
+        const packName = (pack?.name || '').slice(2, 9);
+        const pretty = JSON.stringify(pack?.loops ?? {}, null, 2);
+        const body = encodeURIComponent(
+          'Hi WAVY team,\n\n' +
+          'I would like to propose a public sample pack for MONKEY.\n' +
+          'Please find the details below.\n\n' +
+          'Author: <your name here>\n' +
+          'Description: <one sentence about the pack>\n' +
+          `Pack name (max 7 characters): ${packName}\n\n` +
+          'Here is the sample pack content, cheers:\n\n' +
+          pretty
+        );
+        return `mailto:hello@wavyindustries.com?subject=${subject}&body=${body}`;
+      } catch {
+        return 'mailto:hello@wavyindustries.com';
+      }
+    }
 
     const moveUp = (idx) => {
       if (!selectedPacks) return;
@@ -90,6 +125,7 @@
 <!-- {#if editState.open}
 <PackEditor />
 {:else} -->
+{#if editState.open === false}
 <div class="content">
   <div class="beta-banner">
     <span class="beta-badge">BETA</span>
@@ -125,7 +161,7 @@
           <div class="row">
             <span class="index">{i < 9 ? i + 1 : 0}</span>
             <span class={`badge ${selectedPacks.display[i]?.type?.toLowerCase()}`}>{selectedPacks.display[i]?.type}</span>
-            <span class="name">{selectedPacks.display[i]?.name}</span>
+            <span class="name"><NameBoxes value={selectedPacks.display[i]?.name || ''} /></span>
 
             {#if selectedPacks.asyncData?.[i]}
               {#await selectedPacks.asyncData?.[i]}
@@ -143,7 +179,11 @@
               <button class="btn" title="Move up"    onclick={() => moveUp(i)}>Move up</button>
               <button class="btn" title="Move down"  onclick={() => moveDown(i)}>Move down</button>
               <button class="btn" title="Remove"     onclick={() => selectedPacks.ids[i] = null}>Remove</button>
-              <button class="btn" title="Mutate pack (edit or clone)" onclick={() => alert('Not implemented')}>Mutate</button>
+              {#if selectedPacks.display[i]?.type === 'Local'}
+                <button class="btn" title="Edit local pack" onclick={() => openPackEditorForId(selectedPacks.ids[i])}>Edit</button>
+              {:else}
+                <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorForId(selectedPacks.ids[i])}>Mutate</button>
+              {/if}
             </div>
           </div>
         {:else}
@@ -170,12 +210,24 @@
     <div class="pane-header">
       <h3>Local Packs</h3>
       <div class="inline-actions">
-        <button class="btn primary" title="Create new pack" aria-label="Create new pack" onclick={() => alert('Not implemented')}>+ Create Local pack</button>
+        <button class="btn primary" title="Create new pack" aria-label="Create new pack" onclick={() => openPackEditorNew()}>+ Create Local pack</button>
       </div>
     </div>
-    <div class="local-list">
-      {#each samplesLocal.packs as p}
-        <div class="row">{p.name}</div>
+    <div class="grid">
+      {#each samplesLocal.packs as p (p.name)}
+        <div class="card">
+          <div class="title"><span class="badge local">Local</span> <NameBoxes value={p.name.slice(2)} /></div>
+          <div class="meta">
+            <span class="usage">{deviceSamplesState.storageTotal ? (sampleParser_packSize(p) / deviceSamplesState.storageTotal * 100).toFixed(1) : '-'}%</span>
+          </div>
+          <div class="desc"></div>
+          <div class="card-actions">
+            <button class="btn" title="Add to selected" disabled={selectedPacks.ids?.includes(p.name)} onclick={() => addToSelected(p.name)}>Add</button>
+            <button class="btn primary" title="Edit local pack" onclick={() => openPackEditorForId(p.name)}>Edit</button>
+            <button class="btn" title="Delete local pack" onclick={() => { if (confirm('Delete this local pack? This cannot be undone.')) deleteLocalSamplePack(p.name); }}>Delete</button>
+            <a class="btn" title="Publish (email)" href={mailtoForLocalPack(p)}>Publish</a>
+          </div>
+        </div>
       {/each}
       {#if samplesLocal.packs.length === 0}
         <div class="hint">No local packs — create one above.</div>
@@ -185,7 +237,7 @@
 
   <div class="pane">
     <div class="pane-header">
-      <h3>Available Packs</h3>
+      <h3>Online Packs</h3>
     </div>
     <div class="grid">
       {#await availablePacks()}
@@ -193,7 +245,7 @@
       {:then packs}
         {#each Object.entries(packs) as [k, p], idx (k)}
           <div class="card" class:selected={k in selectedPacks.ids} >
-            <div class="title"><span class="badge {p.display.type.toLowerCase()}">{p.display.type}</span> {p.display.name}</div>
+            <div class="title"><span class="badge {p.display.type.toLowerCase()}">{p.display.type}</span> <NameBoxes value={p.display.name || ''} /></div>
             <div class="meta">
               {#if p.author}
                 <span>{p.author}</span>
@@ -207,6 +259,7 @@
             {/if}
             <div class="card-actions">
               <button class="btn primary" title="Add to selected" disabled={selectedPacks.ids?.includes(k)} onclick={() => addToSelected(k)}>Add</button>
+              <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorForId(k)}>Mutate</button>
             </div>
           </div>
         {/each}
@@ -214,7 +267,9 @@
     </div>
   </div>
 </div>
-<!-- {/if} -->
+{:else}
+  <PackEditor />
+{/if}
 
 <style>
 .content { padding: 16px; display: flex; flex-direction: column; gap: 16px; max-width: var(--du-maxw, 1100px); margin: 0 auto; }

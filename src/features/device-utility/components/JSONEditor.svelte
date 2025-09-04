@@ -37,8 +37,8 @@
         <textarea class="json-input" bind:value={text} placeholder='Paste loops array or an object with a "loops" array'></textarea>
       </div>
       <div class="modal-actions">
-        <button class="button-link" onclick={handleSave}>Save</button>
-        <button class="button-link" onclick={close}>Cancel</button>
+          <button class="button-link" onclick={close}>Cancel</button>
+          <button class="button-link" onclick={handleSave}>Save & Close</button>
       </div>
     </div>
   </div>

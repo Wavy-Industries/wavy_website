@@ -179,3 +179,50 @@ export const compareDeviceSample = (a: DeviceSamples, b: DeviceSamples): DeviceS
 export const getPackIds = (deviceSamples: DeviceSamples): string[] => {
     return deviceSamples.pages.map((pack) => pack?.name);
 }
+
+// Basic validator for a page used by the editor (import dialog, etc.)
+export function validatePage(id: string, page: SamplePack | null): string[] {
+    const errs: string[] = [];
+    if (!page) { errs.push('Page is null'); return errs; }
+    if (!page.name || typeof page.name !== 'string') errs.push('Missing page name');
+    if (!Array.isArray(page.loops)) errs.push('Loops must be an array');
+    if (Array.isArray(page.loops) && page.loops.length !== 15) errs.push('Loops array must have exactly 15 items');
+    const loops = Array.isArray(page.loops) ? page.loops : [];
+    for (let i = 0; i < Math.min(15, loops.length); i++) {
+        const l = loops[i] as any;
+        if (l == null) continue;
+        if (typeof l.length_beats !== 'number' || l.length_beats < 1 || l.length_beats > 64) errs.push(`Loop ${i+1}: invalid length_beats`);
+        if (!Array.isArray(l.events)) { errs.push(`Loop ${i+1}: events must be an array`); continue; }
+        for (let j = 0; j < l.events.length; j++) {
+            const ev = l.events[j];
+            if (typeof ev.note !== 'number' || ev.note < 0 || ev.note > 127) errs.push(`Loop ${i+1} event ${j+1}: invalid note`);
+            if (typeof ev.velocity !== 'number' || ev.velocity < 0 || ev.velocity > 127) errs.push(`Loop ${i+1} event ${j+1}: invalid velocity`);
+            if (typeof ev.time_ticks_press !== 'number' || ev.time_ticks_press < 0 || ev.time_ticks_press > 511) errs.push(`Loop ${i+1} event ${j+1}: invalid time_ticks_press`);
+            if (typeof ev.time_ticks_release !== 'number' || ev.time_ticks_release < 0 || ev.time_ticks_release > 511) errs.push(`Loop ${i+1} event ${j+1}: invalid time_ticks_release`);
+            if (ev.time_ticks_release <= ev.time_ticks_press) errs.push(`Loop ${i+1} event ${j+1}: release must be after press`);
+        }
+    }
+    return errs;
+}
+
+export function calculateLoopLength(
+    events: { time_ticks_release: number }[] | null | undefined,
+    ticksPerBeat: number,
+    minBeats: number = 1,
+    maxBeats: number = 64,
+): number {
+    try {
+        const tpb = Math.max(1, Math.floor(ticksPerBeat || 24));
+        const minB = Math.max(1, Math.floor(minBeats || 1));
+        const maxB = Math.max(minB, Math.floor(maxBeats || 64));
+        const maxTicks = Math.max(0, ...((events || []).map(e => Math.max(0, e.time_ticks_release || 0))));
+        const neededBeats = Math.max(minB, Math.ceil(maxTicks / tpb));
+        // Round up to next power of two: 1,2,4,8,...
+        let pow = 1;
+        while (pow < neededBeats && pow < maxB) pow <<= 1;
+        return Math.min(pow, maxB);
+    } catch (e) {
+        log.error(`calculate loop length failed: ${String(e)}`);
+        return Math.max(1, Math.floor(minBeats || 1));
+    }
+}

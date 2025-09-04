@@ -28,7 +28,8 @@ export const getLocalSamplePack = (packName: string): SamplePack | null => {
     log.debug(`Getting local sample pack for name: ${packName}`);
     const pack = samplesLocal.packs.find(p => p.name === packName);
     log.debug(`Found local sample pack for name: ${packName}: ${pack ? pack.name : 'null'}`);
-    return pack || null;
+    // Return a deep clone to avoid reactive proxies in constructed packs
+    return pack ? JSON.parse(JSON.stringify(pack)) as SamplePack : null;
 }
 
 export const newLocalSamplePack = (pack: SamplePack) => {
@@ -43,9 +44,12 @@ export const newLocalSamplePack = (pack: SamplePack) => {
             log.error("Pack with same name already exists");
             return;
         }
-        packs.push(pack);
+        // store a plain clone to avoid reactive proxies
+        const clean: SamplePack = JSON.parse(JSON.stringify(pack));
+        packs.push(clean);
         localStorage.setItem(STORAGE_SAMPLES_KEY, JSON.stringify(packs));
-        samplesLocal.packs = packs;
+        // refresh from storage to ensure plain objects
+        refreshLocalSamples();
     } catch {
         log.error("Failed to save local sample pack");
     }
@@ -63,9 +67,12 @@ export const updateLocalSamplePack = (pack: SamplePack) => {
             log.error("Pack to update not found");
             return
         }
-        packs[idx] = pack;
+        // store a plain clone to avoid reactive proxies
+        const clean: SamplePack = JSON.parse(JSON.stringify(pack));
+        packs[idx] = clean;
         localStorage.setItem(STORAGE_SAMPLES_KEY, JSON.stringify(packs));
-        samplesLocal.packs = packs;
+        // refresh from storage to ensure plain objects
+        refreshLocalSamples();
     } catch {
         log.error("Failed to update local sample pack");
     }

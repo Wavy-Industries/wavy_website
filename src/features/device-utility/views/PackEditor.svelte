@@ -1,25 +1,25 @@
 <script>
-  import { sampleState } from '~/features/device-utility/states/samples.svelte';
-  import { editState, closePackEditor, setEditorLoopData, saveEditor, saveEditorAsNew } from '~/features/device-utility/states/edits.svelte';
+  import { onMount } from 'svelte';
+  import { editState, closePackEditor, setEditorLoopData, saveEditor, saveEditorAsNew, setEditorName7 } from '~/features/device-utility/states/edits.svelte';
   import { sampleParser_packSize } from '~/lib/parsers/samples_parser';
   import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
   import { soundBackend } from '~/lib/soundBackend';
   import MidiEditor from '~/features/device-utility/views/MidiEditor.svelte';
   import MidiPreview from '~/features/device-utility/components/MidiPreview.svelte';
   import { tempoState } from '~/features/device-utility/states/tempo.svelte';
-  import { validatePage } from '~/features/device-utility/utils/samples';
+  import { validatePage, getSamplePack } from '~/features/device-utility/utils/samples';
+    import { deviceSamplesState } from '../states/samplesDevice.svelte';
+  import NameBoxes from '~/features/device-utility/components/NameBoxes.svelte';
 
   const slots = $derived(editState.loops);
+
+  onMount(() => {
+    try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
+  });
 
   // Local UI state for full-screen MIDI editor
   let midiEditor = $state({ open: false, index: -1 });
   function openMidiEditorFor(index) {
-    // Ensure page scaffold exists
-    let page = slots[0];
-    if (!page) page = { name: `U-${editState.name7 || 'NONAME'}`.slice(0, 8), loops: Array(15).fill(null) };
-    // Ensure loop placeholder exists
-    if (!page.loops[index]) page.loops[index] = { length_beats: 16, events: [] };
-    setEditorLoopData(0, page);
     midiEditor.open = true; midiEditor.index = index;
   }
   function closeMidiEditor() { midiEditor.open = false; midiEditor.index = -1; }
@@ -50,13 +50,13 @@
     return sampleParser_packSize(page);
   }
   function percentTotal() {
-    const total = sampleState.storageTotal || 0;
+    const total = deviceSamplesState.storageTotal || 0;
     if (!total) return '0.0';
     return ((totalBytes() / total) * 100).toFixed(1);
   }
 
   function percentFor(idx) {
-    const total = sampleState.storageTotal || 0;
+    const total = deviceSamplesState.storageTotal || 0;
     if (!total) return 0;
     const b = bytesFor(idx);
     return ((b / total) * 100).toFixed(1);
@@ -108,8 +108,7 @@
       if (slots[0]) {
         importDialog.text = JSON.stringify(slots[0], null, 2);
       } else if (editState.id) {
-        const { getPackPageById } = await import('~/features/device-utility/states/samples.svelte');
-        const page = await getPackPageById(editState.id);
+        const page = await getSamplePack(editState.id);
         importDialog.text = JSON.stringify(page ?? {}, null, 2);
       } else {
         importDialog.text = '{}';
@@ -149,18 +148,19 @@
   }
 </script>
 
+{#if !midiEditor.open}
 <div class="page">
   <div class="header">
     <div class="left">
       <button class="icon" title="Back" aria-label="Back" onclick={closePackEditor}>←</button>
       <h2>{editState.id ? 'Edit Pack' : 'Create Pack'}</h2>
       {#if editState.id}
-        <span class="type-badge">{editState.id.startsWith('U-') ? 'Local' : (editState.id.startsWith('P-') ? 'Public' : 'Official')}</span>
+        <span class="type-badge">{editState.id.startsWith('L-') ? 'Local' : (editState.id.startsWith('U-') ? 'User' : 'Official')}</span>
       {/if}
     </div>
     <div class="actions">
-      <button class="button-link" onclick={openImportDialog}>Import raw</button>
-      {#if editState.id && editState.id.startsWith('U-')}
+      <button class="button-link" onclick={openImportDialog}>View raw</button>
+      {#if editState.id && editState.id.startsWith('L-')}
         <button onclick={saveEditor} class="primary">Save</button>
       {:else}
         <button onclick={saveEditorAsNew} class="primary">Save As New Pack</button>
@@ -180,17 +180,14 @@
   <div class="toolbar settings">
     <div class="namer">
       <label>Name</label>
-      <input maxlength="7" bind:value={editState.name7} placeholder="MYPACK" oninput={(e)=>{ const v=e.target.value||''; if (/[^\x20-\x7E]/.test(v)) { e.target.value = v.replace(/[^\x20-\x7E]/g,''); editState.name7 = e.target.value; } }} />
+      <input maxlength="7" bind:value={editState.name7} placeholder="MYPACK" oninput={(e)=>{ const v=e.target.value||''; if (/[^\x20-\x7E]/.test(v)) { e.target.value = v.replace(/[^\x20-\x7E]/g,''); setEditorName7(e.target.value); } else { setEditorName7(v); } }} />
+      <NameBoxes value={editState.name7} />
       <span class="hint">ASCII, up to 7 characters</span>
     </div>
-    {#if editState.id}
-      {@const meta = sampleState.available.find(p => p.id === editState.id)}
-      {#if meta?.author || meta?.created}
-        <div class="meta">by {meta?.author}</div>
-      {/if}
-    {/if}
+    <!-- meta removed during migration -->
     <div class="bytes">Total: {totalBytes()} bytes ({percentTotal()}%)</div>
   </div>
+  <div class="tip">Tip: You can edit notes directly in the built-in Piano Roll — no MIDI file needed.</div>
   <div class="list">
     {#each Array(15) as _, idx}
       <div class="row">
@@ -201,11 +198,19 @@
         <div class="content">
           {#if slots[0]?.loops?.[idx]}
             {@const loop = slots[0].loops[idx]}
-            <MidiPreview {loop} onOpen={() => openMidiEditorFor(idx)} />
+            <div class="preview-stack">
+              <MidiPreview {loop} onOpen={() => openMidiEditorFor(idx)} />
+              <div class="preview-actions">
+                <button class="button-link" onclick={() => openMidiEditorFor(idx)}>Open editor</button>
+              </div>
+            </div>
           {:else}
             <div class="drop">
               <input type="file" accept=".mid,.midi" onchange={(e)=>onFileChange(e, idx)} />
-              <div class="hint">Drop MIDI or click to choose — or <a href="#" onclick={(e)=>{e.preventDefault(); openMidiEditorFor(idx);}}>open editor</a></div>
+              <div class="actions">
+                <button class="btn primary" onclick={() => openMidiEditorFor(idx)}>Open MIDI editor</button>
+              </div>
+              <div class="hint">You can also compose directly in the editor — no MIDI file required.</div>
             </div>
           {/if}
         </div>
@@ -219,14 +224,15 @@
     {/each}
   </div>
 </div>
-
-{#if midiEditor.open}
-  <MidiEditor index={midiEditor.index} close={closeMidiEditor} onback={closeMidiEditor} />
+{:else}
+  <div class="embedded-editor">
+    <MidiEditor index={midiEditor.index} close={closeMidiEditor} onback={closeMidiEditor} />
+  </div>
 {/if}
 
 {#if importDialog.open}
-  <div class="modal-backdrop" onclick={closeImportDialog}>
-    <div class="modal" onclick={(e)=>e.stopPropagation()}>
+  <div class="modal-backdrop" onpointerdown={closeImportDialog}>
+    <div class="modal" role="dialog" aria-modal="true" onpointerdown={(e)=>e.stopPropagation()}>
       <div class="modal-header">
         <div class="title">Import raw JSON</div>
         <button class="icon" onclick={closeImportDialog}>✕</button>
@@ -275,6 +281,10 @@
 .hint { color: #777; font-size: 0.9em; }
 .content { min-height: 120px; display: flex; }
 input[type="file"] { width: 100%; }
+.tip { margin-top: 4px; color: var(--du-muted); font-size: 0.92em; }
+.preview-stack { display:flex; flex-direction: column; gap: 6px; width: 100%; }
+.preview-actions { display:flex; }
+.drop .actions { display:flex; gap: 8px; margin-top: 8px; }
 
 /* Small industrial buttons */
 .btn { border: 1px solid #2f313a; background: #f2f3f5; color: #111827; border-radius: var(--du-radius); padding: 6px 8px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
@@ -293,4 +303,6 @@ input[type="file"] { width: 100%; }
 .json-input { width: 100%; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
 .error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:6px; }
 .errors { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+/* Embedded MIDI editor container */
+.embedded-editor { margin-top: 8px; display: flex; justify-content: center; }
 </style>
