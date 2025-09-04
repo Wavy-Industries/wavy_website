@@ -43,7 +43,7 @@
   
   // Default view settings - more reasonable for screen width
   const DEFAULT_VIEW_BEATS = 4; // Reduced from 8.5 to prevent excessive width
-  const DEFAULT_NOTE_RANGE = { min: 48, max: 59 }; // C3 to B3 (one octave)
+  const DEFAULT_NOTE_RANGE = { min: 0, max: 127 }; // Full MIDI range for vertical scroll
   
   // Playback state
   let isPlaying = $state(false);
@@ -57,6 +57,11 @@
   // Track pointer start in client space to compute deltas robustly
   let dragStartClient = $state({ x: 0, y: 0 });
 
+  // Derive loop length early so other derived values can use it
+  const loopLengthBeats = $derived(() => {
+    return calculateLoopLength(localLoop.events, TICKS_PER_BEAT, 16, 64);
+  });
+
   // Derived metrics for overlay beyond loop end
   const overlayMetrics = $derived(() => {
     const effectiveWidth = gridDimensions().effectiveTickWidth || tickWidth;
@@ -66,70 +71,37 @@
     return { overlayLeft, overlayWidth };
   });
 
-  // Grid dimensions - simplified calculations
-  const noteRange = $derived(() => {
-    const notes = localLoop.events.map(e => e.note).filter(n => typeof n === 'number');
-    if (notes.length === 0) return DEFAULT_NOTE_RANGE; // Default C3 to B3
-    const min = Math.max(0, Math.min(...notes) - 2);
-    const max = Math.min(127, Math.max(...notes) + 2);
-    // Ensure at least one octave is shown
-    const range = max - min;
-    if (range < 12) {
-      const center = Math.floor((min + max) / 2);
-      return {
-        min: Math.max(0, center - 6),
-        max: Math.min(127, center + 6)
-      };
-    }
-    return { min, max };
-  });
+  // Show full MIDI range so vertical scrollbar can reach all notes
+  const noteRange = $derived(() => DEFAULT_NOTE_RANGE);
 
   const gridDimensions = $derived(() => {
     const range = noteRange();
     const laneCount = range.max - range.min + 1;
-    
-    // Use default view beats or calculate based on content
-    const contentTicks = localLoop.events.length > 0 ? Math.max(
-      ...localLoop.events.map(e => e.time_ticks_release || 0),
-      0
-    ) : 0;
-    
-    const viewTicks = Math.max(
-      DEFAULT_VIEW_BEATS * TICKS_PER_BEAT,
-      contentTicks + TICKS_PER_BEAT
+
+    // X width equals loop length + 1 bar (4 beats), capped to MAX_TICKS
+    const totalTicks = Math.min(
+      MAX_TICKS,
+      (loopLengthBeats() + 4) * TICKS_PER_BEAT
     );
-    const totalTicks = Math.min(MAX_TICKS, viewTicks);
-    
-    // Calculate raw dimensions
-    const rawGridWidth = totalTicks * tickWidth;
-    const rawTotalWidth = rawGridWidth + PIANO_WIDTH;
-    
-    // Constrain to reasonable maximum width (e.g., 2000px)
-    const MAX_GRID_WIDTH = 2000;
-    const constrainedGridWidth = Math.min(rawGridWidth, MAX_GRID_WIDTH);
-    const constrainedTotalWidth = constrainedGridWidth + PIANO_WIDTH;
-    
-    // If we had to constrain, recalculate effective tick width
-    const effectiveTickWidth = rawGridWidth > MAX_GRID_WIDTH 
-      ? MAX_GRID_WIDTH / totalTicks 
-      : tickWidth;
-    
+
+    const gridWidth = totalTicks * tickWidth;
+    const totalWidth = gridWidth + PIANO_WIDTH;
+
     const dimensions = {
       laneCount,
       totalTicks,
-      gridWidth: constrainedGridWidth,
+      gridWidth,
       gridHeight: laneCount * laneHeight,
-      totalWidth: constrainedTotalWidth,
+      totalWidth,
       totalHeight: laneCount * laneHeight + HEADER_HEIGHT,
-      effectiveTickWidth // For coordinate calculations
+      effectiveTickWidth: tickWidth
     };
-    
+
     log.debug(`Grid calculation details:`);
     log.debug(`- Range: ${JSON.stringify(range)}, laneCount: ${laneCount}`);
-    log.debug(`- Content ticks: ${contentTicks}, view ticks: ${viewTicks}, total ticks: ${totalTicks}`);
-    log.debug(`- Raw width: ${rawTotalWidth}px, constrained width: ${constrainedTotalWidth}px`);
-    log.debug(`- Tick width: ${tickWidth}px -> effective: ${effectiveTickWidth}px`);
-    
+    log.debug(`- totalTicks: ${totalTicks}`);
+    log.debug(`- Total width: ${totalWidth}px, tick width: ${tickWidth}px`);
+
     return dimensions;
   });
 
@@ -233,12 +205,15 @@
       // Set pointer capture for smooth dragging
       (event.target as HTMLElement).setPointerCapture(event.pointerId);
     } else {
-      // Create new note
+      // Create new note centered under cursor horizontally
+      const baseTick = xToTick(x);
+      const press = clamp(snapTick(baseTick - (DEFAULT_NOTE_LENGTH / 2)), 0, MAX_TICKS - 1);
+      const release = clamp(press + DEFAULT_NOTE_LENGTH, 0, MAX_TICKS);
       const newNote = {
         note,
         velocity: 100,
-        time_ticks_press: tick,
-        time_ticks_release: Math.min(MAX_TICKS, tick + DEFAULT_NOTE_LENGTH)
+        time_ticks_press: press,
+        time_ticks_release: release
       };
       
       log.debug(`Creating new note: ${JSON.stringify(newNote)}`);
@@ -295,26 +270,32 @@
 
       log.debug(`Resize: dX=${deltaXClient}, ticks=${deltaTicksFloat.toFixed(2)}, snappedRelease=${snappedRelease}, newRelease=${newRelease}`);
     } else {
-      // Move the entire note - PRESERVE ORIGINAL LENGTH
-      const newTick = snapTick(xToTick(x));
-      const newNote = yToNote(y);
-      
+      // Move the entire note - PRESERVE ORIGINAL LENGTH and keep cursor alignment
+      const pointerTick = xToTick(x);
+      const pointerNote = yToNote(y);
+
       // Calculate original note length
       const originalLength = dragOriginalNote.time_ticks_release - dragOriginalNote.time_ticks_press;
-      
+
+      // Keep the grabbed offset so the note stays under the cursor
+      const desiredPress = pointerTick - (dragOffsetTick ?? 0);
+      const newTick = snapTick(desiredPress);
+      const newNote = clamp(pointerNote - (dragOffsetNote ?? 0), 0, 127);
+
       // Ensure the note stays within bounds
       const clampedTick = clamp(newTick, 0, MAX_TICKS - originalLength);
       const clampedNote = clamp(newNote, 0, 127);
-      
+
       currentNote.time_ticks_press = clampedTick;
-      currentNote.time_ticks_release = clampedTick + originalLength; // Preserve length!
+      currentNote.time_ticks_release = clampedTick + originalLength;
       currentNote.note = clampedNote;
-      
+
       log.debug(`Note moved: newTick=${newTick}, newNote=${newNote}, originalLength=${originalLength}`);
-      
-      // Audition note on pitch change
-      if (currentNote.note !== dragOriginalNote.note) {
-        log.debug(`Auditioning note: oldNote=${dragOriginalNote.note}, newNote=${currentNote.note}`);
+
+      // Audition only when the pitch actually changes (debounced by value)
+      if (currentNote.note !== lastAuditionedNote) {
+        lastAuditionedNote = currentNote.note;
+        log.debug(`Auditioning note change: ${currentNote.note}`);
         soundBackend.noteOn(currentNote.note, currentNote.velocity, 9);
         setTimeout(() => soundBackend.noteOff(currentNote.note, 0, 9), 100);
       }
@@ -342,6 +323,7 @@
     isDragging = false;
     dragMode = null;
     dragOriginalNote = null;
+    lastAuditionedNote = null;
     
     // Only update loop length if we actually changed something
     if (dragOriginalNote) {
@@ -396,6 +378,10 @@
   }
 
   // Note-specific event handlers
+  let lastAuditionedNote: number | null = null;
+  let dragOffsetTick: number | null = null;
+  let dragOffsetNote: number | null = null;
+
   function handleNotePointerDown(event: PointerEvent, noteIndex: number, mode: 'move' | 'velocity' | 'resize' = 'move') {
     event.stopPropagation();
     
@@ -409,7 +395,24 @@
     dragStartPos = { x: event.clientX - rect.left, y: event.clientY - rect.top };
     dragStartClient = { x: event.clientX, y: event.clientY };
     dragOriginalNote = { ...localLoop.events[noteIndex] };
-    
+
+    // Compute grab offsets relative to grid to keep cursor aligned with note
+    try {
+      const grect = gridEl?.getBoundingClientRect();
+      if (grect) {
+        const gx = event.clientX - grect.left;
+        const gy = event.clientY - grect.top;
+        const pTick = xToTick(gx);
+        const pNote = yToNote(gy);
+        dragOffsetTick = pTick - dragOriginalNote.time_ticks_press;
+        dragOffsetNote = pNote - dragOriginalNote.note;
+      } else {
+        dragOffsetTick = 0; dragOffsetNote = 0;
+      }
+    } catch { dragOffsetTick = 0; dragOffsetNote = 0; }
+
+    lastAuditionedNote = dragOriginalNote.note;
+
     (event.target as HTMLElement).setPointerCapture(event.pointerId);
   }
 
@@ -423,11 +426,6 @@
     sortEvents();
   }
 
-  // Dynamically derive loop length from events
-  const loopLengthBeats = $derived(() => {
-    // Calculate recommended loop length (don't filter here - it causes notes to disappear)
-    return calculateLoopLength(localLoop.events, TICKS_PER_BEAT, 16, 64);
-  });
 
   // Playback functions
   function startPlayback() {
@@ -619,7 +617,7 @@
             role="button"
             tabindex="0"
           >
-            {isC ? `C${Math.floor(note / 12) - 1}` : ''}
+            {isC ? `C${Math.floor(note / 12)}` : ''}
           </div>
         {/each}
       </div>
