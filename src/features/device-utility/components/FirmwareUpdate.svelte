@@ -1,4 +1,6 @@
 <script>
+    import { deviceSampleTransferState } from "~/features/device-utility/states/samplesDevice.svelte";
+
     const { stage, uploadProgress, sampleUploadProgress } = $props();
     const hasSampleProgress = $derived(typeof sampleUploadProgress === 'number');
 </script>
@@ -18,7 +20,10 @@
         {:else if ['applying', 'verifying', 'done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
-        Uploading firmware {#if stage === 'uploading'}({#if uploadProgress === null}preparing device{:else}{uploadProgress}%{/if}){/if}
+        Uploading firmware 
+        {#if stage === 'uploading'}
+            <span class="stage-info">{#if uploadProgress === null}preparing device{:else}Progress {uploadProgress}%{/if}</span>
+        {/if}
     </div>
     <div class="stage" class:active={stage === 'applying'}>
         {#if stage === 'applying'}
@@ -26,7 +31,10 @@
         {:else if ['verifying', 'done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
-        Applying update (waiting on device)
+        Applying update 
+        {#if stage === 'applying'}
+            <span class="stage-info">Waiting on device</span>
+        {/if}
     </div>
     <div class="stage" class:active={stage === 'verifying'}>
         {#if stage === 'verifying'}
@@ -34,7 +42,19 @@
         {:else if ['done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
-        Verifying update {#if hasSampleProgress}(uploading samples {sampleUploadProgress}%) {/if}
+        Verifying update 
+        {#if stage === 'verifying'}
+        {#if deviceSampleTransferState.supportCheck.type === 'transferring'}
+            {@const progress = deviceSampleTransferState.supportCheck.progress}
+            <span class="stage-info">Checking support ({progress ? progress.toFixed(1) + '%' : 'Preparing'})</span>
+        {:else if deviceSampleTransferState.upload.type === 'transferring'}
+            {@const progress = deviceSampleTransferState.upload.progress}
+            <span class="stage-info">Uploading default samples({progress ? progress.toFixed(1) + '%' : 'Preparing'})</span>
+        {:else if deviceSampleTransferState.download.type === 'transferring'}
+            {@const progress = deviceSampleTransferState.download.progress}
+            <span class="stage-info">Checking device samples({progress ? progress.toFixed(1) + '%' : 'Preparing'})</span>
+        {/if}
+        {/if}
     </div>
     <div class="stage" class:active={stage === 'done'}>
         {#if stage === 'done'}
@@ -58,6 +78,12 @@
     .stage.active {
         opacity: 1;
         font-weight: bold;
+    }
+
+    .stage-info {
+        font-size: 0.8em;
+        font-style: italic;
+        margin-left: 5px;
     }
 
     .spinner {

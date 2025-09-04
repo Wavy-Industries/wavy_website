@@ -93,11 +93,11 @@
             >
                 Playground
             </a>
-            <span class={`tab-with-badge ${needsUpdateAttention && !isUpdateTabActive ? 'blink-update' : ''}`}>
+            <span class={`tab-with-badge ${upgradeAvailable && !isUpdateTabActive ? 'blink-update' : ''}`}>
               <a href="#device-update" class={currentView === DeviceUtilityView.DeviceUpdate ? 'active' : ''}>
                   Device Update
               </a>
-              {#if needsUpdateAttention}
+              {#if upgradeAvailable}
                   <span class="alert-dot" title={upgradeAvailable ? 'Upgrade available' : 'Downgrade available'}>!</span>
               {/if}
             </span>

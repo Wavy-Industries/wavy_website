@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { midiControlState } from '~/features/device-utility/states/midiControl.svelte';
+  import { midiControlState, initPlaygroundSynthPersistence, resetAllSynthChannels, resetSynthChannel, playgroundUI } from '~/features/device-utility/states/playground.svelte';
   import SynthChannelEditor from '~/features/device-utility/components/SynthChannelEditor.svelte';
   import { onMount } from 'svelte';
 
@@ -28,6 +28,8 @@
   const sizes = Array.from({ length: 10 }, () => ({ w: 0, h: 0, dpr: 1 }));
   let raf = 0;
   const selected = $state<{ ch: number | null }>({ ch: null });
+  // Use shared UI state for refresh key (nudges editor to reload)
+  const refreshKey = $derived(playgroundUI.refreshKey);
   function modCanvas(node: HTMLCanvasElement, ch: number) {
     modCanvases[ch] = node;
     ctxs[ch] = node.getContext('2d');
@@ -85,9 +87,12 @@
   $effect(() => () => { if (raf) cancelAnimationFrame(raf); });
 
   onMount(() => {
-    // Attach MIDI logging to control panel
-    // initMidiControl();
+    initPlaygroundSynthPersistence();
   });
+
+  function resetAll() { resetAllSynthChannels(); }
+
+  function resetChannel(ch: number) { resetSynthChannel(ch); }
 </script>
 
 <div class="content">
@@ -104,7 +109,10 @@
   </div>
 
   <div class="pane">
-    <div class="pane-header"><h3>Channel Activity</h3></div>
+    <div class="pane-header">
+      <h3>Channel Activity</h3>
+      <button class="btn-reset-all" title="Reset all synth channels to defaults" onclick={resetAll}>Reset All</button>
+    </div>
     <div class="list">
       {#each Array(10) as _, ch}
         <div class="row">
@@ -143,7 +151,7 @@
 {#if selected.ch !== null}
   <div class="modal-overlay" onclick={() => selected.ch = null}>
     <div class="modal-panel" onclick={(e)=> e.stopPropagation()}>
-      <SynthChannelEditor channel={selected.ch!} onClose={() => selected.ch = null} />
+      <SynthChannelEditor channel={selected.ch!} refreshKey={refreshKey} onReset={() => resetChannel(selected.ch!)} onClose={() => selected.ch = null} />
     </div>
   </div>
 {/if}
@@ -160,6 +168,7 @@
   .toolbar .left .muted { color: var(--du-muted); font-size: 0.9em; }
   .toolbar .left h1 { position: relative; display: inline-block; padding-bottom: 6px; margin: 0; }
   .toolbar .left h1::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; border-radius: 0; }
+  .toolbar .right { display:flex; align-items:center; gap:8px; }
   .status { display:flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--du-muted); font-size: 0.9em; }
 
   .pane { display: flex; flex-direction: column; gap: 8px; }
@@ -171,11 +180,15 @@
   .btn-chan:hover { background:#f9fafb; }
   .btn-chan.disabled { opacity: 0.6; cursor: default; }
   .btn-chan .gear { margin-left: auto; font-size: 18px; color: #000; line-height: 1; }
+  .btn-reset { border:1px solid var(--du-border); background:#fff; padding:6px 8px; border-radius:6px; cursor:pointer; }
+  .btn-reset:hover { background:#f3f4f6; }
+  .btn-reset-all { border: 1px solid #1f2329; background: #2b2f36; color: #fff; padding:6px 12px; border-radius:6px; cursor:pointer; }
+  .btn-reset-all:hover { filter: brightness(0.97); }
 
   .field { display: inline-flex; align-items: center; gap: 6px; }
   .events { flex: 1; overflow: hidden; position: relative; height: 28px; }
-  .mod-canvas-overlay { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: transparent; pointer-events: none; }
-  .strip { position: absolute; inset: 0; }
+  .mod-canvas-overlay { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: transparent; pointer-events: none; z-index: 0; }
+  .strip { position: absolute; inset: 0; z-index: 1; }
   .evt { position: absolute; left: 0; top: 6px; animation: flow-right var(--dur, 3000ms) linear forwards; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; padding: 0 3px; border: none; background: #fff; color: rgba(17, 24, 39, var(--a, 1)); white-space: nowrap; border-radius: 2px; }
   @keyframes flow-right { from { left: 0; } to { left: calc(100% + 100px); } }
   .hint { color: #888; font-size: 12px; padding: 2px 0; }

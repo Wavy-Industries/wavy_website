@@ -9,8 +9,8 @@ import { smpService, midiService } from './states/bluetooth.svelte';
 import { soundBackend } from '~/lib/soundBackend';
 import { refreshLocalSamples } from './states/samplesLocal.svelte';
 import { initialiseDeviceSamples, invalidateDeviceSamplesState } from './states/samplesDevice.svelte';
-import { updaterNotifyConnectionReestablished } from './states/updater.svelte';
-import { midiControlOnCC, midiControlOnNoteOff, midiControlOnNoteOn } from './states/midiControl.svelte';
+import { updaterNotifyConnectionReestablished, updaterNotifyIsSupported } from './states/updater.svelte';
+import { midiControlOnCC, midiControlOnNoteOff, midiControlOnNoteOn } from './states/playground.svelte';
 import { windowState, DeviceUtilityView } from './states/window.svelte';
 
 export const callbacksSet = () => {
@@ -22,7 +22,10 @@ export const callbacksSet = () => {
         refreshDeviceFirmwareVersion();
         refreshChangelog();
         refreshLocalSamples();
-        initialiseDeviceSamples();
+        (async () => {
+            await initialiseDeviceSamples();
+            updaterNotifyIsSupported();
+        })()
 
         bluetoothStateSetConnected();
     }
@@ -33,8 +36,10 @@ export const callbacksSet = () => {
         
         refreshDeviceFirmwareVersion();
 
-        // we dont do anything with the device samples if it only lost connection
-        initialiseDeviceSamples();
+        (async () => {
+            await initialiseDeviceSamples();
+            updaterNotifyIsSupported();
+        })()
         updaterNotifyConnectionReestablished();
         
         bluetoothStateSetConnectionReestablished();

@@ -61,7 +61,7 @@ export const newLocalSamplePack = (pack: SamplePack) => {
     }
 }
 
-export const updateLocalSamplePack = (pack: SamplePack) => {
+export const updateLocalSamplePack = (pack: SamplePack, prevName?: string | null) => {
     try {
         const display = packDisplayName(pack.name);
         if (display?.type !== 'Local' && display?.type !== 'Archive') {
@@ -74,10 +74,17 @@ export const updateLocalSamplePack = (pack: SamplePack) => {
         if (raw) {
             packs = JSON.parse(raw) as SamplePack[];
         }
-        const idx = packs.findIndex(p => p.name === pack.name);
-        if (!(idx >= 0)) {
-            log.error("Pack to update not found");
-            return
+        // Find existing by previous name if provided; otherwise by current name
+        let idx = -1;
+        if (prevName && typeof prevName === 'string') {
+            idx = packs.findIndex(p => p.name === prevName);
+        }
+        if (idx === -1) idx = packs.findIndex(p => p.name === pack.name);
+        if (idx === -1) { log.error("Pack to update not found"); return; }
+        // If name is changing, ensure no other pack already has the target name
+        if (pack.name !== packs[idx].name) {
+            const clash = packs.findIndex((p, i) => p.name === pack.name && i !== idx);
+            if (clash !== -1) { log.error("Target name already exists"); return; }
         }
         // store a plain clone to avoid reactive proxies
         const clean: SamplePack = JSON.parse(JSON.stringify(pack));

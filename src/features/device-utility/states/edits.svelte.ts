@@ -117,8 +117,9 @@ export function saveEditor(): boolean {
   if (!id || !id.startsWith('L-')) return false;
 
   // ensure the working copy has the correct local name
-  page.name = makeLocalId(editState.name7 || id.slice(2));
-  updateLocalSamplePack(deepClone(page));
+  const newName = makeLocalId(editState.name7 || id.slice(2));
+  page.name = newName;
+  updateLocalSamplePack(deepClone(page), id);
   editState.unsaved = false;
   return true;
 }
@@ -136,5 +137,4 @@ export function saveEditorAsNew(): boolean {
   editState.unsaved = false;
   return true;
 }
-
 
