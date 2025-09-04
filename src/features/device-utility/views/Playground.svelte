@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { midiControlState, initMidiControl } from '~/features/device-utility/stores/midiControl.svelte';
-  import { tempoState, setTempo } from '~/features/device-utility/stores/tempo.svelte';
+  import { midiControlState, initPlaygroundSynthPersistence, resetAllSynthChannels, resetSynthChannel, playgroundUI } from '~/features/device-utility/states/playground.svelte';
   import SynthChannelEditor from '~/features/device-utility/components/SynthChannelEditor.svelte';
   import { onMount } from 'svelte';
 
@@ -16,7 +15,7 @@
     if (ev.kind === 'noteoff') return `(${noteName(ev.note)})`;
     return '';
   }
-  function shouldShow(ev: any) { return ev.kind === 'noteon' || ev.kind === 'noteoff'; }
+  function eventIsNote(ev: any) { return ev.kind === 'noteon' || ev.kind === 'noteoff'; }
   function removeEvent(ch: number, id: number) {
     const list = midiControlState.events[ch];
     const idx = list.findIndex((e:any) => e.id === id);
@@ -29,6 +28,10 @@
   const sizes = Array.from({ length: 10 }, () => ({ w: 0, h: 0, dpr: 1 }));
   let raf = 0;
   const selected = $state<{ ch: number | null }>({ ch: null });
+  // Use shared UI state for refresh key (nudges editor to reload)
+  const refreshKey = $derived(playgroundUI.refreshKey);
+  // Focus management for modal dialog
+  let modalPanelEl: HTMLDivElement | null = null;
   function modCanvas(node: HTMLCanvasElement, ch: number) {
     modCanvases[ch] = node;
     ctxs[ch] = node.getContext('2d');
@@ -86,9 +89,19 @@
   $effect(() => () => { if (raf) cancelAnimationFrame(raf); });
 
   onMount(() => {
-    // Attach MIDI logging to control panel
-    initMidiControl();
+    initPlaygroundSynthPersistence();
   });
+
+  // When the dialog opens, move focus to it so ESC works immediately
+  $effect(() => {
+    if (selected.ch !== null && modalPanelEl) {
+      try { modalPanelEl.focus(); } catch {}
+    }
+  });
+
+  function resetAll() { resetAllSynthChannels(); }
+
+  function resetChannel(ch: number) { resetSynthChannel(ch); }
 </script>
 
 <div class="content">
@@ -102,18 +115,13 @@
       <h1>Playground</h1>
       <span class="muted">Go ahead, play on your MONKEY.</span>
     </div>
-    <!-- <div class="right">
-      <div class="subhead">GLOBAL</div>
-      <div class="actions-row">
-        <label class="field">BPM
-          <input class="input-small" type="number" min="1" max="999" step="1" value={tempoState.bpm} oninput={(e)=>setTempo(Number((e.target as HTMLInputElement).value||120))} />
-        </label>
-      </div>
-    </div> -->
   </div>
 
   <div class="pane">
-    <div class="pane-header"><h3>Channel Activity</h3></div>
+    <div class="pane-header">
+      <h3>Channel Activity</h3>
+      <button class="btn-reset-all" title="Reset all synth channels to defaults" onclick={resetAll}>Reset All</button>
+    </div>
     <div class="list">
       {#each Array(10) as _, ch}
         <div class="row">
@@ -131,14 +139,14 @@
             <canvas use:modCanvas={ch} class="mod-canvas-overlay"></canvas>
             <div class="strip">
               {#each midiControlState.events[ch] as ev (ev.id)}
-                {#if shouldShow(ev)}
+                {#if eventIsNote(ev)}
                   <div class="evt {ev.kind}"
                        style={`--a:${Math.max(0, Math.min(1, (ev.velocity ?? 0) / 127))}; --dur:${3000}ms;`}
                        title={fmtTime(ev.ts)}
                        onanimationend={() => removeEvent(ch, ev.id)}>{fmtEvent(ev)}</div>
                 {/if}
               {/each}
-              {#if midiControlState.events[ch].filter(shouldShow).length === 0}
+              {#if midiControlState.events[ch].filter(eventIsNote).length === 0}
                 <div class="hint">No events</div>
               {/if}
             </div>
@@ -150,9 +158,16 @@
 </div>
 
 {#if selected.ch !== null}
-  <div class="modal-overlay" onclick={() => selected.ch = null}>
-    <div class="modal-panel" onclick={(e)=> e.stopPropagation()}>
-      <SynthChannelEditor channel={selected.ch!} onClose={() => selected.ch = null} />
+  <div
+    class="modal-overlay"
+    role="button"
+    tabindex="0"
+    aria-label="Close editor"
+    onclick={() => selected.ch = null}
+    onkeydown={(e) => { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') { selected.ch = null; } }}
+  >
+    <div class="modal-panel" role="dialog" aria-modal="true" tabindex="-1" bind:this={modalPanelEl} onclick={(e)=> e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') { selected.ch = null; } }}>
+      <SynthChannelEditor channel={selected.ch!} refreshKey={refreshKey} onReset={() => resetChannel(selected.ch!)} onClose={() => selected.ch = null} />
     </div>
   </div>
 {/if}
@@ -167,12 +182,9 @@
   .toolbar { display: flex; gap: 12px; align-items: flex-end; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--du-border); }
   .toolbar .left { display: flex; flex-direction: column; }
   .toolbar .left .muted { color: var(--du-muted); font-size: 0.9em; }
-  .toolbar .right { display: flex; gap: 6px; align-items: flex-end; flex-direction: column; }
-  .toolbar .right .actions-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .toolbar .right .subhead { position: relative; font-size: 12px; font-weight: 800; letter-spacing: .08em; color: #111827; text-transform: uppercase; padding-bottom: 6px; align-self: flex-end; }
-  .toolbar .right .subhead::after { content: ""; position: absolute; right: 0; bottom: 0; width: 140px; height: 3px; background: #2f313a; }
   .toolbar .left h1 { position: relative; display: inline-block; padding-bottom: 6px; margin: 0; }
   .toolbar .left h1::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; border-radius: 0; }
+  .toolbar .right { display:flex; align-items:center; gap:8px; }
   .status { display:flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--du-muted); font-size: 0.9em; }
 
   .pane { display: flex; flex-direction: column; gap: 8px; }
@@ -184,14 +196,15 @@
   .btn-chan:hover { background:#f9fafb; }
   .btn-chan.disabled { opacity: 0.6; cursor: default; }
   .btn-chan .gear { margin-left: auto; font-size: 18px; color: #000; line-height: 1; }
-  .actions .btn { border: 1px solid var(--du-border); background: #fff; color: var(--du-text); padding: 6px 10px; font-size: 13px; line-height: 1; border-radius: var(--du-radius); }
-  .actions .btn:hover { background: #f9fafb; }
+  .btn-reset { border:1px solid var(--du-border); background:#fff; padding:6px 8px; border-radius:6px; cursor:pointer; }
+  .btn-reset:hover { background:#f3f4f6; }
+  .btn-reset-all { border: 1px solid #1f2329; background: #2b2f36; color: #fff; padding:6px 12px; border-radius:6px; cursor:pointer; }
+  .btn-reset-all:hover { filter: brightness(0.97); }
 
   .field { display: inline-flex; align-items: center; gap: 6px; }
-  .actions-row input[type=number] { width: 80px; padding: 6px 8px; border: 1px solid var(--du-border); border-radius: var(--du-radius); background: #fff; }
   .events { flex: 1; overflow: hidden; position: relative; height: 28px; }
-  .mod-canvas-overlay { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: transparent; pointer-events: none; }
-  .strip { position: absolute; inset: 0; }
+  .mod-canvas-overlay { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: transparent; pointer-events: none; z-index: 0; }
+  .strip { position: absolute; inset: 0; z-index: 1; }
   .evt { position: absolute; left: 0; top: 6px; animation: flow-right var(--dur, 3000ms) linear forwards; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; padding: 0 3px; border: none; background: #fff; color: rgba(17, 24, 39, var(--a, 1)); white-space: nowrap; border-radius: 2px; }
   @keyframes flow-right { from { left: 0; } to { left: calc(100% + 100px); } }
   .hint { color: #888; font-size: 12px; padding: 2px 0; }

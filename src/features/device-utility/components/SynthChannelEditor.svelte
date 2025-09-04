@@ -1,6 +1,6 @@
 <script lang="ts">
   import { soundBackend, type SynthChannelConfig, type OscType, type ModRouting } from '~/lib/soundBackend';
-  const { channel, onClose } = $props<{ channel: number; onClose: () => void }>();
+  const { channel, onClose, refreshKey = 0, onReset = null } = $props<{ channel: number; onClose: () => void; refreshKey?: number; onReset?: (()=>void) | null }>();
 
   const cfg = $state<SynthChannelConfig>(soundBackend.getChannelConfig(channel));
   const WAVE_TYPES: OscType[] = ['sine','square','sawtooth','triangle'];
@@ -8,6 +8,13 @@
   function setCfg(patch: Partial<SynthChannelConfig>) {
     Object.assign(cfg, patch);
     soundBackend.setChannelConfig(channel, patch);
+    try {
+      const key = 'wavy_playground_synth_cfg_v1';
+      const raw = localStorage.getItem(key);
+      const obj = raw ? JSON.parse(raw) : {};
+      obj[String(channel)] = soundBackend.getChannelConfig(channel);
+      localStorage.setItem(key, JSON.stringify(obj));
+    } catch {}
   }
 
   // Wave preview drawing
@@ -54,6 +61,12 @@
     adsrUI.d = uiFromTime(cfg.adsr.decay, minD, maxD);
     adsrUI.s = Math.max(0, Math.min(1, cfg.adsr.sustain));
     adsrUI.r = uiFromTime(cfg.adsr.release, minR, maxR);
+  });
+  // When refreshKey changes (e.g., reset from parent), reload config from backend
+  $effect(() => {
+    void refreshKey; // dependency
+    const latest = soundBackend.getChannelConfig(channel);
+    Object.assign(cfg, latest);
   });
   function drawADSR() {
     const ctx = adsrCanvas.getContext('2d')!;
@@ -149,7 +162,10 @@
 <div class="editor">
   <div class="head">
     <h3>Channel {channel + 1} Synth</h3>
-    <button class="btn" onclick={onClose}>Close</button>
+    <div class="head-actions">
+      <button class="btn primary" onclick={() => { if (typeof onReset==='function') onReset(); }}>Reset channel</button>
+      <button class="btn" onclick={onClose}>Close</button>
+    </div>
   </div>
   <div class="stack">
     <div class="card">
@@ -236,8 +252,11 @@
 <style>
   .editor { width: min(920px, 95vw); background: #fff; border: 1px solid #2f313a; border-radius: 8px; box-shadow: none; padding: 14px; }
   .head { display:flex; align-items:center; justify-content: space-between; }
+  .head-actions { display:flex; gap:8px; align-items:center; }
   h3 { margin: 0; }
   .btn { border:1px solid var(--du-border); background:#fff; padding:6px 10px; border-radius:6px; cursor:pointer; }
+  .btn.primary { background: #2b2f36; color: #fff; border-color: #1f2329; }
+  .btn.primary:hover { filter: brightness(0.97); }
   .stack { display:flex; flex-direction: column; gap: 12px; margin-top: 8px; }
   .card { border:1px solid var(--du-border); border-radius:8px; padding:10px; background:#fcfcfd; }
   .card-title { font-weight:700; margin-bottom:8px; }

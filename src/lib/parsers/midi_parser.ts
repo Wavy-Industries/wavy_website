@@ -1,13 +1,6 @@
 import { TICKS_PER_BEAT, type LoopData } from '~/lib/parsers/samples_parser';
 import { computeLoopLengthBeatsFromEvents } from '~/lib/music/loop_utils';
 
-// Minimal MIDI SMF parser → LoopData
-// - Supports format 0/1, running status, VLQ deltas, note on/off (note_on vel 0 treated as off)
-// - Merges all tracks by absolute tick time
-// - Scales PPQN to device TICKS_PER_BEAT (24) and rounds to nearest tick
-// - Ensures zero-length notes are at least 1 tick
-// - Closes unterminated notes at end of loop
-
 function readStr(buf: Uint8Array, o: number, len: number) { return String.fromCharCode(...buf.slice(o, o+len)); }
 function readU32(dv: DataView, o: number) { return dv.getUint32(o); }
 function readU16(dv: DataView, o: number) { return dv.getUint16(o); }

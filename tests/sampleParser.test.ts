@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { generateDummySamples, samplesParser_decode, samplesParser_encode } from '~/js/parsers/samples_parser';
-import {canonicalize} from '~/js/utilities.js'
+import {  samplesParser_decode, samplesParser_encode } from '~/lib/parsers/samples_parser';
+import {canonicalize} from '~/lib/utils/canonicalize';
 
 describe('Samples Parser', () => {
   it('should encode and decode sample packs symmetrically', () => {

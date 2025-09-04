@@ -1,86 +1,189 @@
 <script>
-    import { sampleState, addPackToSelected, removeSelectedAt, moveSelected, uploadSelected, loadInitialData, revertToDevice, deviceSampleUploadDefault, deleteUserPackById, syncToDevice, syncFromDevice } from "~/features/device-utility/stores/samples.svelte";
-    import { editState, openPackEditorFor } from "~/features/device-utility/stores/edits.svelte";
-    import { packDisplayName, canonicalIdKey, deviceIndexForDisplay } from "~/features/device-utility/utils/packs";
-    import { getPageByteSize } from "~/lib/parsers/samples_parser";
-    import { onMount } from 'svelte';
-    import PackEditor from '~/features/device-utility/views/PackEditor.svelte';
+    import { uplaodDeviceSamples, uplaodDeviceDefaultSamples } from "~/features/device-utility/states/samplesDevice.svelte";
+    import { constructSamplePacks, packDisplayName, getSamplePack, compareDeviceSample } from "~/features/device-utility/utils/samples";
+    import { deviceSamplesState, deviceSampleTransferState, DEFAULT_SAMPLE_PACK_IDS } from "~/features/device-utility/states/samplesDevice.svelte";
+    import { fetchAvailableServerPacks } from "~/features/device-utility/services/serverSamplePacks";
+    import { sampleParser_packSize } from "~/lib/parsers/samples_parser";
+    import { compareSamplePack, getPackType } from "~/features/device-utility/utils/samples";
 
-    const storagePercentage = $derived(sampleState.storageUsed != null && sampleState.storageTotal != null ? (sampleState.storageUsed/sampleState.storageTotal * 100).toFixed(1) : "??.?")
+    import { Log } from "~/lib/utils/Log";
+    import PackEditor from "./PackEditor.svelte";
+    import { openPackEditorForId, openPackEditorNew, editState } from "../states/edits.svelte";
+    import { samplesLocal, deleteLocalSamplePack, newLocalSamplePack } from "../states/samplesLocal.svelte";
+    import NameBoxes from "../components/NameBoxes.svelte";
+    import PackTypeBadge from "../components/PackTypeBadge.svelte";
+    const LOG_LEVEL = Log.LEVEL_DEBUG
+    const log = new Log("DeviceSampleManager", LOG_LEVEL);
 
-    onMount(() => { loadInitialData(); });
+    const selectedPacks = $state({
+      ids: null,
+      display: null,
+      asyncData: null,
+    });
 
-    const isSelected = (id) => sampleState.selected.some(x => x && canonicalIdKey(x.id) === canonicalIdKey(id));
-    const diffFor = (id) => sampleState.diffs[canonicalIdKey(id)];
+    $inspect(selectedPacks);
 
-    function mailtoForUserPack(id) {
-      const meta = sampleState.userPacks.find(p => p.id === id);
-      const page = meta?.loops;
-      const subject = encodeURIComponent('WAVY MONKEY sample pack proposal');
-      const packName = packDisplayName(id).slice(0,7);
-      const pretty = page ? JSON.stringify(page, null, 2) : '{}';
-      const body = encodeURIComponent(
-        'Hi WAVY team,\n\n' +
-        'I would like to propose a public sample pack for MONKEY.\n' +
-        'Please find the details below.\n\n' +
-        'Author: <your name here>\n' +
-        'Description: <one sentence about the pack>\n' +
-        `Pack name (max 7 characters): ${packName}\n\n` +
-        'Here is the sample pack content, cheers:\n\n' +
-        pretty
-      );
-      return `mailto:hello@wavyindustries.com?subject=${subject}&body=${body}`;
-    }
+    // initiate selection from device
+    $effect(() => {
+      // store the packs only once as we fetch the packs from device.
+      if (selectedPacks.ids == null && deviceSamplesState.ids) {
+        selectedPacks.ids = deviceSamplesState.ids;
+      }
+    });
+    
+    // update display and async data
+    $effect(() => {
+      const ids = selectedPacks.ids;
+      const total = deviceSamplesState.storageTotal;
+      const pages = deviceSamplesState.deviceSamples?.pages ?? [];
+      selectedPacks.display = ids.map((id) => id ? packDisplayName(id) : {});
+      selectedPacks.asyncData = ids.map((id, idx) => {
+        if (!id) return null;
+        const page = pages[idx];
+        const totalSnapshot = total;
+        return (async () => {
+          const pack = await getSamplePack(id);
+          const percentageUsage =
+            pack && totalSnapshot ? (sampleParser_packSize(pack) / totalSnapshot) * 100 : null;
+          const outOfSync =
+            pack && page ? compareSamplePack(pack, page) : null;
+          return { data: pack, percentageUsage, outOfSync };
+        })();
+      });
+    });
 
-    function usagePercentFor(p, i) {
-      if (!(i < 10)) return '';
-      const total = sampleState.storageTotal || 0;
-      if (!total) return '';
-      if (!p) return '';
-      // For user-local packs, estimate from encoded page size
-      if (p?.source === 'user_local') {
-        const page = p.loops || sampleState.userPacks.find(x => x.id === p.id)?.loops;
-        if (page) {
-          try {
-            const bytes = getPageByteSize(page);
-            return ((bytes / total) * 100).toFixed(1) + '%';
-          } catch {}
+    // If a pack was mutated and saved-as-new in the editor, replace it in the selection
+    $effect(() => {
+      const from = editState.sourceId;
+      const to = editState.id;
+      if (!selectedPacks?.ids || !from || !to || from === to) return;
+      const idx = selectedPacks.ids.indexOf(from);
+      if (idx !== -1) {
+        selectedPacks.ids[idx] = to;
+      }
+    });
+
+    // Transfer device packs to archive if online pack disappears; ensure all device packs exist locally
+    $effect(async () => {
+        const dev = deviceSamplesState.deviceSamples;
+        if (!dev || !Array.isArray(dev.pages)) return;
+        try {
+            for (const page of dev.pages) {
+                if (!page) continue;
+                // If online pack but it no longer exists online, archive it locally and switch selection to archive ID
+                if (getPackType(page.name) !== 'Local' && getPackType(page.name) !== 'Archive') {
+                  const onlinePacks = await availablePacks();
+                  if (!onlinePacks[page.name]) {
+                    const archiveName = `A-${page.name.slice(2)}`;
+                    const existsLocal = samplesLocal.packs.some(p => p?.name === archiveName);
+                    if (!existsLocal) {
+                      const pageMut = JSON.parse(JSON.stringify(page));
+                      pageMut.name = archiveName;
+                      newLocalSamplePack(pageMut);
+                    }
+                    const idx = selectedPacks.ids?.indexOf(page.name) ?? -1;
+                    if (idx !== -1) selectedPacks.ids[idx] = archiveName;
+                  }
+                } else {
+                  const exists = samplesLocal.packs.some(p => p?.name === page.name);
+                  if (!exists) {
+                    // Store a plain clone to ensure availability locally
+                    newLocalSamplePack(JSON.parse(JSON.stringify(page)));
+                  }
+                }
+            }
+        } catch {}
+    });
+
+    const deviceStoragePercentState = $derived(deviceSamplesState.storageUsed != null && deviceSamplesState.storageTotal != null ? (deviceSamplesState.storageUsed/deviceSamplesState.storageTotal * 100).toFixed(1) : null)
+    const isTransferring = $derived(deviceSampleTransferState.supportCheck.type === 'transferring' || deviceSampleTransferState.download.type === 'transferring' || deviceSampleTransferState.upload.type === 'transferring');
+
+    let showTransferDetails = $state(false);
+    
+    let selectionCompare = $state({ dirty: false, computing: false });
+    $effect(() => {
+      const ids = selectedPacks.ids;
+      const dev = deviceSamplesState.deviceSamples;
+      if (!Array.isArray(ids) || !dev) { selectionCompare.dirty = false; return; }
+      selectionCompare.computing = true;
+      (async () => {
+        try {
+          const candidate = await constructSamplePacks(ids);
+          if (!candidate) { selectionCompare.dirty = true; selectionCompare.computing = false; return; }
+          const diff = compareDeviceSample(candidate, dev);
+          selectionCompare.dirty = !(diff?.areIdentical ?? true);
+        } catch {
+          selectionCompare.dirty = true;
+        } finally {
+          selectionCompare.computing = false;
         }
+      })();
+    });
+    
+    const availablePacks = $state(async () => fetchAvailableServerPacks());
+
+    const mailtoForLocalPack = (pack) => {
+      try {
+        const subject = encodeURIComponent('WAVY MONKEY sample pack proposal');
+        const packName = (pack?.name || '').slice(2, 9);
+        const pretty = JSON.stringify(pack?.loops ?? {}, null, 2);
+        const body = encodeURIComponent(
+          'Hi WAVY team,\n\n' +
+          'I would like to propose a public sample pack for MONKEY.\n' +
+          'Please find the details below.\n\n' +
+          'Author: <your name here>\n' +
+          'Description: <one sentence about the pack>\n' +
+          `Pack name (max 7 characters): ${packName}\n\n` +
+          'Here is the sample pack content, cheers:\n\n' +
+          pretty
+        );
+        return `mailto:hello@wavyindustries.com?subject=${subject}&body=${body}`;
+      } catch {
+        return 'mailto:hello@wavyindustries.com';
       }
-      // Otherwise, use device-reported usage if available
-      const used = sampleState.storagePacksUsed?.[deviceIndexForDisplay(i)];
-      if (used != null) return ((used / total) * 100).toFixed(1) + '%';
-      return '';
     }
 
-    // JSON dialog state
-    let jsonDialog = $state({ open: false, title: '', content: '', copied: false });
-    async function openJsonDialogFor(id) {
-      jsonDialog.title = `${packDisplayName(id)} — JSON`;
-      jsonDialog.copied = false;
-      jsonDialog.content = 'Loading…';
-      jsonDialog.open = true;
-      try {
-        const { getPackPageById } = await import('~/features/device-utility/stores/samples.svelte');
-        const page = await getPackPageById(id);
-        jsonDialog.content = JSON.stringify(page ?? {}, null, 2);
-      } catch (_) {
-        jsonDialog.content = '{}';
-      }
+    const moveUp = (idx) => {
+      if (!selectedPacks) return;
+      const id = selectedPacks.ids[idx];
+      selectedPacks.ids[idx] = selectedPacks.ids[idx - 1];
+      selectedPacks.ids[idx - 1] = id;
     }
-    function closeJsonDialog() { jsonDialog.open = false; }
-    async function copyJsonToClipboard() {
-      try {
-        await navigator.clipboard.writeText(jsonDialog.content || '');
-        jsonDialog.copied = true;
-        setTimeout(() => { jsonDialog.copied = false; }, 1500);
-      } catch (_) {
-        // no-op
-      }
+    
+    const moveDown = (idx) => {
+      if (!selectedPacks) return;
+      const id = selectedPacks.ids[idx];
+      selectedPacks.ids[idx] = selectedPacks.ids[idx + 1];
+      selectedPacks.ids[idx + 1] = id;
     }
+
+    const addToSelected = (id) => {
+      if (!selectedPacks.ids) return;
+      const nullIndex = selectedPacks.ids.findIndex(id => id === null);
+      if (nullIndex === -1) {
+        log.warning("No empty slots found in selected packs");
+        return;
+      }
+      selectedPacks.ids[nullIndex] = id;
+    }
+
+    const uploadSelected = async () => {
+      const samples = await constructSamplePacks(selectedPacks.ids);
+      if (!samples) {
+        log.error("Failed to construct samples");
+        return;
+      }
+      log.debug("Uploading samples:");
+      log.debug(samples);
+      await uplaodDeviceSamples(samples);
+    }
+
 </script>
 
-{#if !editState.open}
+<!-- {#if editState.open}
+<PackEditor />
+{:else} -->
+{#if editState.open === false}
 <div class="content">
   <div class="beta-banner">
     <span class="beta-badge">BETA</span>
@@ -94,80 +197,102 @@
     <div class="right">
       <div class="subhead">DEVICE ACTIONS</div>
       <div class="actions-row">
-        <button class="btn caution" title="Reset device samples to default" aria-label="Reset to default" onclick={deviceSampleUploadDefault} disabled={sampleState.uploadPercentage != null}>Reset to default</button>
-        <button class="btn" title="Sync selection from device" aria-label="Sync from device" onclick={revertToDevice} disabled={!sampleState.dirty}>Sync from device</button>
-        <button class="btn primary" title="Upload selected packs to device" aria-label="Upload to device" onclick={uploadSelected} disabled={sampleState.uploadPercentage != null}>Upload to device</button>
+        <button class="btn caution" disabled={isTransferring} title="Reset device samples to default" aria-label="Reset to default" onclick={uplaodDeviceDefaultSamples}>Reset to default</button>
+        <button class="btn" disabled={isTransferring} title="Sync selection from device" aria-label="Sync from device" onclick={() => selectedPacks.ids = DEFAULT_SAMPLE_PACK_IDS}>Sync from device</button>
+        <button class="btn primary" disabled={isTransferring} title="Upload selected packs to device" aria-label="Upload to device" onclick={uploadSelected}>Upload to device</button>
       </div>
     </div>
   </div>
   <div class="status">
-    <span>Storage used: {storagePercentage}%</span>
-    <div class="progress" style={`--p:${storagePercentage}`}></div>
-    {#if sampleState.uploadPercentage != null}
-      <span>Uploading... {sampleState.uploadPercentage == 0 ? "(preparing device)" : `${sampleState.uploadPercentage}%`}</span>
+    <span>Storage used: {deviceStoragePercentState ?? "-"}%</span>
+    <div class="progress" style={`--p:${deviceStoragePercentState ?? 0}`}></div>
+    <div class="divider"></div>
+    <span>Device activity:</span>
+    {#if deviceSampleTransferState.supportCheck.type === 'transferring'}
+      {@const progress = deviceSampleTransferState.supportCheck.progress}
+      <span class="pill active">Checking support ({progress ? progress.toFixed(1) + '%' : 'Preparing'})</span>
+    {:else if deviceSampleTransferState.download.type === 'transferring'}
+      {@const progress = deviceSampleTransferState.download.progress}
+      <span class="pill active">Downloading ({progress ? progress.toFixed(1) + '%' : 'Preparing'})</span>
+    {:else if deviceSampleTransferState.upload.type === 'transferring'}
+      {@const progress = deviceSampleTransferState.upload.progress}
+      <span class="pill active">Uploading ({progress ? progress.toFixed(1) + '%' : 'Preparing'})</span>
+    {:else}
+      <span class="pill idle">Idle</span>
     {/if}
-    {#if sampleState.dirty}<span class="dirty">unsaved changes</span>{/if}
-    {#if sampleState.errors.length > 0}
-      <div class="errors">
-        {#each sampleState.errors as e}
-          <div class="error">{e}</div>
-        {/each}
-      </div>
+    <button class="button-link" onclick={() => showTransferDetails = !showTransferDetails}>{showTransferDetails ? 'Hide' : 'Show'} details</button>
+    {#if selectionCompare.dirty}
+      <span class="dirty">Unsaved selection</span>
     {/if}
   </div>
+  {#if showTransferDetails}
+    <div class="transfer-details">
+      <div>Support check: {deviceSampleTransferState.supportCheck.type}{#if deviceSampleTransferState.supportCheck.progress != null} ({deviceSampleTransferState.supportCheck.progress}%) {/if}</div>
+      <div>Download: {deviceSampleTransferState.download.type}{#if deviceSampleTransferState.download.progress != null} ({deviceSampleTransferState.download.progress}%) {/if}</div>
+      <div>Upload: {deviceSampleTransferState.upload.type}{#if deviceSampleTransferState.upload.progress != null} ({deviceSampleTransferState.upload.progress}%) {/if}</div>
+    </div>
+  {/if}
 
   <div class="pane">
     <div class="pane-header"><h3>Selected Packs</h3></div>
     <div class="selected-list">
-      {#each Array(10) as _, i}
-        {#if sampleState.selected[i]}
+      {#each Array(10) as _, i (i + ':' + (selectedPacks.ids?.[i] ?? 'empty'))}
+        {#if selectedPacks.ids?.[i]}
           <div class="row">
-            <span class="index">{i<9 ? i+1 : 0}</span>
-            <span class="badge {sampleState.selected[i].type}">{sampleState.selected[i].type}</span>
-            <span class="name" title={(sampleState.selected[i].author || sampleState.selected[i].created) ? `${sampleState.selected[i].author ?? ''}${sampleState.selected[i].author && sampleState.selected[i].created ? ' • ' : ''}${sampleState.selected[i].created ?? ''}` : ''}>{packDisplayName(sampleState.selected[i].id)} {#if diffFor(sampleState.selected[i].id)?.status && diffFor(sampleState.selected[i].id).status !== 'in_sync'}<span class="outofsync">Out of sync</span>{/if}</span>
-            <span class="usage">{usagePercentFor(sampleState.selected[i], i)}</span>
+            <span class="index">{i < 9 ? i + 1 : 0}</span>
+            <PackTypeBadge type={selectedPacks.display[i]?.type} />
+            <span class="name"><NameBoxes value={selectedPacks.display[i]?.name || ''} />
+              {#if selectedPacks.asyncData?.[i]}
+                {#await selectedPacks.asyncData?.[i]}
+                  <span class=""></span>
+                {:then data}
+                  {#if data?.outOfSync?.areIdentical === false}
+                    <span class="outofsync">Out of sync</span>
+                  {/if}
+                {:catch e}
+                  <span class="error">-</span>
+                {/await}
+              {/if}
+            </span>
+
+            {#if selectedPacks.asyncData?.[i]}
+              {#await selectedPacks.asyncData?.[i]}
+                <span class="usage">Loading...</span>
+              {:then data}
+                <span class="usage">{data.percentageUsage != null ? data.percentageUsage.toFixed(1) : "-" }%</span>
+              {:catch e}
+                <span class="usage error">-</span>
+              {/await}
+            {:else}
+              <span class="usage">-</span>
+            {/if}
+
             <div class="actions">
-              <button class="btn" title="Move up" onclick={() => moveSelected(i, -1)}>Move up</button>
-              <button class="btn" title="Move down" onclick={() => moveSelected(i, 1)}>Move down</button>
-              <button class="btn" title="Remove" onclick={() => removeSelectedAt(i)}>Remove</button>
-              {#if sampleState.selected[i].source === 'user_local'}
-                <button class="btn" title="Edit user pack" onclick={() => openPackEditorFor(sampleState.selected[i].id, 'selected')}>Edit</button>
-                <button class="btn" title="Sync device → local" onclick={() => syncFromDevice(sampleState.selected[i].id)} disabled={sampleState.uploadPercentage != null}>Push down</button>
+              <button class="btn" title="Move up"    onclick={() => moveUp(i)}>Move up</button>
+              <button class="btn" title="Move down"  onclick={() => moveDown(i)}>Move down</button>
+              <button class="btn" title="Remove"     onclick={() => selectedPacks.ids[i] = null}>Remove</button>
+              {#if selectedPacks.display[i]?.type === 'Local'}
+                <button class="btn" title="Edit local pack" onclick={() => openPackEditorForId(selectedPacks.ids[i])}>Edit</button>
               {:else}
-                <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorFor(sampleState.selected[i].id, 'selected')}>Mutate</button>
+                <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorForId(selectedPacks.ids[i])}>Mutate</button>
               {/if}
             </div>
           </div>
         {:else}
           <div class="row empty">
-            <span class="index">{i<9 ? i+1 : 0}</span>
+            <span class="index">{i < 9 ? i + 1 : 0}</span>
             <span class="badge">empty</span>
             <span class="name muted">Empty slot</span>
             <span class="usage"></span>
             <div class="actions">
-              <button class="btn" title="Move up" onclick={() => moveSelected(i, -1)}>Move up</button>
-              <button class="btn" title="Move down" onclick={() => moveSelected(i, 1)}>Move down</button>
+              <button class="btn" title="Move up"   onclick={() => moveUp(i)}>Move up</button>
+              <button class="btn" title="Move down" onclick={() => moveDown(i)}>Move down</button>
             </div>
           </div>
         {/if}
       {/each}
-      {#if sampleState.selected.length > 10}
-        {#each sampleState.selected.slice(10) as p, k}
-          {#if p}
-            <div class="row overflow">
-              <span class="index">-</span>
-              <span class="badge {p.type}">{p.type}</span>
-              <span class="name" title={(p.author || p.created) ? `${p.author ?? ''}${p.author && p.created ? ' • ' : ''}${p.created ?? ''}` : ''}>{packDisplayName(p.id)}</span>
-              <span class="usage"></span>
-              <div class="actions">
-                <button class="btn" title="Remove" onclick={() => removeSelectedAt(10 + k)}>Remove</button>
-                <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorFor(p.id, 'selected')}>Mutate</button>
-              </div>
-            </div>
-          {/if}
-        {/each}
-      {/if}
-      {#if sampleState.selected.slice(0,10).every(x => !x) && sampleState.selected.length <= 10}
+
+      {#if selectedPacks.ids?.length === 0}
         <div class="hint">No packs selected — add from below.</div>
       {/if}
     </div>
@@ -175,67 +300,74 @@
 
   <div class="pane">
     <div class="pane-header">
-      <h3>Available Packs</h3>
+      <h3>Local Packs</h3>
       <div class="inline-actions">
-        <button class="btn primary" title="Create new pack" aria-label="Create new pack" onclick={() => openPackEditorFor(null)}>+ Create Local pack</button>
+        <button class="btn primary" title="Create new pack" aria-label="Create new pack" onclick={() => openPackEditorNew()}>+ Create Local pack</button>
       </div>
     </div>
     <div class="grid">
-      {#each sampleState.available as p}
-        <div class="card" class:selected={isSelected(p.id)} class:disabled={p?.disabled}>
-          <div class="title"><span class="badge {p.type}">{p.type}</span> {packDisplayName(p.id)}</div>
+      {#each samplesLocal.packs as p (p.name)}
+        {@const packType = getPackType(p.name)}
+        <div class="card">
+          <div class="title"><PackTypeBadge id={p.name} /> <NameBoxes value={p.name.slice(2)} /></div>
           <div class="meta">
-            {#if p.author || p.created}
-              <span>{p.author}</span>
-            {/if}
-            {#if diffFor(p.id)?.status && diffFor(p.id).status !== 'in_sync'}
-              <span class="outofsync">Out of sync</span>
-            {/if}
+            <span class="usage">{deviceSamplesState.storageTotal ? (sampleParser_packSize(p) / deviceSamplesState.storageTotal * 100).toFixed(1) : '-'}%</span>
           </div>
-          {#if p.description}
-            <div class="desc">{p.description}</div>
-          {/if}
+          <div class="desc"></div>
           <div class="card-actions">
-            <button class="btn primary" title="Add to selected" onclick={() => addPackToSelected(p.id)} disabled={p?.disabled || isSelected(p.id)}>Add</button>
-            {#if p.source === 'user_local'}
-              <button class="btn" title="Edit user pack" onclick={() => openPackEditorFor(p.id, 'available')} disabled={p?.disabled}>Edit</button>
-              <button class="btn" title="Sync device → local (disabled for official/public)" disabled>Push down</button>
+            <button class="btn" title="Add to selected" disabled={selectedPacks.ids?.includes(p.name)} onclick={() => addToSelected(p.name)}>Add</button>
+            {#if packType === 'Local'}
+              <button class="btn primary" title="Edit local pack" onclick={() => openPackEditorForId(p.name)}>Edit</button>
             {:else}
-              <button class="btn" title="Mutate pack (clone to local)" onclick={() => openPackEditorFor(p.id, 'available')} disabled={p?.disabled}>Mutate</button>
+              <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorForId(p.name)}>Mutate</button>
             {/if}
-            <button class="btn" title="Sync local → device" onclick={() => syncToDevice(p.id)} disabled={sampleState.uploadPercentage != null}>Push up</button>
-            {#if p.source === 'user_local'}
-              <button class="btn danger" title="Delete user pack" onclick={() => deleteUserPackById(p.id)} disabled={p?.disabled}>Delete</button>
-              <button class="btn success" title="Publish pack via email" onclick={() => (window.location.href = mailtoForUserPack(p.id))} disabled={p?.disabled}>Publish</button>
+            <button class="btn" title="Delete pack" disabled={selectedPacks.ids?.includes(p.name)} onclick={() => { if (confirm('Delete this pack? This cannot be undone.')) deleteLocalSamplePack(p.name); }}>Delete</button>
+            {#if packType === 'Local'}
+              <a class="btn" title="Publish (email)" href={mailtoForLocalPack(p)}>Publish</a>
             {/if}
-            <button class="btn" title="View raw JSON" onclick={() => openJsonDialogFor(p.id)} disabled={p?.disabled}>View raw</button>
           </div>
         </div>
       {/each}
+      {#if samplesLocal.packs.length === 0}
+        <div class="hint">No local packs — create one above.</div>
+      {/if}
     </div>
   </div>
 
+  <div class="pane">
+    <div class="pane-header">
+      <h3>Online Packs</h3>
+    </div>
+    <div class="grid">
+      {#await availablePacks()}
+        <p>Loading...</p>
+      {:then packs}
+        {#each Object.entries(packs) as [k, p], idx (k)}
+          <div class="card" class:selected={k in selectedPacks.ids} >
+            <div class="title"><PackTypeBadge type={p.display.type} /> <NameBoxes value={p.display.name || ''} /></div>
+            <div class="meta">
+              {#if p.author}
+                <span>{p.author}</span>
+              {/if}
+              {#if selectedPacks.asyncData?.[idx]?.outOfSync?.areIdentical === false}
+                <span class="outofsync">Out of sync</span>
+              {/if}
+            </div>
+            {#if p.description}
+              <div class="desc">{p.description}</div>
+            {/if}
+            <div class="card-actions">
+              <button class="btn primary" title="Add to selected" disabled={selectedPacks.ids?.includes(k)} onclick={() => addToSelected(k)}>Add</button>
+              <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorForId(k)}>Mutate</button>
+            </div>
+          </div>
+        {/each}
+      {/await}
+    </div>
+  </div>
 </div>
 {:else}
   <PackEditor />
-{/if}
-
-{#if jsonDialog.open}
-  <div class="modal-backdrop" onclick={closeJsonDialog}>
-    <div class="modal" onclick={(e)=>e.stopPropagation()}>
-      <div class="modal-header">
-        <div class="title">{jsonDialog.title}</div>
-        <button class="icon" onclick={closeJsonDialog}>✕</button>
-      </div>
-      <div class="modal-body">
-        <pre class="json-block">{jsonDialog.content}</pre>
-      </div>
-      <div class="modal-actions">
-        <button class="button-link" onclick={copyJsonToClipboard}>Copy</button>
-        {#if jsonDialog.copied}<span class="copied">Copied!</span>{/if}
-      </div>
-    </div>
-  </div>
 {/if}
 
 <style>
@@ -253,13 +385,17 @@
 .toolbar .left h1 { position: relative; display: inline-block; padding-bottom: 6px; }
 .toolbar .left h1::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; border-radius: 0; }
 .user-pack { display: flex; gap: 8px; align-items: center; }
-.user-pack textarea { width: 320px; height: 60px; }
 .dirty { background: repeating-linear-gradient(45deg, #FFFEAC, #FFFEAC 6px, #f1ea7d 6px, #f1ea7d 12px); color: #3a3200; border: 1px solid #b3ac5a; padding: 2px 6px; border-radius: var(--du-radius); font-weight: 700; }
 .primary { background: var(--du-accent); color: var(--du-accent-contrast); }
 .icon { border-radius: var(--du-radius); width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
 .status { display:flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--du-muted); }
 .progress { position: relative; width: 160px; height: 8px; background: #E9ECFF; border-radius: var(--du-radius); overflow: hidden; border: 1px solid var(--du-border); }
 .progress::after { content: ""; position: absolute; inset: 0; width: calc(var(--p, 0) * 1%); background: black; border-radius: var(--du-radius); }
+.divider { width: 1px; height: 16px; background: var(--du-border); }
+.pill { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--du-border); font-size: 12px; }
+.pill.active { background: #fff2cc; color: #7a5d00; border-color: #e5c566; }
+.pill.idle { background: #f3f4f6; color: #6b7280; }
+.transfer-details { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; border: 1px dashed var(--du-border); background: #fbfbfd; padding: 8px; border-radius: 8px; margin-top: 6px; }
 .errors { display:flex; flex-direction: column; gap:4px; }
 .error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:6px; }
 .pane { display: flex; flex-direction: column; gap: 8px; }
@@ -274,27 +410,24 @@
 .badge.official { background:#eef5ff; color:#1f4fd6; border-color:#cfe0ff; }
 .badge.public { background:#eef9f3; color:#1d6f3a; border-color:#cfeedd; }
 .badge.local { background:#f3f4f6; color:#4b5563; }
+.badge.archive { background:#fff7ed; color:#9a3412; border-color:#fed7aa; }
 .usage { text-align: right; font-variant-numeric: tabular-nums; color: #555; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .actions .btn { border: 1px solid #2f313a; background: #f2f3f5; color: #111827; border-radius: var(--du-radius); padding: 6px 8px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
 .actions .btn:hover { background: #e9ebee; }
 .actions button:disabled, .button-link:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Disabled look for top toolbar actions */
+.toolbar .right .actions-row .btn:disabled { background: #f3f4f6; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; pointer-events: none; opacity: 0.7; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .card { border: 1px solid #2f313a; border-radius: var(--du-radius); background: #fcfcfd; padding: 12px; display:flex; flex-direction: column; gap: 8px; box-shadow: none; min-height: 170px; }
 .card.disabled { opacity: 0.6; filter: grayscale(0.1); }
-.card:hover { background-color: #f5f5f5; }
 .card-actions { margin-top: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--du-border); }
 .card-actions .btn { appearance: none; -webkit-appearance: none; border: 1px solid var(--du-border); background: #fff; color: var(--du-text); padding: 6px 10px; font-size: 13px; line-height: 1; border-radius: var(--du-radius); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .card-actions .btn:hover { background: #f9fafb; }
 .card-actions .btn.primary { background: #2b2f36; color: #fff; border-color: #1f2329; }
 .card-actions .btn.primary:hover { filter: brightness(0.97); }
-.card-actions .btn.caution { background: repeating-linear-gradient(45deg, #FFFEAC, #FFFEAC 6px, #f1ea7d 6px, #f1ea7d 12px); color: #3a3200; border-color: #b3ac5a; }
-.card-actions .btn.success { background: var(--du-success); color: #fff; border-color: transparent; }
-.card-actions .btn.success:hover { filter: brightness(0.97); }
-.card-actions .btn.danger { border-color: #ffd2d2; color: #a40000; background: #fff5f5; }
-.card-actions .btn.danger:hover { background: #ffecec; }
+/* removed caution/success/danger unused selectors during migration */
 .card-actions .btn:disabled { background: #f3f4f6; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; pointer-events: none; }
-.card:hover { border-color: var(--du-border-strong); }
 .card.selected { border: 3px solid black; }
 .card.selected .title, .card.selected .meta { opacity: 0.7; }
 .title { font-weight: 600; color: var(--du-text); }
@@ -309,7 +442,6 @@
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 1000; padding: 12px; }
 .modal { background: white; border-radius: var(--du-radius); border: 1px solid var(--du-border); width: min(800px, 90vw); max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--du-shadow); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #eee; }
-.modal-header .title { font-weight: 600; }
 .modal-body { padding: 0; }
 .json-block { margin: 0; padding: 12px; background: #0b1020; color: #d7e2ff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; line-height: 1.4; max-height: 60vh; overflow: auto; }
 .modal-actions { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid #eee; }

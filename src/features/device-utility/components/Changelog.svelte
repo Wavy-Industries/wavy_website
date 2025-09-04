@@ -1,5 +1,5 @@
 <script>
-    import { firmwareState } from "~/features/device-utility/stores/firmware.svelte";
+    import { firmwareState } from "~/features/device-utility/states/firmware.svelte";
 
     const changelog = $derived(firmwareState.changelog);
 

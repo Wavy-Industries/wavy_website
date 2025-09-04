@@ -1,31 +1,28 @@
 import { BluetoothManager } from './bluetoothManager';
 
-export class MIDICharacteristic {
+export class MIDIService {
     private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
     private _boundCharHandler: ((event: Event) => void) | null = null;
-    private _onMIDIMessage = new Set<(data: Uint8Array) => void>();
-    private _onNoteOn = new Set<(note: number, velocity: number, channel: number) => void>();
-    private _onNoteOff = new Set<(note: number, velocity: number, channel: number) => void>();
-    private _onControlChange = new Set<(controller: number, value: number, channel: number) => void>();
+    public onMIDIMessage: ((data: Uint8Array) => void) | null = null;
+    public onNoteOn: ((note: number, velocity: number, channel: number) => void) | null = null;
+    public onNoteOff: ((note: number, velocity: number, channel: number) => void) | null = null;
+    public onControlChange: ((controller: number, value: number, channel: number) => void) | null = null;
+
     private midiWritePromise: Promise<void> | null = null;
     private midiInitPromise: Promise<void> | null = null;
 
     private readonly MIDI_SERVICE_UUID = '03b80e5a-ede8-4b33-a751-6ce34ec4c700';
     private readonly MIDI_CHARACTERISTIC_UUID = '7772e5db-3868-4112-a1a9-f2669d106bf3';
 
-    constructor(private bluetoothManager: BluetoothManager) {
-        this.bluetoothManager.onConnectionReestablished(() => {
-            this.characteristic = null; this.midiInitPromise = null; this.initialize();
-        });
-        this.bluetoothManager.onConnect(() => {
-            this.characteristic = null; this.midiInitPromise = null; this.initialize();
-        });
+    private bluetoothManager: BluetoothManager;
+
+    public constructor(bluetoothManager: BluetoothManager) {
+        this.bluetoothManager = bluetoothManager;
     }
 
-    public onMIDIMessage(callback: (data: Uint8Array) => void) { this._onMIDIMessage.add(callback); }
-    public onNoteOn(callback: (note: number, velocity: number, channel: number) => void) { this._onNoteOn.add(callback); }
-    public onNoteOff(callback: (note: number, velocity: number, channel: number) => void) { this._onNoteOff.add(callback); }
-    public onControlChange(callback: (controller: number, value: number, channel: number) => void) { this._onControlChange.add(callback); }
+    public reset(): void {
+        this.characteristic = null; this.midiInitPromise = null; this.initialize();
+    }
 
     public async initialize(): Promise<boolean> {
         if (this.midiInitPromise) { await this.midiInitPromise; return this.characteristic !== null; }
@@ -63,7 +60,7 @@ export class MIDICharacteristic {
     private _handleMIDIMessage(event: Event): void {
         const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
         const value = new Uint8Array(characteristic.value!.buffer);
-        this._onMIDIMessage.forEach(cb => cb(value));
+        this.onMIDIMessage?.(value);
         this._parseMIDIMessage(value);
     }
 
@@ -71,9 +68,9 @@ export class MIDICharacteristic {
         if (data.length < 5) return;
         const status = data[2]; const type = status & 0xF0; const channel = status & 0x0F; const noteOrController = data[3]; const value = data[4];
         switch (type) {
-            case 0x90: if (value === 0) this._onNoteOff.forEach(cb => cb(noteOrController, value, channel)); else this._onNoteOn.forEach(cb => cb(noteOrController, value, channel)); break;
-            case 0x80: this._onNoteOff.forEach(cb => cb(noteOrController, value, channel)); break;
-            case 0xB0: this._onControlChange.forEach(cb => cb(noteOrController, value, channel)); break;
+            case 0x90:  this.onNoteOn?.(noteOrController, value, channel); break;
+            case 0x80: this.onNoteOff?.(noteOrController, value, channel); break;
+            case 0xB0: this.onControlChange?.(noteOrController, value, channel); break;
         }
     }
 

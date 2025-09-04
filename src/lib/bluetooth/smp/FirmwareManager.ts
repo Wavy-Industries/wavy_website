@@ -1,5 +1,5 @@
-import { SMPCharacteristic, MGMT_OP, MGMT_ERR } from '../SMPCharacteristic';
-import { imageHash, Log } from '../../utilities';
+import { SMPService, MGMT_OP, MGMT_ERR } from '../SMPService';
+import { Log } from '../../utils/Log';
 import CBOR from './cbor';
 
 let log = new Log('img_mgr', Log.LEVEL_WARNING);
@@ -19,19 +19,21 @@ export const firmwareRhsIsNewer = (lhs: FirmwareVersion, rhs: FirmwareVersion): 
   return false;
 };
 
+const imageHash = (image: ArrayBuffer) => crypto.subtle.digest('SHA-256', image);
+
 class FirmwareManager {
   private readonly IMAGE_GROUP_ID = 1;
   private state: IMG_STATE = IMG_STATE.IDLE;
-  constructor(private mcumgr: SMPCharacteristic) {}
+  constructor(private smpBluetoothCharacteristic: SMPService) {}
 
-  async uploadImage(image: ArrayBuffer, uploadProgressUpdate?: (percent: Number) => void): Promise<boolean> {
+  async uploadImage(image: ArrayBuffer, uploadProgressUpdate?: (percent: number) => void): Promise<boolean> {
     if (this.state === IMG_STATE.UPLOADING) return false;
     this.state = IMG_STATE.UPLOADING;
     let offset = 0;
     const totalLength = image.byteLength;
     try {
       const hash = new Uint8Array(await imageHash(image));
-      const maxPayloadSize = this.mcumgr.maxPayloadSize;
+      const maxPayloadSize = this.smpBluetoothCharacteristic.maxPayloadSize;
       while (offset < totalLength) {
         let payload: any = { off: offset, data: new Uint8Array([]) };
         if (offset === 0) { payload.len = totalLength; payload.sha = hash; }
@@ -42,7 +44,7 @@ class FirmwareManager {
         const dataEnd = Math.min(offset + maxDataSize, totalLength);
         payload.data = new Uint8Array(image.slice(offset, dataEnd));
         encodedPayload = CBOR.encode(payload);
-        const response = await this.mcumgr.sendMessage(MGMT_OP.WRITE, this.IMAGE_GROUP_ID, IMG_MGMT_ID.UPLOAD, new Uint8Array(encodedPayload)) as any;
+        const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.WRITE, this.IMAGE_GROUP_ID, IMG_MGMT_ID.UPLOAD, new Uint8Array(encodedPayload)) as any;
         if (response.rc !== undefined && response.rc !== MGMT_ERR.EOK) { this.state = IMG_STATE.IDLE; return false; }
         const { off } = response as any;
         offset = off;
@@ -52,15 +54,16 @@ class FirmwareManager {
     } catch (e) { this.state = IMG_STATE.IDLE; return false; }
   }
 
-  async getFirmwareVersion(): Promise<FirmwareVersion> {
-    const response = await this.mcumgr.sendMessage(MGMT_OP.READ, this.IMAGE_GROUP_ID, IMG_MGMT_ID.STATE) as any;
-    if (!response.images?.length) throw new Error('No image state found');
-    const activeImage = response.images.find((i: any) => i.active);
-    if (!activeImage) throw new Error('Device does not use Image Manager');
-    const [major, minor, revision] = activeImage.version.split('.').map(Number);
-    return { versionString: activeImage.version, major, minor, revision };
-  }
+  async getFirmwareVersion(): Promise<FirmwareVersion | null> {
+    try {
+      const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.READ, this.IMAGE_GROUP_ID, IMG_MGMT_ID.STATE) as any;
+      if (!response.images?.length) { log.error('No images in response'); return null; }
+      const activeImage = response.images.find((i: any) => i.active);
+      if (!activeImage) { log.error('No active image found'); return null; }
+      const [major, minor, revision] = activeImage.version.split('.').map(Number);
+      return { versionString: activeImage.version, major, minor, revision };
+    } catch (e) { log.error(`Error getting firmware version: ${e}`); return null; }
 }
-
+}
 export { FirmwareManager };
 

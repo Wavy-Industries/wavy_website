@@ -1,4 +1,4 @@
-import { FirmwareVersion, firmwareRhsIsNewer } from "~/lib/bluetooth/mcumgr/FirmwareManager";
+import { FirmwareVersion, firmwareRhsIsNewer } from "~/lib/bluetooth/smp/FirmwareManager";
 
 export interface Changelog { release: FirmwareVersion | null; dev: FirmwareVersion | null; versions: VersionDetail[] }
 export interface VersionDetail { version: FirmwareVersion; isObsolete: boolean; isDev: boolean; highlight: string | null; date: string | null; summary: string | null; changes: string[] }
