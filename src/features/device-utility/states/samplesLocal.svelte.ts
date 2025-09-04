@@ -1,6 +1,6 @@
 import { SamplePack } from "~/lib/parsers/samples_parser";
-import { SamplePackInfo } from "../utils/samples";
 import {Log} from "~/lib/utils/Log";
+import { packDisplayName } from "../utils/samples";
 
 const LOG_LEVEL = Log.LEVEL_INFO
 const log = new Log("samples-local", LOG_LEVEL);
@@ -34,6 +34,12 @@ export const getLocalSamplePack = (packName: string): SamplePack | null => {
 
 export const newLocalSamplePack = (pack: SamplePack) => {
     try {
+        const display = packDisplayName(pack.name);
+        if (display?.type !== 'Local' && display?.type !== 'Archive') {
+            log.error("Pack is not a local pack");
+            return;
+        }
+
         const raw = localStorage.getItem(STORAGE_SAMPLES_KEY);
         let packs: SamplePack[] = [];
         if (raw) {
@@ -57,6 +63,12 @@ export const newLocalSamplePack = (pack: SamplePack) => {
 
 export const updateLocalSamplePack = (pack: SamplePack) => {
     try {
+        const display = packDisplayName(pack.name);
+        if (display?.type !== 'Local' && display?.type !== 'Archive') {
+            log.error("Pack is not a local pack");
+            return;
+        }
+
         const raw = localStorage.getItem(STORAGE_SAMPLES_KEY);
         let packs: SamplePack[] = [];
         if (raw) {

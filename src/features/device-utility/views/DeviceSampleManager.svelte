@@ -1,15 +1,15 @@
 <script>
     import { uplaodDeviceSamples, uplaodDeviceDefaultSamples } from "~/features/device-utility/states/samplesDevice.svelte";
-    import { constructSamplePacks, packDisplayName, getSamplePack } from "~/features/device-utility/utils/samples";
-    import { deviceSamplesState, DEFAULT_SAMPLE_PACK_IDS } from "~/features/device-utility/states/samplesDevice.svelte";
+    import { constructSamplePacks, packDisplayName, getSamplePack, compareDeviceSample } from "~/features/device-utility/utils/samples";
+    import { deviceSamplesState, deviceSampleTransferState, DEFAULT_SAMPLE_PACK_IDS } from "~/features/device-utility/states/samplesDevice.svelte";
     import { fetchAvailableServerPacks } from "~/features/device-utility/services/serverSamplePacks";
     import { sampleParser_packSize } from "~/lib/parsers/samples_parser";
-    import { compareSamplePack } from "~/features/device-utility/utils/samples";
+    import { compareSamplePack, getPackType } from "~/features/device-utility/utils/samples";
 
     import { Log } from "~/lib/utils/Log";
     import PackEditor from "./PackEditor.svelte";
     import { openPackEditorForId, openPackEditorNew, editState } from "../states/edits.svelte";
-    import { samplesLocal, deleteLocalSamplePack } from "../states/samplesLocal.svelte";
+    import { samplesLocal, deleteLocalSamplePack, newLocalSamplePack } from "../states/samplesLocal.svelte";
     import NameBoxes from "../components/NameBoxes.svelte";
     const LOG_LEVEL = Log.LEVEL_DEBUG
     const log = new Log("DeviceSampleManager", LOG_LEVEL);
@@ -60,7 +60,63 @@
       }
     });
 
+    // Transfer device packs to archive if online pack disappears; ensure all device packs exist locally
+    $effect(async () => {
+        const dev = deviceSamplesState.deviceSamples;
+        if (!dev || !Array.isArray(dev.pages)) return;
+        try {
+            for (const page of dev.pages) {
+                if (!page) continue;
+                // If online pack but it no longer exists online, archive it locally and switch selection to archive ID
+                if (getPackType(page.name) !== 'Local' && getPackType(page.name) !== 'Archive') {
+                  const onlinePacks = await availablePacks();
+                  if (!onlinePacks[page.name]) {
+                    const archiveName = `A-${page.name.slice(2)}`;
+                    const existsLocal = samplesLocal.packs.some(p => p?.name === archiveName);
+                    if (!existsLocal) {
+                      const pageMut = JSON.parse(JSON.stringify(page));
+                      pageMut.name = archiveName;
+                      newLocalSamplePack(pageMut);
+                    }
+                    const idx = selectedPacks.ids?.indexOf(page.name) ?? -1;
+                    if (idx !== -1) selectedPacks.ids[idx] = archiveName;
+                  }
+                } else {
+                  const exists = samplesLocal.packs.some(p => p?.name === page.name);
+                  if (!exists) {
+                    // Store a plain clone to ensure availability locally
+                    newLocalSamplePack(JSON.parse(JSON.stringify(page)));
+                  }
+                }
+            }
+        } catch {}
+    });
+
     const deviceStoragePercentState = $derived(deviceSamplesState.storageUsed != null && deviceSamplesState.storageTotal != null ? (deviceSamplesState.storageUsed/deviceSamplesState.storageTotal * 100).toFixed(1) : null)
+    const isTransferring = $derived(deviceSampleTransferState.supportCheck.type === 'transferring' || deviceSampleTransferState.download.type === 'transferring' || deviceSampleTransferState.upload.type === 'transferring');
+
+    let showTransferDetails = $state(false);
+    
+    let selectionCompare = $state({ dirty: false, computing: false });
+    $effect(() => {
+      const ids = selectedPacks.ids;
+      const dev = deviceSamplesState.deviceSamples;
+      if (!Array.isArray(ids) || !dev) { selectionCompare.dirty = false; return; }
+      selectionCompare.computing = true;
+      (async () => {
+        try {
+          const candidate = await constructSamplePacks(ids);
+          if (!candidate) { selectionCompare.dirty = true; selectionCompare.computing = false; return; }
+          const diff = compareDeviceSample(candidate, dev);
+          selectionCompare.dirty = !(diff?.areIdentical ?? true);
+        } catch {
+          selectionCompare.dirty = true;
+        } finally {
+          selectionCompare.computing = false;
+        }
+      })();
+    });
+    const isSelectionDirty = $derived(selectionCompare.dirty);
     
     const availablePacks = $state(async () => fetchAvailableServerPacks());
 
@@ -139,19 +195,41 @@
     <div class="right">
       <div class="subhead">DEVICE ACTIONS</div>
       <div class="actions-row">
-        <button class="btn caution" title="Reset device samples to default" aria-label="Reset to default" onclick={uplaodDeviceDefaultSamples}>Reset to default</button>
-        <button class="btn" title="Sync selection from device" aria-label="Sync from device" onclick={() => selectedPacks.ids = DEFAULT_SAMPLE_PACK_IDS}>Sync from device</button>
-        <button class="btn primary" title="Upload selected packs to device" aria-label="Upload to device" onclick={uploadSelected}>Upload to device</button>
+        <button class="btn caution" disabled={isTransferring} title="Reset device samples to default" aria-label="Reset to default" onclick={uplaodDeviceDefaultSamples}>Reset to default</button>
+        <button class="btn" disabled={isTransferring} title="Sync selection from device" aria-label="Sync from device" onclick={() => selectedPacks.ids = DEFAULT_SAMPLE_PACK_IDS}>Sync from device</button>
+        <button class="btn primary" disabled={isTransferring} title="Upload selected packs to device" aria-label="Upload to device" onclick={uploadSelected}>Upload to device</button>
       </div>
     </div>
   </div>
   <div class="status">
     <span>Storage used: {deviceStoragePercentState ?? "-"}%</span>
-  <div class="progress" style={`--p:${deviceStoragePercentState ?? 0}`}></div>
-    {#if false}
-      <!-- Placeholder for future upload progress/errors from selectedState if needed -->
+    <div class="progress" style={`--p:${deviceStoragePercentState ?? 0}`}></div>
+    <div class="divider"></div>
+    <span>Device activity:</span>
+    {#if deviceSampleTransferState.supportCheck.type === 'transferring'}
+      {@const progress = deviceSampleTransferState.supportCheck.progress}
+      <span class="pill active">Checking support ({progress ? progress.toFixed(1) + '%' : 'Preparing'})</span>
+    {:else if deviceSampleTransferState.download.type === 'transferring'}
+      {@const progress = deviceSampleTransferState.download.progress}
+      <span class="pill active">Downloading ({progress ? progress.toFixed(1) + '%' : 'Preparing'})</span>
+    {:else if deviceSampleTransferState.upload.type === 'transferring'}
+      {@const progress = deviceSampleTransferState.upload.progress}
+      <span class="pill active">Uploading ({progress ? progress.toFixed(1) + '%' : 'Preparing'})</span>
+    {:else}
+      <span class="pill idle">Idle</span>
+    {/if}
+    <button class="button-link" onclick={() => showTransferDetails = !showTransferDetails}>{showTransferDetails ? 'Hide' : 'Show'} details</button>
+    {#if isSelectionDirty}
+      <span class="dirty">Unsaved selection</span>
     {/if}
   </div>
+  {#if showTransferDetails}
+    <div class="transfer-details">
+      <div>Support check: {deviceSampleTransferState.supportCheck.type}{#if deviceSampleTransferState.supportCheck.progress != null} ({deviceSampleTransferState.supportCheck.progress}%) {/if}</div>
+      <div>Download: {deviceSampleTransferState.download.type}{#if deviceSampleTransferState.download.progress != null} ({deviceSampleTransferState.download.progress}%) {/if}</div>
+      <div>Upload: {deviceSampleTransferState.upload.type}{#if deviceSampleTransferState.upload.progress != null} ({deviceSampleTransferState.upload.progress}%) {/if}</div>
+    </div>
+  {/if}
 
   <div class="pane">
     <div class="pane-header"><h3>Selected Packs</h3></div>
@@ -161,7 +239,19 @@
           <div class="row">
             <span class="index">{i < 9 ? i + 1 : 0}</span>
             <span class={`badge ${selectedPacks.display[i]?.type?.toLowerCase()}`}>{selectedPacks.display[i]?.type}</span>
-            <span class="name"><NameBoxes value={selectedPacks.display[i]?.name || ''} /></span>
+            <span class="name"><NameBoxes value={selectedPacks.display[i]?.name || ''} />
+              {#if selectedPacks.asyncData?.[i]}
+                {#await selectedPacks.asyncData?.[i]}
+                  <span class=""></span>
+                {:then data}
+                  {#if data?.outOfSync?.areIdentical === false}
+                    <span class="outofsync">Out of sync</span>
+                  {/if}
+                {:catch e}
+                  <span class="error">-</span>
+                {/await}
+              {/if}
+            </span>
 
             {#if selectedPacks.asyncData?.[i]}
               {#await selectedPacks.asyncData?.[i]}
@@ -215,17 +305,24 @@
     </div>
     <div class="grid">
       {#each samplesLocal.packs as p (p.name)}
+        {@const packType = getPackType(p.name)}
         <div class="card">
-          <div class="title"><span class="badge local">Local</span> <NameBoxes value={p.name.slice(2)} /></div>
+          <div class="title"><span class={`badge ${packType?.toLowerCase()}`}>{packType}</span> <NameBoxes value={p.name.slice(2)} /></div>
           <div class="meta">
             <span class="usage">{deviceSamplesState.storageTotal ? (sampleParser_packSize(p) / deviceSamplesState.storageTotal * 100).toFixed(1) : '-'}%</span>
           </div>
           <div class="desc"></div>
           <div class="card-actions">
             <button class="btn" title="Add to selected" disabled={selectedPacks.ids?.includes(p.name)} onclick={() => addToSelected(p.name)}>Add</button>
-            <button class="btn primary" title="Edit local pack" onclick={() => openPackEditorForId(p.name)}>Edit</button>
-            <button class="btn" title="Delete local pack" onclick={() => { if (confirm('Delete this local pack? This cannot be undone.')) deleteLocalSamplePack(p.name); }}>Delete</button>
-            <a class="btn" title="Publish (email)" href={mailtoForLocalPack(p)}>Publish</a>
+            {#if packType === 'Local'}
+              <button class="btn primary" title="Edit local pack" onclick={() => openPackEditorForId(p.name)}>Edit</button>
+            {:else}
+              <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorForId(p.name)}>Mutate</button>
+            {/if}
+            <button class="btn" title="Delete pack" disabled={selectedPacks.ids?.includes(p.name)} onclick={() => { if (confirm('Delete this pack? This cannot be undone.')) deleteLocalSamplePack(p.name); }}>Delete</button>
+            {#if packType === 'Local'}
+              <a class="btn" title="Publish (email)" href={mailtoForLocalPack(p)}>Publish</a>
+            {/if}
           </div>
         </div>
       {/each}
@@ -292,6 +389,11 @@
 .status { display:flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--du-muted); }
 .progress { position: relative; width: 160px; height: 8px; background: #E9ECFF; border-radius: var(--du-radius); overflow: hidden; border: 1px solid var(--du-border); }
 .progress::after { content: ""; position: absolute; inset: 0; width: calc(var(--p, 0) * 1%); background: black; border-radius: var(--du-radius); }
+.divider { width: 1px; height: 16px; background: var(--du-border); }
+.pill { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--du-border); font-size: 12px; }
+.pill.active { background: #fff2cc; color: #7a5d00; border-color: #e5c566; }
+.pill.idle { background: #f3f4f6; color: #6b7280; }
+.transfer-details { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; border: 1px dashed var(--du-border); background: #fbfbfd; padding: 8px; border-radius: 8px; margin-top: 6px; }
 .errors { display:flex; flex-direction: column; gap:4px; }
 .error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:6px; }
 .pane { display: flex; flex-direction: column; gap: 8px; }
@@ -306,11 +408,14 @@
 .badge.official { background:#eef5ff; color:#1f4fd6; border-color:#cfe0ff; }
 .badge.public { background:#eef9f3; color:#1d6f3a; border-color:#cfeedd; }
 .badge.local { background:#f3f4f6; color:#4b5563; }
+.badge.archive { background:#fff7ed; color:#9a3412; border-color:#fed7aa; }
 .usage { text-align: right; font-variant-numeric: tabular-nums; color: #555; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .actions .btn { border: 1px solid #2f313a; background: #f2f3f5; color: #111827; border-radius: var(--du-radius); padding: 6px 8px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
 .actions .btn:hover { background: #e9ebee; }
 .actions button:disabled, .button-link:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Disabled look for top toolbar actions */
+.toolbar .right .actions-row .btn:disabled { background: #f3f4f6; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; pointer-events: none; opacity: 0.7; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .card { border: 1px solid #2f313a; border-radius: var(--du-radius); background: #fcfcfd; padding: 12px; display:flex; flex-direction: column; gap: 8px; box-shadow: none; min-height: 170px; }
 .card.disabled { opacity: 0.6; filter: grayscale(0.1); }

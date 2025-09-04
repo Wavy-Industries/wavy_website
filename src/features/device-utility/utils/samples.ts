@@ -7,7 +7,7 @@ import { fetchServerPack } from "../services/serverSamplePacks";
 const LOG_LEVEL = Log.LEVEL_DEBUG
 const log = new Log("samples-util", LOG_LEVEL);
 
-export type PackType = 'Official' | 'User' | 'Local';
+export type PackType = 'Official' | 'User' | 'Local' | 'Archive';
 
 export type SamplePackInfo = {
     display: PackDisplay;
@@ -25,6 +25,7 @@ export const getPackType = (id: string): PackType | null => {
             case 'W': return 'Official';
             case 'U': return 'User';
             case 'L': return 'Local';
+            case 'A': return 'Archive';
             default: null;
         }   
     }
@@ -59,6 +60,7 @@ export const getSamplePack = async(id: string): Promise<SamplePack | null> => {
 
     switch (packType) {
         case 'Local':
+        case 'Archive':
             return getLocalSamplePack(id);
         case 'Official':
         case 'User':

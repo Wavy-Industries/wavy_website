@@ -1,6 +1,5 @@
 <script>
   export let open = false;
-  export let title = 'Edit JSON';
   export let text = '';
   export let onSave = null;
   export let onClose = null;
@@ -30,7 +29,7 @@
   <div class="modal-backdrop" role="button" tabindex="0" onclick={close} onkeydown={handleBackdropKeydown}>
     <div class="modal" role="dialog" aria-modal="true" tabindex="0" onclick={(e)=>e.stopPropagation()} onkeydown={handleModalKeydown}>
       <div class="modal-header">
-        <div class="title">{title}</div>
+        <div class="title">View & edit raw JSON</div>
         <button class="icon" onclick={close}>✕</button>
       </div>
       <div class="modal-body padded">

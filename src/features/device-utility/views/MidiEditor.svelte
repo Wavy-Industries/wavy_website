@@ -58,6 +58,7 @@
 
   // Track pointer start in client space to compute deltas robustly
   let dragStartClient = $state({ x: 0, y: 0 });
+  let dragStartPos = $state({ x: 0, y: 0 });
 
   // Derive loop length early so other derived values can use it
   const loopLengthBeats = $derived(() => {
@@ -609,7 +610,7 @@
         </select>
       </label>
       
-      <button class="text-button" onclick={openJsonEditor}>Edit JSON</button>
+      <button class="text-button" onclick={openJsonEditor}>View raw</button>
       <button class="save-button" class:disabled={!isDirty} onclick={saveAndClose}>Save</button>
     </div>
   </div>
