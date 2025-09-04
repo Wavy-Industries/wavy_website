@@ -26,7 +26,7 @@ class FirmwareManager {
   private state: IMG_STATE = IMG_STATE.IDLE;
   constructor(private smpBluetoothCharacteristic: SMPService) {}
 
-  async uploadImage(image: ArrayBuffer, uploadProgressUpdate?: (percent: Number) => void): Promise<boolean> {
+  async uploadImage(image: ArrayBuffer, uploadProgressUpdate?: (percent: number) => void): Promise<boolean> {
     if (this.state === IMG_STATE.UPLOADING) return false;
     this.state = IMG_STATE.UPLOADING;
     let offset = 0;

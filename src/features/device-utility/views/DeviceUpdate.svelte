@@ -1,27 +1,19 @@
 <script>
     import { firmwareState } from "~/features/device-utility/states/firmware.svelte";
     import { firmwareRhsIsNewer } from '~/lib/bluetooth/smp/FirmwareManager';
-    import { firmwareManager } from '~/features/device-utility/states/firmware.svelte'
     import Changelog from "~/features/device-utility/components/Changelog.svelte";
     import ToggleSwitch from "~/features/device-utility/components/ToggleSwitch.svelte";
     import FirmwareUpdate from "~/features/device-utility/components/FirmwareUpdate.svelte";
-    import { bluetoothManager } from '~/features/device-utility/states/bluetooth.svelte';
-    import { sampleManager, sampleState } from '~/features/device-utility/states/samples.svelte';
 
-    let beta = $state(false);
-    let updateStage = $state('idle');
-    let uploadProgress = $state(0);
+    import { deviceUpdate, updaterState } from "~/features/device-utility/states/updater.svelte";
+    let betaEnabled = $state(false);
 
-    const betaChanged = (value) => beta = value;
-
-    const newestAvailableFirmware = $derived(beta ? firmwareState.changelog?.dev.versionString : firmwareState.changelog?.release.versionString)
-
-    let updateState = $derived.by(() => {
+    const updateState = $derived.by(() => {
         if (firmwareState.firmwareVersion == null || firmwareState.changelog == null)
             return null;
 
         const fw = firmwareState.firmwareVersion;
-        const availableNewest = beta ? firmwareState.changelog.dev : firmwareState.changelog.release;
+        const availableNewest = betaEnabled ? firmwareState.changelog.dev : firmwareState.changelog.release;
 
         if (availableNewest.versionString == fw.versionString) {
             return 'up-to-date';
@@ -32,56 +24,8 @@
         }
     });
 
-    async function startUpdate() {
-        try {
-            updateStage = 'fetching';
-            const firmwareVersion = beta ? firmwareState.changelog.dev.versionString : firmwareState.changelog.release.versionString;
-            
-            updateStage = 'uploading';
-            const image = await fetch(`/firmware/MONKEY/app_update_${firmwareVersion}.bin`)
-                .then(res => res.arrayBuffer());
-
-            const success = await firmwareManager.uploadImage(image, (percent) => {
-                uploadProgress = percent;
-            });
-            if (!success) {
-                throw "failed to upload image"
-            }
-            
-            updateStage = 'applying';
-            await new Promise((resolve) => {
-                bluetoothManager.onConnectionReestablished(() => {
-                    resolve(null);
-                });
-            });
-            
-            updateStage = 'verifying';
-            const newFirmware = await firmwareManager.getFirmwareVersion();
-            if (newFirmware.versionString !== firmwareVersion) {
-                throw new Error(`Update failed: Device firmware version is ${newFirmware.versionString} but expected ${firmwareVersion}`);
-            }
-
-            // As part of verification: if samples are not set and an upload is in progress, await it
-            try {
-                const isSetNow = await sampleManager.isSet();
-                if (!isSetNow && sampleManager.isUploading()) {
-                    await sampleManager.waitForUploadToFinish();
-                }
-            } catch (e) {
-                // Sample manager unsupported; skip silently
-            }
-            
-            updateStage = 'done';
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            updateStage = 'idle';
-            uploadProgress = 0;
-        } catch (e) {
-            console.log(e)
-            updateStage = 'failed'
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            updateStage = 'idle';
-        }
-    }
+    const updateFirmware = $derived( betaEnabled ? firmwareState.changelog.dev.versionString : firmwareState.changelog.release.versionString)
+    
 </script>
 
 <div class="content">
@@ -94,16 +38,16 @@
         <div class="right">
             <div class="subhead">Update Actions</div>
             <div class="actions-row">
-                <span class="toggle-wrap"><span class="label">Beta</span><ToggleSwitch init={false} onChange={betaChanged} /></span>
-                <button class="update-buttons primary" onclick={startUpdate} disabled={!(updateState === 'upgrade') || (updateStage !== 'idle' && updateStage !== 'failed')}>Start update</button>
-                <button class="update-buttons caution" onclick={startUpdate} disabled={!(updateState === 'downgrade') || (updateStage !== 'idle' && updateStage !== 'failed')}>Start downgrade</button>
+                <span class="toggle-wrap"><span class="label">Beta</span><ToggleSwitch init={false} onChange={(val) => betaEnabled = val} /></span>
+                <button class="update-buttons primary" onclick={() => deviceUpdate(updateFirmware)} disabled={!(updateState === 'upgrade') || (updaterState.stage !== 'idle' && updaterState.stage !== 'failed')}>Start update</button>
+                <button class="update-buttons caution" onclick={() => deviceUpdate(updateFirmware)} disabled={!(updateState === 'downgrade') || (updaterState.stage !== 'idle' && updaterState.stage !== 'failed')}>Start downgrade</button>
             </div>
         </div>
     </div>
     <div class="main-content">
         <div class="console">
-            {#if updateStage !== 'idle' && updateStage !== 'failed'}
-              <FirmwareUpdate stage={updateStage} uploadProgress={uploadProgress} sampleUploadProgress={sampleState.uploadPercentage} />
+            {#if updaterState.stage !== 'idle' && updaterState.stage !== 'failed'}
+              <FirmwareUpdate stage={updaterState.stage} uploadProgress={updaterState.uploadProgress} sampleUploadProgress={deviceSampleTransferState.type === 'transferring' ? deviceSampleTransferState.progress : null} />
             {:else}
               {#if updateState === 'up-to-date'}
                 <div class="status-card ok">
@@ -128,25 +72,14 @@
             {/if}
         </div>
         <hr />
-        <Changelog beta={beta} />
+        <Changelog beta={betaEnabled} />
     </div>
 </div>
 
 <style>
     .content { padding: 16px; max-width: var(--du-maxw, 1100px); margin: 0 auto; }
-    .top-bar {
-        display: flex;
-        flex-direction: row;
-        justify-content: end;
-        align-items: center;
-        gap: 5px;
-    }
-
     .main-content { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
-
     .console { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; border: 1px solid #2f313a; background: #fcfcfd; border-radius: var(--du-radius); padding: 12px; }
-    .console h1, .console h2 { position: relative; padding-bottom: 6px; margin: 6px 0; text-transform: uppercase; letter-spacing: .04em; }
-    .console h1::after, .console h2::after { content: ""; position: absolute; left: 0; bottom: 0; width: 180px; height: 3px; background: #2f313a; }
     hr { border: none; border-top: 1px solid var(--du-border); width: 100%; }
     .status-card { width: 100%; border: 1px solid #2f313a; border-radius: var(--du-radius); padding: 10px; background: #f2f3f5; }
     .status-card.ok { background: #f2f7f3; border-color: #1f2329; }

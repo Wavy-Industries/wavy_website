@@ -9,11 +9,11 @@
     import { dev } from '~/features/device-utility/states/devmode.svelte';
     import { onMount } from 'svelte';
     import { fade } from 'svelte/transition';
-    import { sampleState } from '~/features/device-utility/states/samples.svelte';
-    import { deviceUtilityView, DeviceUtilityView, initDeviceUtilityView } from '~/features/device-utility/states/view.svelte';
+    import { deviceSamplesState } from '~/features/device-utility/states/samplesDevice.svelte';
+    import {  windowStateInit, windowState, DeviceUtilityView } from '~/features/device-utility/states/window.svelte';
 
     onMount(async () => {
-        initDeviceUtilityView();
+        windowStateInit();
 
         isLoading = true;
         await waitForInitialData();
@@ -30,13 +30,26 @@
         // Ready when firmware known AND (samples unsupported OR basic sample info fetched)
         while (Date.now() - start < timeoutMs) {
             const fwReady = firmwareState?.firmwareVersion != null;
-            const samplesUnsupported = sampleState.isSupported === false && sampleState.isset === null && sampleState.names === null;
-            const samplesReady = sampleState.isSupported === true && sampleState.names != null && sampleState.storageUsed != null && sampleState.storageTotal != null;
+            const samplesUnsupported = deviceSamplesState.isSupported === false && deviceSamplesState.isset === null && deviceSamplesState.names === null;
+            const samplesReady = deviceSamplesState.isSupported === true && deviceSamplesState.names != null && deviceSamplesState.storageUsed != null && deviceSamplesState.storageTotal != null;
             if (fwReady && (samplesUnsupported || samplesReady)) return true;
             await wait(100);
         }
         return false; // timeout
     }
+
+    const currentView = $derived.by(() => {
+        const hash = windowState.hash;
+        const v = (hash || '').replace('#', '').trim();
+
+        let view = DeviceUtilityView.Playground;
+        if (deviceSamplesState.isSupported && v === DeviceUtilityView.SampleManager) view = DeviceUtilityView.SampleManager;
+        else if (v === DeviceUtilityView.Playground) view = DeviceUtilityView.Playground;
+        else if (v === DeviceUtilityView.DeviceUpdate) view = DeviceUtilityView.DeviceUpdate;
+        else if (dev.enabled && v === DeviceUtilityView.DeviceTester) view = DeviceUtilityView.DeviceTester;
+
+        return view;
+    })
 
     // Indicators for upgrade/downgrade availability
     const upgradeAvailable = $derived.by(() => {
@@ -53,7 +66,7 @@
         return firmwareRhsIsNewer(rel, fw);
     });
     const needsUpdateAttention = $derived(upgradeAvailable || downgradeAvailable);
-    const isUpdateTabActive = $derived(deviceUtilityView.current === DeviceUtilityView.DeviceUpdate);
+    const isUpdateTabActive = $derived(currentView === DeviceUtilityView.DeviceUpdate);
 
 </script>
 
@@ -76,12 +89,12 @@
         <div>
             <a 
                 href="#playground" 
-                class={deviceUtilityView.current === DeviceUtilityView.Playground ? 'active' : ''}
+                class={currentView === DeviceUtilityView.Playground ? 'active' : ''}
             >
                 Playground
             </a>
             <span class={`tab-with-badge ${needsUpdateAttention && !isUpdateTabActive ? 'blink-update' : ''}`}>
-              <a href="#device-update" class={deviceUtilityView.current === DeviceUtilityView.DeviceUpdate ? 'active' : ''}>
+              <a href="#device-update" class={currentView === DeviceUtilityView.DeviceUpdate ? 'active' : ''}>
                   Device Update
               </a>
               {#if needsUpdateAttention}
@@ -90,17 +103,17 @@
             </span>
             <a 
                 href="#sample-manager" 
-                class={`blink ${deviceUtilityView.current === DeviceUtilityView.SampleManager ? 'active' : ''}`}
-                class:disabled={!sampleState.isSupported}
-                onclick={e => sampleState.isSupported == false && e.preventDefault()}
-                title={!sampleState.isSupported ? "firmware version 1.2.0 or greater is required" : ""}
+                class={`blink ${currentView === DeviceUtilityView.SampleManager ? 'active' : ''}`}
+                class:disabled={!deviceSamplesState.isSupported}
+                onclick={e => deviceSamplesState.isSupported == false && e.preventDefault()}
+                title={!deviceSamplesState.isSupported ? "firmware version 1.2.0 or greater is required" : ""}
             >
                 Sample Manager
             </a>
             {#if dev.enabled}
                 <a 
                     href="#device-tester" 
-                    class={deviceUtilityView.current === DeviceUtilityView.DeviceTester ? 'active' : ''}
+                    class={currentView === DeviceUtilityView.DeviceTester ? 'active' : ''}
                 >
                     Device Tester
                 </a>
@@ -114,19 +127,19 @@
           <div class="spinner"></div>
           <div>Fetching device info…</div>
       </div>
-    {:else if deviceUtilityView.current === DeviceUtilityView.DeviceUpdate}
+    {:else if currentView === DeviceUtilityView.DeviceUpdate}
     <div in:fade={{ duration: 200 }}>
         <DeviceUpdate />
     </div>
-    {:else if deviceUtilityView.current === DeviceUtilityView.SampleManager}
+    {:else if currentView === DeviceUtilityView.SampleManager}
         <div in:fade={{ duration: 200 }}>
             <DeviceSampleManager />
         </div>
-    {:else if deviceUtilityView.current === DeviceUtilityView.DeviceTester}
+    {:else if currentView === DeviceUtilityView.DeviceTester}
         <div in:fade={{ duration: 200 }}>
             <DeviceTester />
         </div>
-    {:else if deviceUtilityView.current === DeviceUtilityView.Playground}
+    {:else if currentView === DeviceUtilityView.Playground}
         <div in:fade={{ duration: 200 }}>
             {#await import('~/features/device-utility/views/Playground.svelte') then Mod}
               {@const Comp = Mod.default}

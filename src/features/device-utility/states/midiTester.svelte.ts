@@ -1,5 +1,3 @@
-import { deviceUtilityView, DeviceUtilityView } from './view.svelte';
-
 const DEVOUNCE_REQUIREMENT = 300; // ms
 
 // DeviceTester state - persists across component mounts
@@ -143,20 +141,14 @@ function playCCSound() {
 }
 
 export const midiTesterOnNoteOn = (note: number, velocity: number, channel: number) => {
-    const isActive = () => deviceUtilityView.current === DeviceUtilityView.DeviceTester;
-    if (!isActive()) return;
     markKeyActive(note);
     addPressedKey(note);
 }
 
 export const midiTesterOnNoteOff = (note: number, velocity: number, channel: number) => {
-    const isActive = () => deviceUtilityView.current === DeviceUtilityView.DeviceTester;
-    if (!isActive()) return;
     removePressedKey(note);
 }
 
 export const midiTesterOnCC = (controller: number, value: number, channel: number) => {
-    const isActive = () => deviceUtilityView.current === DeviceUtilityView.DeviceTester;
-    if (!isActive()) return;
     handleControlChange(controller, value);
 }

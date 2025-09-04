@@ -8,7 +8,10 @@ import { midiTesterOnNoteOn, midiTesterOnNoteOff, midiTesterOnCC } from '~/featu
 import { smpService, midiService } from './states/bluetooth.svelte';
 import { soundBackend } from '~/lib/soundBackend';
 import { refreshLocalSamples } from './states/samplesLocal.svelte';
-import { initialiseDeviceSamples } from './states/samplesDevice.svelte';
+import { initialiseDeviceSamples, invalidateDeviceSamplesState } from './states/samplesDevice.svelte';
+import { updaterNotifyConnectionReestablished } from './states/updater.svelte';
+import { midiControlOnCC, midiControlOnNoteOff, midiControlOnNoteOn } from './states/midiControl.svelte';
+import { windowState, DeviceUtilityView } from './states/window.svelte';
 
 export const callbacksSet = () => {
 
@@ -18,8 +21,8 @@ export const callbacksSet = () => {
         
         refreshDeviceFirmwareVersion();
         refreshChangelog();
-        initialiseDeviceSamples();
         refreshLocalSamples();
+        initialiseDeviceSamples();
 
         bluetoothStateSetConnected();
     }
@@ -29,7 +32,10 @@ export const callbacksSet = () => {
         smpService.reset();
         
         refreshDeviceFirmwareVersion();
+
+        // we dont do anything with the device samples if it only lost connection
         initialiseDeviceSamples();
+        updaterNotifyConnectionReestablished();
         
         bluetoothStateSetConnectionReestablished();
     }
@@ -39,10 +45,12 @@ export const callbacksSet = () => {
     }
 
     bluetoothManager.onDisconnect = () => {
+        invalidateDeviceSamplesState();
         bluetoothStateSetDisconnected();
     }
 
     bluetoothManager.onConnectionLoss = () => {    
+        invalidateDeviceSamplesState();
         bluetoothStateSetConnectionLoss();
     }
 
@@ -51,16 +59,25 @@ export const callbacksSet = () => {
         try { soundBackend.resume?.(); } catch {}
         soundBackend.noteOn(note, velocity, channel);
 
-        midiTesterOnNoteOn(note, velocity, channel);
+        midiControlOnNoteOn(note, velocity, channel);
+
+        if (windowState.hash === DeviceUtilityView.DeviceTester)
+            midiTesterOnNoteOn(note, velocity, channel);
     }
 
     midiService.onNoteOff = (note: number, velocity: number, channel: number) => {
         soundBackend.noteOff(note, velocity, channel);
 
-        midiTesterOnNoteOff(note, velocity, channel);
+        midiControlOnNoteOff(note, velocity, channel);
+        
+        if (windowState.hash === DeviceUtilityView.DeviceTester)
+            midiTesterOnNoteOff(note, velocity, channel);
     }
 
     midiService.onControlChange = (_controller: number, _value: number, _channel: number) => {
-        midiTesterOnCC(_controller, _value, _channel);
+        midiControlOnCC(_controller, _value, _channel);
+
+        if (windowState.hash === DeviceUtilityView.DeviceTester)
+            midiTesterOnCC(_controller, _value, _channel);
     }
 }

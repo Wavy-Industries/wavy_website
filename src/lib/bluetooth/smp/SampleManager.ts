@@ -239,7 +239,7 @@ export class SampleManager {
                 }
 
             } catch (error) {
-                log.error('Error during upload:', error);
+                log.error(`Error during upload: ${error}`);
                 this.state = _STATE.IDLE;
                 this._notifyUploadFinished();
                 return false;
@@ -295,7 +295,7 @@ export class SampleManager {
             // Call progress callback if defined
             uploadProgressUpdate?.(Math.floor((offset / total_length) * 100));
         } catch (error) {
-            log.error('Error during download:', error);
+            log.error(`Error during download: ${error}`);
             this.state = _STATE.IDLE;
             return null;
         }
@@ -331,7 +331,7 @@ export class SampleManager {
                 }
 
             } catch (error) {
-                log.error('Error during download:', error);
+                log.error(`Error during download: ${error}`);
                 this.state = _STATE.IDLE;
                 return null;
             }

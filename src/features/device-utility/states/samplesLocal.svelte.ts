@@ -1,10 +1,11 @@
 import { SamplePack } from "~/lib/parsers/samples_parser";
+import { SamplePackInfo } from "../utils/samples";
 import {Log} from "~/lib/utils/Log";
 
 const LOG_LEVEL = Log.LEVEL_INFO
 const log = new Log("samples-local", LOG_LEVEL);
 
-const STORAGE_SAMPLES_KEY = 'wavy_user_packs';
+const STORAGE_SAMPLES_KEY = 'wavy_local_packs';
 
 export const samplesLocal = $state({
     packs: [] as SamplePack[]
@@ -24,7 +25,9 @@ export const refreshLocalSamples = () => {
 }
 
 export const getLocalSamplePack = (packName: string): SamplePack | null => {
+    log.debug(`Getting local sample pack for name: ${packName}`);
     const pack = samplesLocal.packs.find(p => p.name === packName);
+    log.debug(`Found local sample pack for name: ${packName}: ${pack ? pack.name : 'null'}`);
     return pack || null;
 }
 

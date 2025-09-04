@@ -1,13 +1,13 @@
 <script>
   import { sampleState } from '~/features/device-utility/states/samples.svelte';
   import { editState, closePackEditor, setEditorLoopData, saveEditor, saveEditorAsNew } from '~/features/device-utility/states/edits.svelte';
-  import { getPageByteSize } from '~/lib/parsers/samples_parser';
+  import { sampleParser_packSize } from '~/lib/parsers/samples_parser';
   import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
   import { soundBackend } from '~/lib/soundBackend';
   import MidiEditor from '~/features/device-utility/views/MidiEditor.svelte';
   import MidiPreview from '~/features/device-utility/components/MidiPreview.svelte';
   import { tempoState } from '~/features/device-utility/states/tempo.svelte';
-  import { validatePage as validatePackPage } from '~/features/device-utility/utils/packs';
+  import { validatePage } from '~/features/device-utility/utils/samples';
 
   const slots = $derived(editState.loops);
 
@@ -42,12 +42,12 @@
     const page = slots[0]; if (!page) return 0;
     const tmp = { name: page.name, loops: Array(15).fill(null) };
     tmp.loops[idx] = page.loops[idx];
-    return getPageByteSize(tmp);
+    return sampleParser_packSize(tmp);
   }
 
   function totalBytes() {
     const page = slots[0]; if (!page) return 0;
-    return getPageByteSize(page);
+    return sampleParser_packSize(page);
   }
   function percentTotal() {
     const total = sampleState.storageTotal || 0;
@@ -136,7 +136,7 @@
       const page = { name: currentName, loops: normalizeLoops(loops) };
       // Validate using central validator
       const uiId = editState.id ?? `U-${(editState.name7 || 'NONAME').slice(0,7)}`;
-      const errs = validatePackPage(uiId, page) || [];
+      const errs = validatePage(uiId, page) || [];
       if (errs.length > 0) {
         importDialog.errors = errs;
         return; // keep dialog open
