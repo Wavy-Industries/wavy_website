@@ -199,10 +199,7 @@
           {#if slots[0]?.loops?.[idx]}
             {@const loop = slots[0].loops[idx]}
             <div class="preview-stack">
-              <MidiPreview {loop} onOpen={() => openMidiEditorFor(idx)} />
-              <div class="preview-actions">
-                <button class="button-link" onclick={() => openMidiEditorFor(idx)}>Open editor</button>
-              </div>
+              <MidiPreview class="clickable" {loop} onOpen={() => openMidiEditorFor(idx)} />
             </div>
           {:else}
             <div class="drop">
@@ -214,7 +211,7 @@
             </div>
           {/if}
         </div>
-        <div class="bytes">{bytesFor(idx)} bytes ({percentFor(idx)}%)</div>
+        <div class="bytes">{percentFor(idx)}%</div>
         <div class="reorder">
           <button class="btn" onclick={() => move(idx, -1)}>Move up</button>
           <button class="btn" onclick={() => move(idx, 1)}>Move down</button>
@@ -283,7 +280,19 @@
 input[type="file"] { width: 100%; }
 .tip { margin-top: 4px; color: var(--du-muted); font-size: 0.92em; }
 .preview-stack { display:flex; flex-direction: column; gap: 6px; width: 100%; }
-.preview-actions { display:flex; }
+.preview-actions { display:none; }
+.preview-stack :global(svg.pianoroll) {
+  border: 2px solid #111; /* black border to indicate interactivity */
+  cursor: pointer;
+  transition: box-shadow 120ms ease, transform 80ms ease;
+  background: #f8fafc;
+}
+.preview-stack :global(svg.pianoroll:hover) {
+  box-shadow: 0 2px 0 0 #111;
+}
+.preview-stack :global(svg.pianoroll:active) {
+  transform: translateY(1px);
+}
 .drop .actions { display:flex; gap: 8px; margin-top: 8px; }
 
 /* Small industrial buttons */
@@ -304,5 +313,5 @@ input[type="file"] { width: 100%; }
 .error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:6px; }
 .errors { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 /* Embedded MIDI editor container */
-.embedded-editor { margin-top: 8px; display: flex; justify-content: center; }
+.embedded-editor { margin-top: 8px; display: flex; justify-content: center; width: 100%; overflow-x: hidden; }
 </style>

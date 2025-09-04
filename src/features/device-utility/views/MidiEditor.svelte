@@ -4,7 +4,7 @@
   import { tempoState } from '~/features/device-utility/states/tempo.svelte';
   import { TICKS_PER_BEAT, type LoopData, type SamplePack } from '~/lib/parsers/samples_parser';
   import { soundBackend } from '~/lib/soundBackend';
-  import { calculateLoopLength } from "../utils/samples";
+  import { calculateLoopLength, packDisplayName } from "../utils/samples";
   import { Log } from '~/lib/utils/Log';
   
   const LOG_LEVEL = Log.LEVEL_DEBUG;
@@ -14,10 +14,6 @@
   const PIANO_WIDTH = 60;
   const HEADER_HEIGHT = 30;
   const MAX_TICKS = 511;
-  const MIN_LANE_HEIGHT = 18;
-  const MAX_LANE_HEIGHT = 32;
-  const MIN_TICK_WIDTH = 8;
-  const MAX_TICK_WIDTH = 24;
 
   // Props
   let { index, close } = $props<{ index: number, close?: () => void }>();
@@ -27,22 +23,23 @@
   let localLoop = $state<LoopData>({ length_beats: 16, events: [] });
   let originalLoop = $state<LoopData>({ length_beats: 16, events: [] });
   let pageName = $state('');
+  const packInfo = $derived(() => packDisplayName(pageName));
   
   // UI state
   let selectedNoteIndex = $state<number | null>(null);
   let isDragging = $state(false);
   let dragMode = $state<'move' | 'velocity' | 'resize' | null>(null);
-  let dragStartPos = $state({ x: 0, y: 0 });
   let dragOriginalNote = $state<any>(null);
   let laneHeight = $state(34); // Larger lanes for better visibility
-  let tickWidth = $state(16); // Larger for zoomed-in view
+  // Pixels per tick. With 24 ticks/beat, 8 px/tick => 192 px/beat.
+  // Shows ~1 bar + a bit within the editor width.
+  let tickWidth = $state(8);
   let snapValue = $state<'1/1'|'1/2'|'1/4'|'1/8'|'1/16'|'1/32'>('1/16');
   
   // Default note length in ticks (1/16 note)
   const DEFAULT_NOTE_LENGTH = TICKS_PER_BEAT / 4;
   
   // Default view settings - more reasonable for screen width
-  const DEFAULT_VIEW_BEATS = 4; // Reduced from 8.5 to prevent excessive width
   const DEFAULT_NOTE_RANGE = { min: 0, max: 127 }; // Full MIDI range for vertical scroll
   
   // Playback state
@@ -53,13 +50,15 @@
   let playbackTimeout: number | null = null;
   // Grid element ref for coordinate calculations
   let gridEl: HTMLElement | null = null;
+  let gridContainerEl: HTMLElement | null = null;
 
   // Track pointer start in client space to compute deltas robustly
   let dragStartClient = $state({ x: 0, y: 0 });
 
   // Derive loop length early so other derived values can use it
   const loopLengthBeats = $derived(() => {
-    return calculateLoopLength(localLoop.events, TICKS_PER_BEAT, 16, 64);
+    // Use 4 beats (one bar) as minimum to avoid 4x oversizing
+    return calculateLoopLength(localLoop.events, TICKS_PER_BEAT, 4, 64);
   });
 
   // Derived metrics for overlay beyond loop end
@@ -78,11 +77,9 @@
     const range = noteRange();
     const laneCount = range.max - range.min + 1;
 
-    // X width equals loop length + 1 bar (4 beats), capped to MAX_TICKS
-    const totalTicks = Math.min(
-      MAX_TICKS,
-      (loopLengthBeats() + 4) * TICKS_PER_BEAT
-    );
+    // X width equals loop length + 1 bar (4 beats)
+    // Do not cap by MAX_TICKS here so the scrollbar grows with loop length
+    const totalTicks = Math.max(TICKS_PER_BEAT, (loopLengthBeats() + 4) * TICKS_PER_BEAT);
 
     const gridWidth = totalTicks * tickWidth;
     const totalWidth = gridWidth + PIANO_WIDTH;
@@ -114,22 +111,16 @@
   function snapTick(tick: number): number {
     return Math.floor(tick / snapStep()) * snapStep();
   }
+  function snapNearestTick(tick: number): number {
+    const step = snapStep();
+    return Math.round(tick / step) * step;
+  }
   
   // Sort events by press time to maintain proper order
   function sortEvents() {
     localLoop.events.sort((a, b) => a.time_ticks_press - b.time_ticks_press);
   }
   
-  // Validate and clean up a single event
-  function validateEvent(event: any): boolean {
-    if (typeof event.note !== 'number' || event.note < 0 || event.note > 127) return false;
-    if (typeof event.velocity !== 'number' || event.velocity < 1 || event.velocity > 127) return false;
-    if (typeof event.time_ticks_press !== 'number' || event.time_ticks_press < 0 || event.time_ticks_press > 511) return false;
-    if (typeof event.time_ticks_release !== 'number' || event.time_ticks_release < 0 || event.time_ticks_release > 511) return false;
-    if (event.time_ticks_release <= event.time_ticks_press) return false;
-    return true;
-  }
-
   function tickToX(tick: number): number {
     const effectiveWidth = gridDimensions().effectiveTickWidth || tickWidth;
     return PIANO_WIDTH + tick * effectiveWidth;
@@ -166,7 +157,20 @@
     originalLoop = JSON.parse(JSON.stringify(storeLoop || defaultLoop));
   }
 
-  onMount(initializeLoop);
+  onMount(() => {
+    initializeLoop();
+    // After mount, scroll vertically to C3 (MIDI 36)
+    setTimeout(() => {
+      try {
+        if (!gridContainerEl) return;
+        const c3 = 36;
+        // noteToY returns position including header offset
+        const y = noteToY(c3);
+        const target = Math.max(0, y - (gridContainerEl.clientHeight / 2));
+        gridContainerEl.scrollTop = target;
+      } catch {}
+    }, 0);
+  });
 
   const isDirty = $derived(JSON.stringify(localLoop) !== JSON.stringify(originalLoop));
 
@@ -205,15 +209,20 @@
       // Set pointer capture for smooth dragging
       (event.target as HTMLElement).setPointerCapture(event.pointerId);
     } else {
-      // Create new note centered under cursor horizontally
-      const baseTick = xToTick(x);
-      const press = clamp(snapTick(baseTick - (DEFAULT_NOTE_LENGTH / 2)), 0, MAX_TICKS - 1);
-      const release = clamp(press + DEFAULT_NOTE_LENGTH, 0, MAX_TICKS);
+      // Create new note centered to the nearest snap under the cursor
+      const pointerTick = xToTick(x);
+      const center = snapNearestTick(pointerTick);
+      const half = DEFAULT_NOTE_LENGTH / 2;
+      let press = center - half;
+      const release = press + DEFAULT_NOTE_LENGTH;
+      // clamp within valid tick bounds
+      press = clamp(press, 0, MAX_TICKS - 1);
+      const finalRelease = clamp(release, press + 1, MAX_TICKS);
       const newNote = {
         note,
         velocity: 100,
         time_ticks_press: press,
-        time_ticks_release: release
+        time_ticks_release: finalRelease
       };
       
       log.debug(`Creating new note: ${JSON.stringify(newNote)}`);
@@ -573,7 +582,10 @@
     <div class="header-left">
       <button class="back-button" onclick={requestClose} title="Back">←</button>
       <h2>Piano Roll</h2>
-      <span class="subtitle">Editing {pageName} — slot {index + 1}</span>
+      {#if packInfo}
+        <span class="type-badge">{packInfo.type}</span>
+      {/if}
+      <span class="subtitle">Editing {packInfo ? packInfo.name : pageName} — slot {index + 1}</span>
     </div>
     
     <div class="header-right">
@@ -599,7 +611,7 @@
   </div>
 
   <!-- Main Grid Area -->
-  <div class="grid-container">
+  <div class="grid-container" bind:this={gridContainerEl}>
     <div class="grid-wrapper" style="width: {gridDimensions().totalWidth}px; height: {gridDimensions().totalHeight}px;">
       
       <!-- Piano Roll (Y-axis) -->
@@ -607,10 +619,12 @@
         {#each Array(gridDimensions().laneCount) as _, i}
           {@const note = noteRange().max - i}
           {@const isC = note % 12 === 0}
+          {@const isC3 = note === 36}
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
           <div 
             class="piano-key" 
             class:is-c={isC}
+            class:is-c3={isC3}
             style="height: {laneHeight}px; top: {i * laneHeight}px;"
             onclick={() => handlePianoClick(note)}
             onkeydown={(e) => e.key === 'Enter' && handlePianoClick(note)}
@@ -786,7 +800,10 @@
     flex-direction: column;
     height: 100vh;
     max-height: 90vh; /* scale up vertically */
-    max-width: 95vw; /* Prevent exceeding viewport width */
+    max-width: var(--du-maxw, 1100px); /* limit width similar to PackEditor */
+    width: 100%;
+    margin: 0 auto;
+    overflow-x: hidden; /* avoid stray page-level x-scroll */
     background: white;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
@@ -841,6 +858,17 @@
   .subtitle {
     color: #6b7280;
     font-size: 14px;
+  }
+
+  .type-badge {
+    font-size: 12px;
+    padding: 2px 6px;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    text-transform: uppercase;
+    color: #444;
+    background: #fff;
+    margin-left: 8px;
   }
 
   .control-group {
@@ -938,6 +966,13 @@
     background: #f9fafb;
     color: #111827;
     font-weight: 500;
+  }
+
+  .piano-key.is-c3 {
+    background: #ecfdf5;
+    color: #065f46;
+    font-weight: 600;
+    border-left: 3px solid #10b981;
   }
 
   .timeline {
