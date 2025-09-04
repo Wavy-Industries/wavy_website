@@ -16,14 +16,18 @@
   const MAX_TICKS = 511;
 
   // Props
-  let { index, close } = $props<{ index: number, close?: () => void }>();
+  let { index, close, page, pageIndex = 0, pageId = null } = $props<{ index: number, close?: () => void, page?: SamplePack | null, pageIndex?: number, pageId?: string | null }>();
   const dispatch = createEventDispatcher<{ save: void }>();
 
   // Core state
   let localLoop = $state<LoopData>({ length_beats: 16, events: [] });
   let originalLoop = $state<LoopData>({ length_beats: 16, events: [] });
   let pageName = $state('');
-  const packInfo = $derived(() => packDisplayName(pageName));
+  const workingPage = $derived(() => (page ?? (editState.loops?.[pageIndex] as SamplePack | null)));
+  const packInfo = $derived(() => {
+    const idOrName = workingPage()?.name || pageId || editState.id || '';
+    return idOrName ? packDisplayName(idOrName) : null;
+  });
   
   // UI state
   let selectedNoteIndex = $state<number | null>(null);
@@ -146,11 +150,11 @@
 
   // Initialize data
   function initializeLoop() {
-    const page = editState.loops[0];
-    if (!page) return;
+    const wp = workingPage();
+    if (!wp) return;
     
-    pageName = page.name || `U-${(editState.name7 || 'NONAME').slice(0,8)}`;
-    const storeLoop = page.loops?.[index] as LoopData;
+    pageName = wp.name || '';
+    const storeLoop = wp.loops?.[index] as LoopData;
     
     const defaultLoop = { length_beats: 16, events: [] };
     localLoop = JSON.parse(JSON.stringify(storeLoop || defaultLoop));
@@ -516,17 +520,17 @@
 
   // Save functions
   function saveAndClose() {
-    const page = editState.loops[0];
-    if (!page) return;
+    const src = workingPage();
+    if (!src) return;
     
-    const updated = { ...page } as any;
+    const updated = { ...src } as any;
     if (!updated.loops) updated.loops = Array(15).fill(null);
     // Persist the derived loop length into saved data
     const toSave = JSON.parse(JSON.stringify(localLoop));
     toSave.length_beats = loopLengthBeats();
     updated.loops[index] = toSave;
     
-    setEditorLoopData(0, updated);
+    setEditorLoopData(pageIndex, updated);
     dispatch('save');
     close?.();
   }

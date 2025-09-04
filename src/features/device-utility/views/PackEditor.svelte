@@ -223,7 +223,7 @@
 </div>
 {:else}
   <div class="embedded-editor">
-    <MidiEditor index={midiEditor.index} close={closeMidiEditor} onback={closeMidiEditor} />
+    <MidiEditor index={midiEditor.index} page={slots[0]} pageIndex={0} pageId={editState.id} close={closeMidiEditor} onback={closeMidiEditor} />
   </div>
 {/if}
 
