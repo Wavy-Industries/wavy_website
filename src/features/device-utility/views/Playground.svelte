@@ -30,6 +30,8 @@
   const selected = $state<{ ch: number | null }>({ ch: null });
   // Use shared UI state for refresh key (nudges editor to reload)
   const refreshKey = $derived(playgroundUI.refreshKey);
+  // Focus management for modal dialog
+  let modalPanelEl: HTMLDivElement | null = null;
   function modCanvas(node: HTMLCanvasElement, ch: number) {
     modCanvases[ch] = node;
     ctxs[ch] = node.getContext('2d');
@@ -88,6 +90,13 @@
 
   onMount(() => {
     initPlaygroundSynthPersistence();
+  });
+
+  // When the dialog opens, move focus to it so ESC works immediately
+  $effect(() => {
+    if (selected.ch !== null && modalPanelEl) {
+      try { modalPanelEl.focus(); } catch {}
+    }
   });
 
   function resetAll() { resetAllSynthChannels(); }
@@ -149,8 +158,15 @@
 </div>
 
 {#if selected.ch !== null}
-  <div class="modal-overlay" onclick={() => selected.ch = null}>
-    <div class="modal-panel" onclick={(e)=> e.stopPropagation()}>
+  <div
+    class="modal-overlay"
+    role="button"
+    tabindex="0"
+    aria-label="Close editor"
+    onclick={() => selected.ch = null}
+    onkeydown={(e) => { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') { selected.ch = null; } }}
+  >
+    <div class="modal-panel" role="dialog" aria-modal="true" tabindex="-1" bind:this={modalPanelEl} onclick={(e)=> e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') { selected.ch = null; } }}>
       <SynthChannelEditor channel={selected.ch!} refreshKey={refreshKey} onReset={() => resetChannel(selected.ch!)} onClose={() => selected.ch = null} />
     </div>
   </div>

@@ -1,6 +1,8 @@
 <script>
+  import { onMount } from 'svelte';
   const { json, onSave, onClose } = $props();
   let jsonText = $state(JSON.stringify(json ?? {}, null, 2));
+  let jsonAreaEl = null;
 
   function close() {
     if (JSON.stringify(jsonText) !== JSON.stringify(JSON.stringify(json ?? {}, null, 2))) {
@@ -11,12 +13,14 @@
   }
   function handleBackdropKeydown(e) {
     if (e.key === 'Escape') {
+      e.stopPropagation();
       e.preventDefault();
       close();
     }
   }
   function handleModalKeydown(e) {
     if (e.key === 'Escape') {
+      e.stopPropagation();
       e.preventDefault();
       close();
     }
@@ -30,6 +34,15 @@
       alert('Invalid JSON');
     }
   }
+
+  onMount(() => {
+    try {
+      if (jsonAreaEl && typeof jsonAreaEl.focus === 'function') {
+        jsonAreaEl.focus();
+        if (typeof jsonAreaEl.select === 'function') jsonAreaEl.select();
+      }
+    } catch {}
+  });
 </script>
 
 <div class="modal-backdrop" role="button" tabindex="0" onclick={close} onkeydown={handleBackdropKeydown}>
@@ -39,7 +52,7 @@
       <button class="icon" onclick={close}>✕</button>
     </div>
     <div class="modal-body padded">
-      <textarea class="json-input" bind:value={jsonText} placeholder='Paste loops array or an object with a "loops" array'></textarea>
+      <textarea class="json-input" bind:value={jsonText} bind:this={jsonAreaEl} placeholder='Paste loops array or an object with a "loops" array' autofocus></textarea>
     </div>
     <div class="modal-actions">
         <button class="button-link" onclick={close}>Cancel</button>

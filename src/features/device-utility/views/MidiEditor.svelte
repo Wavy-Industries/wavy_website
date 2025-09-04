@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { editState, setEditorLoopData } from '~/features/device-utility/states/edits.svelte';
   import { tempoState } from '~/features/device-utility/states/tempo.svelte';
   import { TICKS_PER_BEAT, type LoopData, type SamplePack } from '~/lib/parsers/samples_parser';
@@ -149,6 +149,20 @@
   function clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
   }
+
+  // Global ESC to close the editor (if a close handler is provided)
+  function onWindowKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape' && typeof close === 'function') {
+      e.preventDefault();
+      try { close(); } catch {}
+    }
+  }
+  onMount(() => {
+    window.addEventListener('keydown', onWindowKeydown);
+  });
+  onDestroy(() => {
+    window.removeEventListener('keydown', onWindowKeydown);
+  });
 
   // Initialize data
   function initializeLoop() {

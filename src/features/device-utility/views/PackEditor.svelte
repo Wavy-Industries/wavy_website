@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { editState, closePackEditor, setEditorLoopData, saveEditor, saveEditorAsNew, setEditorName7 } from '~/features/device-utility/states/edits.svelte';
   import { sampleParser_packSize } from '~/lib/parsers/samples_parser';
   import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
@@ -63,6 +63,19 @@
     const b = bytesFor(idx);
     return ((b / total) * 100).toFixed(1);
   }
+
+  // ESC handling: close embedded MIDI editor if open; otherwise close PackEditor
+  function onWindowKeydown(e) {
+    if (e.key === 'Escape') {
+      if (e.defaultPrevented) return; // allow inner dialogs to consume ESC
+      if (importDialog.open) return; // JSONEditor open: let it handle
+      e.preventDefault();
+      if (midiEditor.open) closeMidiEditor();
+      else closePackEditor();
+    }
+  }
+  onMount(() => { window.addEventListener('keydown', onWindowKeydown); });
+  onDestroy(() => { window.removeEventListener('keydown', onWindowKeydown); });
 
   // Playback
   const engine = soundBackend;
@@ -181,8 +194,8 @@
   {/if}
   <div class="toolbar settings">
     <div class="namer">
-      <label>Name</label>
-      <input maxlength="7" bind:value={editState.name7} placeholder="MYPACK" oninput={(e)=>{ const v=e.target.value||''; if (/[^\x20-\x7E]/.test(v)) { e.target.value = v.replace(/[^\x20-\x7E]/g,''); setEditorName7(e.target.value); } else { setEditorName7(v); } }} />
+      <label for="pack-name">Name</label>
+      <input id="pack-name" maxlength="7" bind:value={editState.name7} placeholder="MYPACK" oninput={(e)=>{ const v=e.target.value||''; if (/[^\x20-\x7E]/.test(v)) { e.target.value = v.replace(/[^\x20-\x7E]/g,''); setEditorName7(e.target.value); } else { setEditorName7(v); } }} />
       <NameBoxes value={editState.name7} />
       <span class="hint">ASCII, up to 7 characters</span>
     </div>
