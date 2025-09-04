@@ -10,6 +10,8 @@
   import { validatePage, getSamplePack } from '~/features/device-utility/utils/samples';
     import { deviceSamplesState } from '../states/samplesDevice.svelte';
   import NameBoxes from '~/features/device-utility/components/NameBoxes.svelte';
+  import PackTypeBadge from "~/features/device-utility/components/PackTypeBadge.svelte";
+  import JSONEditor from "~/features/device-utility/components/JSONEditor.svelte";
 
   const slots = $derived(editState.loops);
 
@@ -98,7 +100,7 @@
   }
 
   // Import raw JSON dialog
-  let importDialog = $state({ open: false, text: '', error: '', errors: [] });
+  let importDialog = $state({ open: false, json: {}, error: '', errors: [] });
   async function openImportDialog() {
     importDialog.open = true;
     importDialog.error = '';
@@ -106,15 +108,15 @@
     // Prefill with current JSON (same as View raw)
     try {
       if (slots[0]) {
-        importDialog.text = JSON.stringify(slots[0], null, 2);
+        importDialog.json = JSON.parse(JSON.stringify(slots[0]));
       } else if (editState.id) {
         const page = await getSamplePack(editState.id);
-        importDialog.text = JSON.stringify(page ?? {}, null, 2);
+        importDialog.json = page ?? {};
       } else {
-        importDialog.text = '{}';
+        importDialog.json = {};
       }
     } catch (_) {
-      importDialog.text = '{}';
+      importDialog.json = {};
     }
   }
   function closeImportDialog() { importDialog.open = false; }
@@ -128,7 +130,7 @@
     try {
       importDialog.error = '';
       importDialog.errors = [];
-      const obj = JSON.parse(importDialog.text || '');
+      const obj = importDialog.json || {};
       const loops = Array.isArray(obj) ? obj : (Array.isArray(obj?.loops) ? obj.loops : null);
       if (!loops) throw new Error('Expected an array of loops or an object with a "loops" array');
       const currentName = slots[0]?.name || `U-${editState.name7}`;
@@ -155,7 +157,7 @@
       <button class="icon" title="Back" aria-label="Back" onclick={closePackEditor}>←</button>
       <h2>{editState.id ? 'Edit Pack' : 'Create Pack'}</h2>
       {#if editState.id}
-        <span class="type-badge">{editState.id.startsWith('L-') ? 'Local' : (editState.id.startsWith('U-') ? 'User' : 'Official')}</span>
+        <PackTypeBadge id={editState.id} />
       {/if}
     </div>
     <div class="actions">
@@ -228,31 +230,7 @@
 {/if}
 
 {#if importDialog.open}
-  <div class="modal-backdrop" onpointerdown={closeImportDialog}>
-    <div class="modal" role="dialog" aria-modal="true" onpointerdown={(e)=>e.stopPropagation()}>
-      <div class="modal-header">
-        <div class="title">Import raw JSON</div>
-        <button class="icon" onclick={closeImportDialog}>✕</button>
-      </div>
-      <div class="modal-body padded">
-        <textarea class="json-input" bind:value={importDialog.text} placeholder='Paste loops array or an object with a "loops" array'></textarea>
-        {#if importDialog.error}
-          <div class="error">{importDialog.error}</div>
-        {/if}
-        {#if importDialog.errors.length}
-          <div class="errors">
-            {#each importDialog.errors as e}
-              <div class="error">{e}</div>
-            {/each}
-          </div>
-        {/if}
-      </div>
-      <div class="modal-actions">
-        <button class="button-link" onclick={doImportRaw}>Import</button>
-        <button class="button-link" onclick={closeImportDialog}>Cancel</button>
-      </div>
-    </div>
-  </div>
+  <JSONEditor json={importDialog.json} onSave={(o)=>{ importDialog.json=o; doImportRaw(); }} onClose={closeImportDialog} />
 {/if}
 
 <style>
@@ -261,7 +239,6 @@
 .header .left { display: flex; align-items: center; gap: 10px; }
 .header .left h2 { position: relative; padding-bottom: 6px; }
 .header .left h2::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; }
-.type-badge { font-size: 12px; padding: 2px 6px; border: 1px solid var(--du-border); border-radius: 4px; text-transform: uppercase; color:#444; }
 .icon { width: 36px; height: 36px; border-radius: var(--du-radius); display: inline-flex; align-items: center; justify-content: center; }
 .actions { display: flex; gap: 8px; }
 .unsaved { margin-top: 8px; background: repeating-linear-gradient(45deg, #FFFEAC, #FFFEAC 6px, #f1ea7d 6px, #f1ea7d 12px); color: #3a3200; border: 1px solid #b3ac5a; padding: 6px 8px; border-radius: var(--du-radius); font-weight: 700; }
@@ -271,7 +248,6 @@
 .settings { background: #fafafa; border: 1px solid var(--du-border); border-radius: var(--du-radius); padding: 10px; }
 .namer { display: flex; gap: 6px; align-items: center; }
 .namer .hint { color:var(--du-muted); font-size: 0.85em; }
-.meta { color: var(--du-muted); }
 .list { display: flex; flex-direction: column; gap: 8px; }
 .row { display: grid; grid-template-columns: 40px 80px 1fr 120px auto; align-items: center; gap: 8px; border: 1px solid #2f313a; border-radius: var(--du-radius); padding: 10px; background: #fcfcfd; box-shadow: none; }
 .drop { border: 1px dashed #2f313a; border-radius: var(--du-radius); padding: 12px; display: grid; place-items: center; background: #fcfcfc; }
@@ -280,7 +256,6 @@
 input[type="file"] { width: 100%; }
 .tip { margin-top: 4px; color: var(--du-muted); font-size: 0.92em; }
 .preview-stack { display:flex; flex-direction: column; gap: 6px; width: 100%; }
-.preview-actions { display:none; }
 .preview-stack :global(svg.pianoroll) {
   border: 2px solid #111; /* black border to indicate interactivity */
   cursor: pointer;
@@ -302,14 +277,6 @@ input[type="file"] { width: 100%; }
 .play { display: flex; }
 
 /* Modal reused styles */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 1000; padding: 12px; }
-.modal { background: white; border-radius: var(--du-radius); border: 1px solid var(--du-border); width: min(800px, 90vw); max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--du-shadow); }
-.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #eee; }
-.modal-header .title { font-weight: 600; }
-.modal-body { padding: 0; }
-.modal-body.padded { padding: 12px; display:flex; flex-direction:column; gap:8px; }
-.modal-actions { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid #eee; }
-.json-input { width: 100%; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
 .error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:6px; }
 .errors { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 /* Embedded MIDI editor container */

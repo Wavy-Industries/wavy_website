@@ -17,6 +17,7 @@ import { SampleManager } from '~/lib/bluetooth/smp/SampleManager';
 import { compareDeviceSample, constructSamplePacks } from '../utils/samples';
 
 import { Log } from '~/lib/utils/Log';
+import { updaterNotifyIsSupported } from './updater.svelte';
 const LOG_LEVEL = Log.LEVEL_DEBUG
 const log = new Log("device-samples", LOG_LEVEL);
 
@@ -222,6 +223,9 @@ export const initialiseDeviceSamples = async () => {
             return;
         }
     }
+
+    log.debug("Notifying updater that device supports samples");
+    updaterNotifyIsSupported();
 
     log.debug("Now, let's download the samples from the device...");
     const _ = await downloadDeviceSamples(); // ignore the result as its handled in the function

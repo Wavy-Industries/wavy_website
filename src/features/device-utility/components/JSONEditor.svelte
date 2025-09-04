@@ -1,14 +1,16 @@
 <script>
-  export let open = false;
-  export let text = '';
-  export let onSave = null;
-  export let onClose = null;
+  const { json, onSave, onClose } = $props();
+  let jsonText = $state(JSON.stringify(json ?? {}, null, 2));
 
   function close() {
+    if (JSON.stringify(jsonText) !== JSON.stringify(JSON.stringify(json ?? {}, null, 2))) {
+      const confirmed = window.confirm('You have unsaved changes. Discard and close?');
+      if (!confirmed) return;
+    }
     onClose && onClose();
   }
   function handleBackdropKeydown(e) {
-    if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') {
+    if (e.key === 'Escape') {
       e.preventDefault();
       close();
     }
@@ -20,28 +22,31 @@
     }
   }
   function handleSave() {
-    if (typeof onSave === 'function') onSave(text);
-    close();
+    try {
+      const parsed = JSON.parse(jsonText);
+      if (typeof onSave === 'function') onSave(parsed);
+      close();
+    } catch (_) {
+      alert('Invalid JSON');
+    }
   }
 </script>
 
-{#if open}
-  <div class="modal-backdrop" role="button" tabindex="0" onclick={close} onkeydown={handleBackdropKeydown}>
-    <div class="modal" role="dialog" aria-modal="true" tabindex="0" onclick={(e)=>e.stopPropagation()} onkeydown={handleModalKeydown}>
-      <div class="modal-header">
-        <div class="title">View & edit raw JSON</div>
-        <button class="icon" onclick={close}>✕</button>
-      </div>
-      <div class="modal-body padded">
-        <textarea class="json-input" bind:value={text} placeholder='Paste loops array or an object with a "loops" array'></textarea>
-      </div>
-      <div class="modal-actions">
-          <button class="button-link" onclick={close}>Cancel</button>
-          <button class="button-link" onclick={handleSave}>Save & Close</button>
-      </div>
+<div class="modal-backdrop" role="button" tabindex="0" onclick={close} onkeydown={handleBackdropKeydown}>
+  <div class="modal" role="dialog" aria-modal="true" tabindex="0" onclick={(e)=>e.stopPropagation()} onkeydown={handleModalKeydown}>
+    <div class="modal-header">
+      <div class="title">View & edit raw JSON</div>
+      <button class="icon" onclick={close}>✕</button>
+    </div>
+    <div class="modal-body padded">
+      <textarea class="json-input" bind:value={jsonText} placeholder='Paste loops array or an object with a "loops" array'></textarea>
+    </div>
+    <div class="modal-actions">
+        <button class="button-link" onclick={close}>Cancel</button>
+        <button class="button-link" onclick={handleSave}>Save & Close</button>
     </div>
   </div>
-{/if}
+</div>
 
 <style>
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 1000; padding: 12px; }

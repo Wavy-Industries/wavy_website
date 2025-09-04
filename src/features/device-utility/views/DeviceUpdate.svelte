@@ -4,6 +4,7 @@
     import Changelog from "~/features/device-utility/components/Changelog.svelte";
     import ToggleSwitch from "~/features/device-utility/components/ToggleSwitch.svelte";
     import FirmwareUpdate from "~/features/device-utility/components/FirmwareUpdate.svelte";
+    import {deviceSampleTransferState} from "~/features/device-utility/states/samplesDevice.svelte";
 
     import { deviceUpdate, updaterState } from "~/features/device-utility/states/updater.svelte";
     let betaEnabled = $state(false);

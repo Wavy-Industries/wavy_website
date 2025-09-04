@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { editState, setEditorLoopData } from '~/features/device-utility/states/edits.svelte';
   import { tempoState } from '~/features/device-utility/states/tempo.svelte';
   import { TICKS_PER_BEAT, type LoopData, type SamplePack } from '~/lib/parsers/samples_parser';
   import { soundBackend } from '~/lib/soundBackend';
   import { calculateLoopLength, packDisplayName } from "../utils/samples";
   import { Log } from '~/lib/utils/Log';
+  import PackTypeBadge from "~/features/device-utility/components/PackTypeBadge.svelte";
+  import JSONEditor from "~/features/device-utility/components/JSONEditor.svelte";
   
   const LOG_LEVEL = Log.LEVEL_DEBUG;
   const log = new Log("midi-editor", LOG_LEVEL);
@@ -16,15 +18,14 @@
   const MAX_TICKS = 511;
 
   // Props
-  let { index, close, page, pageIndex = 0, pageId = null } = $props<{ index: number, close?: () => void, page?: SamplePack | null, pageIndex?: number, pageId?: string | null }>();
-  const dispatch = createEventDispatcher<{ save: void }>();
+  let { index, close, page, pageIndex = 0, pageId = null, onSave = null } = $props<{ index: number, close?: () => void, page?: SamplePack | null, pageIndex?: number, pageId?: string | null, onSave?: (()=>void) | null }>();
 
   // Core state
   let localLoop = $state<LoopData>({ length_beats: 16, events: [] });
   let originalLoop = $state<LoopData>({ length_beats: 16, events: [] });
   let pageName = $state('');
   const workingPage = $derived(() => (page ?? (editState.loops?.[pageIndex] as SamplePack | null)));
-  const packInfo = $derived(() => {
+  const packInfo = $derived.by(() => {
     const idOrName = workingPage()?.name || pageId || editState.id || '';
     return idOrName ? packDisplayName(idOrName) : null;
   });
@@ -532,7 +533,7 @@
     updated.loops[index] = toSave;
     
     setEditorLoopData(pageIndex, updated);
-    dispatch('save');
+    if (typeof onSave === 'function') onSave();
     close?.();
   }
 
@@ -548,22 +549,12 @@
 
   // JSON editor
   let showJsonEditor = $state(false);
-  let jsonText = $state('');
-  let jsonError = $state('');
-
   function openJsonEditor() {
-    jsonText = JSON.stringify(localLoop, null, 2);
-    jsonError = '';
     showJsonEditor = true;
   }
-
-  function applyJson() {
+  function applyJsonObject(parsed: any) {
     try {
-      const parsed = JSON.parse(jsonText);
-      if (!parsed || typeof parsed !== 'object') {
-        throw new Error('Invalid JSON object');
-      }
-      
+      if (!parsed || typeof parsed !== 'object') return;
       const length_beats = Math.max(1, Math.min(64, Number(parsed.length_beats) || 16));
       const events = Array.isArray(parsed.events) ? parsed.events.map((e: any) => ({
         note: clamp(Number(e.note) || 60, 0, 127),
@@ -571,13 +562,8 @@
         time_ticks_press: clamp(Number(e.time_ticks_press) || 0, 0, MAX_TICKS),
         time_ticks_release: clamp(Number(e.time_ticks_release) || 1, 0, MAX_TICKS)
       })) : [];
-      
       localLoop = { length_beats, events };
-      showJsonEditor = false;
-      jsonError = '';
-    } catch (error) {
-      jsonError = 'Invalid JSON format';
-    }
+    } catch {}
   }
 </script>
 
@@ -588,7 +574,7 @@
       <button class="back-button" onclick={requestClose} title="Back">←</button>
       <h2>Piano Roll</h2>
       {#if packInfo}
-        <span class="type-badge">{packInfo.type}</span>
+        <PackTypeBadge type={packInfo.type} />
       {/if}
       <span class="subtitle">Editing {packInfo ? packInfo.name : pageName} — slot {index + 1}</span>
     </div>
@@ -774,29 +760,7 @@
 
 <!-- JSON Editor Modal -->
 {#if showJsonEditor}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={() => showJsonEditor = false}>
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
-      <div class="modal-header">
-        <h3>Edit Loop JSON</h3>
-        <button onclick={() => showJsonEditor = false}>✕</button>
-      </div>
-      
-      <div class="modal-body">
-        <textarea bind:value={jsonText} rows="15"></textarea>
-        {#if jsonError}
-          <div class="error-message">{jsonError}</div>
-        {/if}
-      </div>
-      
-      <div class="modal-footer">
-        <button onclick={applyJson}>Apply</button>
-        <button onclick={() => showJsonEditor = false}>Cancel</button>
-      </div>
-    </div>
-  </div>
+  <JSONEditor json={localLoop} onSave={(obj)=>applyJsonObject(obj)} onClose={()=>showJsonEditor=false} />
 {/if}
 
 <style>
@@ -1113,86 +1077,5 @@
     background: #f59e0b;
     z-index: 15;
     pointer-events: none;
-  }
-
-  /* Modal styles */
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-  }
-
-  .modal {
-    background: white;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 600px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  }
-
-  .modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  .modal-header h3 {
-    margin: 0;
-    font-size: 16px;
-  }
-
-  .modal-header button {
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: none;
-    cursor: pointer;
-    font-size: 18px;
-  }
-
-  .modal-body {
-    padding: 16px;
-    flex: 1;
-    overflow: auto;
-  }
-
-  .modal-body textarea {
-    width: 100%;
-    font-family: 'Monaco', 'Menlo', monospace;
-    font-size: 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    padding: 8px;
-    resize: vertical;
-  }
-
-  .modal-footer {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    padding: 16px;
-    border-top: 1px solid #e5e7eb;
-  }
-
-  .error-message {
-    color: #dc2626;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    border-radius: 4px;
-    padding: 8px;
-    margin-top: 8px;
-    font-size: 12px;
   }
 </style>

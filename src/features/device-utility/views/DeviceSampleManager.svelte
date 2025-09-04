@@ -11,6 +11,7 @@
     import { openPackEditorForId, openPackEditorNew, editState } from "../states/edits.svelte";
     import { samplesLocal, deleteLocalSamplePack, newLocalSamplePack } from "../states/samplesLocal.svelte";
     import NameBoxes from "../components/NameBoxes.svelte";
+    import PackTypeBadge from "../components/PackTypeBadge.svelte";
     const LOG_LEVEL = Log.LEVEL_DEBUG
     const log = new Log("DeviceSampleManager", LOG_LEVEL);
 
@@ -238,7 +239,7 @@
         {#if selectedPacks.ids?.[i]}
           <div class="row">
             <span class="index">{i < 9 ? i + 1 : 0}</span>
-            <span class={`badge ${selectedPacks.display[i]?.type?.toLowerCase()}`}>{selectedPacks.display[i]?.type}</span>
+            <PackTypeBadge type={selectedPacks.display[i]?.type} />
             <span class="name"><NameBoxes value={selectedPacks.display[i]?.name || ''} />
               {#if selectedPacks.asyncData?.[i]}
                 {#await selectedPacks.asyncData?.[i]}
@@ -307,7 +308,7 @@
       {#each samplesLocal.packs as p (p.name)}
         {@const packType = getPackType(p.name)}
         <div class="card">
-          <div class="title"><span class={`badge ${packType?.toLowerCase()}`}>{packType}</span> <NameBoxes value={p.name.slice(2)} /></div>
+          <div class="title"><PackTypeBadge id={p.name} /> <NameBoxes value={p.name.slice(2)} /></div>
           <div class="meta">
             <span class="usage">{deviceSamplesState.storageTotal ? (sampleParser_packSize(p) / deviceSamplesState.storageTotal * 100).toFixed(1) : '-'}%</span>
           </div>
@@ -342,7 +343,7 @@
       {:then packs}
         {#each Object.entries(packs) as [k, p], idx (k)}
           <div class="card" class:selected={k in selectedPacks.ids} >
-            <div class="title"><span class="badge {p.display.type.toLowerCase()}">{p.display.type}</span> <NameBoxes value={p.display.name || ''} /></div>
+            <div class="title"><PackTypeBadge type={p.display.type} /> <NameBoxes value={p.display.name || ''} /></div>
             <div class="meta">
               {#if p.author}
                 <span>{p.author}</span>

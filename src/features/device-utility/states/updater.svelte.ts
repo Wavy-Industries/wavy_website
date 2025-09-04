@@ -1,5 +1,9 @@
 import { firmwareManager } from "./firmware.svelte";
 import { deviceSamplesState, sampleManager } from "./samplesDevice.svelte";
+import { Log } from "~/lib/utils/Log";
+
+const log = new Log("updater", Log.LEVEL_DEBUG);
+
 
 export const updaterState = $state({
     stage: 'idle' as 'idle' | 'fetching' | 'uploading' | 'applying' | 'verifying' | 'done' | 'failed',
@@ -11,13 +15,11 @@ export const updaterState = $state({
 let deviceReconnectedResolve = null
 let isSupportedResolve = null
 
-$effect.root(() => {
-    // wait for isSupported gets set
-    if (deviceSamplesState.isSupported != null) {
-        isSupportedResolve?.();
-        isSupportedResolve = null;
-    }
-});
+export function updaterNotifyIsSupported() {
+    log.debug("Notifying updater that device supports samples");
+    isSupportedResolve?.();
+    isSupportedResolve = null;
+}
 
 export function updaterNotifyConnectionReestablished() {
     deviceReconnectedResolve?.();
