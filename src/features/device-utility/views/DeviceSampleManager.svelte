@@ -23,6 +23,7 @@
 
     $inspect(selectedPacks);
 
+    // initiate selection from device
     $effect(() => {
       // store the packs only once as we fetch the packs from device.
       if (selectedPacks.ids == null && deviceSamplesState.ids) {
@@ -30,6 +31,7 @@
       }
     });
     
+    // update display and async data
     $effect(() => {
       const ids = selectedPacks.ids;
       const total = deviceSamplesState.storageTotal;
@@ -117,7 +119,6 @@
         }
       })();
     });
-    const isSelectionDirty = $derived(selectionCompare.dirty);
     
     const availablePacks = $state(async () => fetchAvailableServerPacks());
 
@@ -220,7 +221,7 @@
       <span class="pill idle">Idle</span>
     {/if}
     <button class="button-link" onclick={() => showTransferDetails = !showTransferDetails}>{showTransferDetails ? 'Hide' : 'Show'} details</button>
-    {#if isSelectionDirty}
+    {#if selectionCompare.dirty}
       <span class="dirty">Unsaved selection</span>
     {/if}
   </div>
