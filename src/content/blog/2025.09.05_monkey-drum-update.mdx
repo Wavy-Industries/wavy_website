@@ -1,0 +1,51 @@
+---
+title: "MONKEY drum firmware release, website sample manager, playground & MIDI Connect"
+description: "Rewritten DRM internals, customizable on‑device storage, and a simple web Sample Manager to personalize your MONKEY."
+author: "Rein Gundersen Bentdal"
+---
+
+We rewrote the internals of the DRM (drum effect) on MONKEY, giving users the freedom to personalise the drums to their taste, paired with a **Sample Manager** embedded directly on the Wavy website. Go ahead and update MONKEY to unlock these features through our website **device utility** in less than 2 minutes.
+
+The main focus of this newsletter from **Wavy Industries** is the new drum update for MONKEY and supporting applications. Towards the end, we will also touch on another update for MIDI Connect for macOS, and the future of Wavy. Visit **device utility** now to update MONKEY: https://wavyindustries.com/resources/device-utility/
+
+![[Pasted image 20250905115521.png]]
+Rhythms are extremely foundational to the creation of music, especially on MONKEY where rhythmic elements also help users get a sense of timing while using the loop recorder. We felt that the pre-installed drum loops have been too big a limitation in people's creative endeavours. The 15 pre-installed drum loops could never satisfy the diversity of creators using MONKEY and the exact ways in which users want to use their MONKEY. Maybe you want to explore Drum 'n' Bass, Jazz, or perhaps upload something other than drums.
+
+This is why we decided to jump back into the material and rework major systems internally to MONKEY, enabling customised storage on-device, the new and redone drum effect, and a powerful way to transfer information enabling a super simple web interface that anyone can easily use. There are online packs available as well as local packs that you create. As your local pack matures, we encourage you to make it public and share it with the world so that other people can upload it to their MONKEY and enjoy it.
+
+The new DRM effect now allows you to upload a total of 150 drum loops, 15 drum loops per page. Change the page similarly to how you would change the preset in the other effects: SHIFT + a number. Furthermore, the "black" keys have been repurposed as modifier effects on the drums that you play.
+![[Monkey sectionss-1.png]]
+
+## Using the Sample Manager
+You can see the front page of the sample manager in the image above. There you can see the packs which are currently on the MONKEY. In the case of my unit, there are 4 official packs and one local pack which I am working on. Below that we have an overview of the local packs as well as the packs which we have created at Wavy and hopefully soon also packs by MONKEY users.
+
+Making edits to a pack is straightforward. Click the "Edit" button and you are greeted with an overview of all the individual drum samples. You can even play them directly in the browser to hear how they sound.
+![[Pasted image 20250905123740.png]]
+The preferred way to create the loops is to import MIDI files. Alternatively, there is also a built-in piano roll to make edits straight in the browser. This feature is currently limited and has some known issues.
+![[ScreenRecording2025-09-05at12.41.19-ezgif.com-video-to-gif-converter.gif|90%]]
+![[Pasted image 20250905124701.png]]
+That's a great segue to the website codebase, which is completely open-sourced under the MIT license! If you’re eager to help make it even more powerful or just hang around and make suggestions, you can find the repo here: https://github.com/Wavy-Industries/wavy_website
+## The Playground
+To make the onboarding process even simpler for MONKEY, we developed a simple playground module in **device utility**. The page has a built-in synth engine and a drum machine. As soon as you connect MONKEY to our website, you can start making songs and explore its functions. Below you can see the stream of events from each MIDI channel while playing a loop from MONKEY.
+![[Pasted image 20250905115645.png]]
+The synth engine is bare-bones but configurable. The beauty of creating these tools with simple ideas is that there are tons of opportunities to expand on them. The interface of the Playground is simple—as it should be—and facilitates expanding on its depth later on. Again, contributions and ideas are very welcome for these tools: https://github.com/Wavy-Industries/wavy_website
+![[Pasted image 20250905125201.png]]
+## MIDI Connect for macOS
+This is a tool we have created which has kind of silently existed on the sidelines, but it’s very important in our minds. Why bother with Bluetooth if it’s not convenient to use? It must be much more convenient than connecting cables. MIDI Connect originated from this idea, and for now we have made it for macOS.
+
+As with all Wavy products, we focus on simplicity and ease of use. It’s a simple menu bar app, just like your Wi‑Fi or Bluetooth settings, and you can easily connect to your Bluetooth MIDI devices (yes, it is not just for Wavy devices but for any Bluetooth MIDI device). It also has auto‑connect so that you are ready to use your Bluetooth MIDI device even without knowing it.
+![[Pasted image 20250905130904.png|40%]]
+We have expanded its functionality with a more detailed settings view. You can now give an alias to your device so that you can more easily distinguish and personalise your devices (imagine having 10 MONKEYs connected at once and trying to figure out which is which—that’s been a problem for us).
+![[Pasted image 20250905131050.png|40%]]
+This also reflects in the MIDI port created. As seen below, we have named the device "GORILLA", with the prefix "@" to signify it’s an alias.
+![[Pasted image 20250905131351.png]]
+You can download the app for macOS here: https://apps.apple.com/no/app/midi-connect/id6476070288
+
+Would you be interested in something similar but for Windows, Linux or something else? Then shoot us a message!
+
+## The future
+We are very excited and grateful to be able to work on Wavy together with our community. How can we think differently about music creation? And how can we give the joy of music creation to more people? Do you have to be technically minded to create electronic music, or can it be framed in a way that is more accessible? These are questions we ask ourselves all the time. We’re surely excited to continue to squeeze value out of MONKEY while looking for and working on new ideas. 
+
+As always, feedback is invaluable to us. We have come to realise that we actually know very little about the MONKEY user base. We never hear from most customers, and we have no idea if they like it, regret buying it, or have any thoughts about what might make it a better device and experience. So please reach out to us with your thoughts!
+
+We hope you like these changes, and we would love to hear from you! Is this useful to you? Would you like a similar type of improvement to the PAT effect? Or are there other features you would rather see? Please reach us by email or through our Discord!

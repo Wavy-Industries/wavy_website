@@ -9,6 +9,7 @@ export const routes = {
     'monkeyConnect': '/resources/guides/monkey-connect',
     'kd3': '/KD-3',
     'midiConnect': '/MIDI-connect',
+    'blog': '/blog',
     'support': '/resources/support',
     'deviceUtility': '/resources/device-utility',
     'faq': '/resources/faq',

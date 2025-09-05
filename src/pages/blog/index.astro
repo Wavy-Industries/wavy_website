@@ -1,0 +1,100 @@
+---
+import '../../styles/global.css';
+import Layout from "../../layouts/Layout.astro";
+import Header from "../../layouts/Header.astro";
+import Footer from "../../layouts/Footer.astro";
+import { getCollection } from 'astro:content';
+
+function parseDateFromId(id) {
+  // Supports YYYY.MM.DD_name, YYYY-MM-DD_name, or YYYYMMDD_name
+  const m = /^(\d{4})([.\-]?)(\d{2})\2(\d{2})/.exec(id);
+  if (!m) return null;
+  const [, y, , mth, d] = m;
+  const dt = new Date(Number(y), Number(mth) - 1, Number(d));
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+const postsRaw = await getCollection('blog');
+const posts = postsRaw
+  .map(p => {
+    const fallbackDate = parseDateFromId(p.id) || new Date(0);
+    const date = p.data.date ?? fallbackDate;
+    return {
+      id: p.id,
+      slug: String(p.slug),
+      title: p.data.title,
+      description: p.data.description,
+      author: p.data.author,
+      date,
+    };
+  })
+  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+---
+
+<Layout title="Blog" description="Updates and articles from Wavy Industries.">
+  <main>
+    <Header />
+    <section class="blog-list">
+      <div class="container">
+        <h1>Blog</h1>
+        <ul class="posts">
+          {posts.map((post) => (
+            <li class="post">
+              <a href={`/blog/${post.slug}`} class="title">{post.title}</a>
+              <div class="meta">
+                <span>{new Date(post.date).toLocaleDateString()}</span>
+                <span>•</span>
+                <span>{post.author}</span>
+              </div>
+              <p class="desc">{post.description}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+    <Footer />
+  </main>
+</Layout>
+
+<style>
+  main {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .blog-list { flex: 1; }
+  .blog-list {
+    width: 100%;
+    padding: 0 20px;
+  }
+  .container {
+    margin: 0 auto;
+    max-width: 900px;
+    width: 100%;
+    min-height: 60vh;
+  }
+  h1 { margin-top: 0; }
+  .posts {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .post { margin: 0; }
+  .title {
+    font-style: normal;
+    font-weight: 600;
+    text-decoration: underline;
+  }
+  .meta {
+    color: #666;
+    font-size: 14px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin: 6px 0;
+  }
+  .desc { margin: 6px 0 0; }
+</style>

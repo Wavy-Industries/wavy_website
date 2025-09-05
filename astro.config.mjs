@@ -1,4 +1,6 @@
 import { defineConfig } from 'astro/config';
+import obsidianEmbeds from './scripts/remark/obsidianEmbeds.js';
+import firstParagraphIntro from './scripts/remark/firstParagraphIntro.js';
 
 import mdx from '@astrojs/mdx';
 
@@ -9,6 +11,9 @@ export default defineConfig({
   build: {
     format: 'directory',
     assets: 'build_assets'
+  },
+  markdown: {
+    remarkPlugins: [obsidianEmbeds, firstParagraphIntro],
   },
   vite: {
     resolve: {

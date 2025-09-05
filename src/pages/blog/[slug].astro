@@ -1,0 +1,73 @@
+---
+import '../../styles/global.css';
+import MarkdownArticleLayout from "../../layouts/MarkdownArticleLayout.astro";
+import { getCollection } from 'astro:content';
+import { routes } from '../../routes';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return posts.map((post) => ({
+    params: { slug: String(post.slug) },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await post.render();
+
+function parseDateFromId(id) {
+  const m = /^(\d{4})([.\-]?)(\d{2})\2(\d{2})/.exec(id);
+  if (!m) return null;
+  const [, y, , mth, d] = m;
+  const dt = new Date(Number(y), Number(mth) - 1, Number(d));
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+// Prev/Next based on date (newest first)
+const all = (await getCollection('blog'))
+  .sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime());
+const index = all.findIndex(p => String(p.slug) === String(post.slug));
+const prev = index > 0 ? all[index - 1] : null;
+const next = index < all.length - 1 ? all[index + 1] : null;
+const postDate = post.data.date ?? parseDateFromId(post.id) ?? new Date(0);
+const formattedDate = new Date(postDate).toLocaleDateString();
+---
+
+<MarkdownArticleLayout frontmatter={post.data}>
+  <div class="post-header">
+    <a class="back" href={routes.blog}>← Back to blog</a>
+    <h1>{post.data.title}</h1>
+    <div class="meta"><time datetime={postDate.toISOString()}>{formattedDate}</time> • {post.data.author}</div>
+  </div>
+
+  <Content />
+
+  <nav class="post-nav">
+    {prev ? <a class="prev" href={`/blog/${String(prev.slug)}`}>← {prev.data.title}</a> : <span />}
+    {next ? <a class="next" href={`/blog/${String(next.slug)}`}>{next.data.title} →</a> : <span />}
+  </nav>
+  <nav class="post-nav">
+    <a class="back" href={routes.blog}>← Back to blog</a>
+  </nav>
+</MarkdownArticleLayout>
+
+<style>
+  .post-header { margin: 0 auto 24px; max-width: 800px; }
+  .post-header .back {
+    display: inline-block;
+    font-style: normal;
+    text-decoration: underline;
+    margin-bottom: 8px;
+  }
+  .post-header h1 { margin: 8px 0 4px; font-weight: 600; font-size: 42px; }
+  .post-header .meta { color: #666; font-size: 14px; }
+
+  .post-nav {
+    margin: 36px auto;
+    max-width: 800px;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .post-nav a { text-decoration: underline; font-style: normal; }
+</style>
