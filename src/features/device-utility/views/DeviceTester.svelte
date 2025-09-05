@@ -112,20 +112,20 @@
         renderKeybed();
     });
 
-    // Initialize MIDI when connected
-    $effect(() => {
-        if (bluetoothState.connectionState === 'connected') {
-            midiBluetoothCharacteristic.initialize().then(success => {
-                if (success) {
-                    console.log('MIDI manager initialized successfully');
-                    renderKeybed();
-                    clearDeviceTesterState();
-                } else {
-                    console.warn('Failed to initialize MIDI manager');
-                }
-            });
-        }
-    });
+    // // Initialize MIDI when connected
+    // $effect(() => {
+    //     if (bluetoothState.connectionState === 'connected') {
+    //         midiBluetoothCharacteristic.initialize().then(success => {
+    //             if (success) {
+    //                 console.log('MIDI manager initialized successfully');
+    //                 renderKeybed();
+    //                 clearDeviceTesterState();
+    //             } else {
+    //                 console.warn('Failed to initialize MIDI manager');
+    //             }
+    //         });
+    //     }
+    // });
 
     // Helper functions for keyboard layout
     function isBlackKey(note) {

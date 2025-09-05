@@ -17,7 +17,7 @@ import { SampleManager } from '~/lib/bluetooth/smp/SampleManager';
 import { compareDeviceSample, constructSamplePacks } from '../utils/samples';
 
 import { Log } from '~/lib/utils/Log';
-const LOG_LEVEL = Log.LEVEL_INFO
+const LOG_LEVEL = Log.LEVEL_DEBUG
 const log = new Log("device-samples", LOG_LEVEL);
 
 export const sampleManager = new SampleManager(smpService);
@@ -69,20 +69,22 @@ export const checkDeviceSampleSupport = async (): Promise<SupportCheckResult> =>
         deviceSamplesState.isSet = isSet;
         log.info(`Device supports samples, isSet = ${isSet}`);
 
-        log.debug("getting space used");
-        const spaceUsed = await sampleManager.getSpaceUsed();
-        deviceSamplesState.storageTotal = spaceUsed.tot;
-        deviceSamplesState.storageUsed = spaceUsed.usd;
-        deviceSamplesState.packsStorageUsed = spaceUsed.packs;
-        log.debug(`Space used: ${JSON.stringify(spaceUsed)}`);
-        log.debug(`Storage total: ${deviceSamplesState.storageTotal}`);
+        if (isSet === true) {
+            log.debug("getting space used");
+            const spaceUsed = await sampleManager.getSpaceUsed();
+            deviceSamplesState.storageTotal = spaceUsed.tot;
+            deviceSamplesState.storageUsed = spaceUsed.usd;
+            deviceSamplesState.packsStorageUsed = spaceUsed.packs;
+            log.debug(`Space used: ${JSON.stringify(spaceUsed)}`);
+            log.debug(`Storage total: ${deviceSamplesState.storageTotal}`);
 
-        log.debug("getting IDs");
-        let ids = await sampleManager.getIDs();
-        ids = ids.map(id => id ? id[0] + "-" + id.slice(1) : null); // add "-" after type
-        ids.push(ids.shift() || null); // rotate to start on index 1
-        deviceSamplesState.ids = ids;
-        log.debug(`IDs: ${JSON.stringify(ids)}`);
+            log.debug("getting IDs");
+            let ids = await sampleManager.getIDs();
+            ids = ids.map(id => id ? id[0] + "-" + id.slice(1) : null); // add "-" after type
+            ids.push(ids.shift() || null); // rotate to start on index 1
+            deviceSamplesState.ids = ids;
+            log.debug(`IDs: ${JSON.stringify(ids)}`);
+        }
     } catch {
         // device does not support samples
         deviceSamplesState.isSupported = false;
@@ -144,6 +146,19 @@ export const uplaodDeviceSamples = async (newSamples: DeviceSamples) => {
     }
     deviceSampleTransferState.upload = { type: 'idle' };
     
+    log.debug("checking if device samples are set...");
+    deviceSampleTransferState.supportCheck = {type: 'transferring', progress: null};
+    const isSet = await sampleManager.isSet();
+    deviceSamplesState.isSet = isSet;
+    log.debug(`Device samples are set: ${isSet}`);
+    deviceSampleTransferState.supportCheck = {type: 'idle'};
+
+    if (deviceSamplesState.isSet === false) {
+        log.error("Device samples are not set, failed to upload samples.");
+        deviceSampleTransferState.upload = { type: 'error', message: 'Device samples are not set' };
+        return false;
+    }
+
     log.debug("Re-downloading samples from device to verify upload...");
     const downloadSamples = await downloadDeviceSamples();
     if (!downloadSamples) {
@@ -205,6 +220,7 @@ export const initialiseDeviceSamples = async () => {
         log.debug("Device samples already set, no need to upload defaults.");
     } else {
         log.debug("Uploading default samples to device...");
+        log.warning("Samples not set, uploading defaults...");
         const didUpload = await uplaodDeviceDefaultSamples();
         if (!didUpload) {
             log.error("Failed to upload default samples to device during initialisation.");
