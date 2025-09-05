@@ -1,0 +1,56 @@
+---
+interface Props {
+  id?: string;
+  url?: string;
+  width?: string; // e.g., "60%"; if omitted, 100%
+  title?: string;
+}
+
+const { id, url, width, title = 'YouTube video' } = Astro.props;
+
+function parseId(u: string | undefined | null): string | null {
+  if (!u) return null;
+  try {
+    const parsed = new URL(u);
+    if (parsed.hostname.includes('youtu.be')) {
+      return parsed.pathname.replace(/^\//, '') || null;
+    }
+    if (parsed.hostname.includes('youtube.com')) {
+      if (parsed.pathname.startsWith('/watch')) return parsed.searchParams.get('v');
+      if (parsed.pathname.startsWith('/embed/')) return parsed.pathname.split('/').pop() || null;
+    }
+  } catch {}
+  return null;
+}
+
+function startFromUrl(u: string | undefined | null): string | null {
+  if (!u) return null;
+  try {
+    const parsed = new URL(u);
+    const t = parsed.searchParams.get('t');
+    if (!t) return null;
+    // Accept seconds (e.g., 90) or YouTube t format (e.g., 1m30s)
+    const num = Number(t);
+    if (!Number.isNaN(num)) return String(Math.max(0, Math.floor(num)));
+    const m = /(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/.exec(t);
+    if (!m) return null;
+    const hours = Number(m[1] || 0);
+    const mins = Number(m[2] || 0);
+    const secs = Number(m[3] || 0);
+    const total = hours * 3600 + mins * 60 + secs;
+    return total > 0 ? String(total) : null;
+  } catch { return null; }
+}
+
+const embedId = id || parseId(url);
+const start = startFromUrl(url);
+let src = embedId ? `https://www.youtube.com/embed/${embedId}` : '';
+if (start) src += `?start=${start}`;
+const styleAttr = width ? `width:${width};` : undefined;
+---
+{src && (
+  <figure class="blog-embed" style={styleAttr}>
+    <iframe src={src} title={title} frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+  </figure>
+)}
+
