@@ -123,9 +123,10 @@
   }
   
   // Sort events by press time to maintain proper order
-  function sortEvents() {
+  $effect(() => {
+    log.debug(`Sorting events: ${JSON.stringify(localLoop.events)}`);
     localLoop.events.sort((a, b) => a.time_ticks_press - b.time_ticks_press);
-  }
+  });
   
   function tickToX(tick: number): number {
     const effectiveWidth = gridDimensions().effectiveTickWidth || tickWidth;
@@ -248,7 +249,6 @@
       log.debug(`Creating new note: ${JSON.stringify(newNote)}`);
       localLoop.events.push(newNote);
       selectedNoteIndex = localLoop.events.length - 1;
-      updateLoopLength();
     }
   }
 
@@ -353,11 +353,6 @@
     dragMode = null;
     dragOriginalNote = null;
     lastAuditionedNote = null;
-    
-    // Only update loop length if we actually changed something
-    if (dragOriginalNote) {
-      updateLoopLength();
-    }
   }
 
   function handleGridContextMenu(event: MouseEvent) {
@@ -388,7 +383,6 @@
       log.debug(`Deleting note: noteIndex=${noteIndex}`);
       localLoop.events.splice(noteIndex, 1);
       selectedNoteIndex = null;
-      updateLoopLength();
     } else {
       log.debug(`No note found to delete at position: x=${x}, y=${y}`);
     }
@@ -403,7 +397,6 @@
     
     localLoop.events.splice(noteIndex, 1);
     selectedNoteIndex = null;
-    updateLoopLength();
   }
 
   // Note-specific event handlers
@@ -449,12 +442,6 @@
     soundBackend.noteOn(note, 100, 9);
     setTimeout(() => soundBackend.noteOff(note, 0, 9), 150);
   }
-
-  function updateLoopLength() {
-    // Kept for compatibility; actual loop length is derived reactively
-    sortEvents();
-  }
-
 
   // Playback functions
   function startPlayback() {
