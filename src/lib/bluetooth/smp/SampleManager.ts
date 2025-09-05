@@ -105,9 +105,6 @@ export class SampleManager {
             throw new Error('ID array length must be even (pairs of 32-bit values)');
         }
         
-        console.log("ids:")
-        console.log(ids)
-
         const result: string[] = [];
         for (let i = 0; i < ids.length; i += 2) {
             const low32 = ids[i];

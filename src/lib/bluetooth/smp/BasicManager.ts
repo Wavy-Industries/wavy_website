@@ -1,7 +1,7 @@
 import { SMPService, MGMT_OP } from '../SMPService';
 import { Log } from '../../utils/Log';
 
-let log = new Log('basic_mgr', Log.LEVEL_DEBUG);
+let log = new Log('basic_mgr', Log.LEVEL_INFO);
 
 enum _MGMT_ID {
     POLL = 0,

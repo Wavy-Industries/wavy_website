@@ -12,7 +12,7 @@
     import { samplesLocal, deleteLocalSamplePack, newLocalSamplePack } from "../states/samplesLocal.svelte";
     import NameBoxes from "../components/NameBoxes.svelte";
     import PackTypeBadge from "../components/PackTypeBadge.svelte";
-    const LOG_LEVEL = Log.LEVEL_DEBUG
+    const LOG_LEVEL = Log.LEVEL_INFO
     const log = new Log("DeviceSampleManager", LOG_LEVEL);
 
     const selectedPacks = $state({
@@ -20,8 +20,6 @@
       display: null,
       asyncData: null,
     });
-
-    $inspect(selectedPacks);
 
     // initiate selection from device
     $effect(() => {

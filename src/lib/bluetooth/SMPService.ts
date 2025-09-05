@@ -3,7 +3,7 @@ import { Log } from '../utils/Log';
 import { BluetoothManager } from './bluetoothManager';
 import CBOR from './smp/cbor';
 
-let log = new Log('smpBluetoothCharacteristic', Log.LEVEL_DEBUG);
+let log = new Log('smpBluetoothCharacteristic', Log.LEVEL_INFO);
 
 export const SMP_ERR_RC: { [code: number]: string } = {
     0: 'No error, OK.',

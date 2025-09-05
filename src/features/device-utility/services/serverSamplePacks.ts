@@ -3,7 +3,7 @@ import { getPackType, packDisplayName, SamplePackInfo } from "../utils/samples";
 
 import { Log } from "~/lib/utils/Log";
 
-const LOG_LEVEL = Log.LEVEL_DEBUG
+const LOG_LEVEL = Log.LEVEL_INFO
 const log = new Log("serverSamplePacks", LOG_LEVEL);
 
 export const fetchServerPack = async (id: string): Promise<SamplePack | null> => {

@@ -4,7 +4,7 @@ import { getLocalSamplePack } from "../states/samplesLocal.svelte";
 import { canonicalize } from "~/lib/utils/canonicalize";
 import { fetchServerPack } from "../services/serverSamplePacks";
 
-const LOG_LEVEL = Log.LEVEL_DEBUG
+const LOG_LEVEL = Log.LEVEL_INFO
 const log = new Log("samples-util", LOG_LEVEL);
 
 export type PackType = 'Official' | 'User' | 'Local' | 'Archive';

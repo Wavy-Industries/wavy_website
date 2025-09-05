@@ -17,7 +17,7 @@ import { SampleManager } from '~/lib/bluetooth/smp/SampleManager';
 import { compareDeviceSample, constructSamplePacks } from '../utils/samples';
 
 import { Log } from '~/lib/utils/Log';
-const LOG_LEVEL = Log.LEVEL_DEBUG
+const LOG_LEVEL = Log.LEVEL_INFO
 const log = new Log("device-samples", LOG_LEVEL);
 
 export const sampleManager = new SampleManager(smpService);

@@ -2,7 +2,7 @@ import { firmwareManager } from "./firmware.svelte";
 import { deviceSamplesState, sampleManager } from "./samplesDevice.svelte";
 import { Log } from "~/lib/utils/Log";
 
-const log = new Log("updater", Log.LEVEL_DEBUG);
+const log = new Log("updater", Log.LEVEL_INFO);
 
 
 export const updaterState = $state({
