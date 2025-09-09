@@ -230,6 +230,7 @@ export const initialiseDeviceSamples = async () => {
         log.info("Successfully uploaded default samples to device during initialisation.");
         
         log.debug("Re-checking device samples after upload...");
+        // TODO: currently checking double, since also checking in uploadDeviceSamples. Fix that.
         const supportAfter = await checkDeviceSampleSupport();
         if (!supportAfter.supported || !supportAfter.isSet) {
             log.error("Device samples still not set after uploading defaults during initialisation.");
