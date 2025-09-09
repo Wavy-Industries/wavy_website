@@ -37,6 +37,20 @@ export type PackDisplay = {
     name: string;
     type: PackType;
 }
+
+// Normalize device-provided pack IDs (e.g., trim trailing spaces from fixed-width names)
+export const normalizePackId = (id: string): string => {
+    try {
+        if (!id) return id;
+        // Remove any trailing whitespace (device may pad names)
+        let cleaned = id.replace(/\s+$/g, '');
+        // Also strip stray null characters if present
+        cleaned = cleaned.replace(/\u0000+$/g, '');
+        return cleaned;
+    } catch {
+        return id;
+    }
+}
 export const packDisplayName = (id: string): PackDisplay | null => {
     if (!id) {
         log.error("Pack ID is null, cannot display name.");
@@ -51,6 +65,7 @@ export const packDisplayName = (id: string): PackDisplay | null => {
 }
 
 export const getSamplePack = async(id: string): Promise<SamplePack | null> => {
+    id = normalizePackId(id);
     log.debug(`Getting sample pack for ID: ${id}`);
     const packType = getPackType(id);
     if (!packType) {

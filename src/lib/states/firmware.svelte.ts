@@ -1,4 +1,4 @@
-import { smpService } from './bluetooth.svelte';
+import { smpService } from '~/lib/states/bluetooth.svelte';
 import { FirmwareManager, FirmwareVersion } from '~/lib/bluetooth/smp/FirmwareManager';
 import { Changelog, parseChangelog } from '~/lib/parsers/changelog_parser';
 
@@ -14,9 +14,8 @@ export const firmwareState = $state({
 })
 
 export async function refreshChangelog() {
-    // TODO: this function should be called after we have fetched the device name from DIS.
     try {
-        const device_name = "MONKEY"; // TODO: use DIS instead to get the ID of the device
+        const device_name = "MONKEY"; // TODO: derive via DIS
         const url = `/firmware/${device_name}/changelog.md?_=${Date.now()}`;
         const response = await fetch(url, { cache: 'no-store' });
         const data = await response.text();
@@ -33,3 +32,4 @@ export const refreshDeviceFirmwareVersion = async () => {
     if (!fw) { log.error("Failed to get firmware version from device"); }
     firmwareState.firmwareVersion = fw;
 }
+

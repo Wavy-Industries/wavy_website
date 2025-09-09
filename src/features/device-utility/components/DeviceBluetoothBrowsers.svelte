@@ -1,48 +1,36 @@
 <script>
     import { getOperatingSystem } from "~/lib/utils/operating_system";
+    import { getBrowserRecommendations } from "~/lib/config/browserSupport";
 
     import chrome from '~/assets/icons/browsers/browser-chrome.svg'
     import edge from '~/assets/icons/browsers/browser-edge.svg'
     import bluefy from '~/assets/icons/browsers/browser-bluefy.webp'
 
-    const os = getOperatingSystem()
+    const os = getOperatingSystem();
+    const support = getBrowserRecommendations(os);
+
+    const iconFor = (id) => ({
+        chrome,
+        edge,
+        bluefy,
+    }[id]);
 </script>
 
 <div class="note" style="text-align: center;">
 
         It looks like your browser does not support Bluetooth :/<br />
-        {#if os === 'Windows'}
-        <p>Use Chrome or Edge on Windows.</p>
+        <p>{support.message}</p>
+        {#if support.recs?.length}
             <div class="browser-icons">
-                <img src={chrome.src} alt="Google Chrome" title="Google Chrome" height="32px" />
-                <img src={edge.src} alt="Microsoft Edge" title="Microsoft Edge" height="32px" />
-            </div>
-        {:else if os === 'MacOS'}
-        <p>Use a Chrome browser on macOS.</p>
-            <div class="browser-icons">
-                <img src={chrome.src} alt="Google Chrome" title="Google Chrome" height="32px" />
-            </div>
-        {:else if os === 'Linux'}
-        <p>Use a Chrome browser on Linux.</p>
-            <div class="browser-icons">
-                <img src={chrome.src} alt="Google Chrome" title="Google Chrome" height="32px" />
-            </div>
-        {:else if os === 'Android'}
-        <p>Use a Chrome browser on Android.</p>
-            <div class="browser-icons">
-                <img src={chrome.src} alt="Google Chrome" title="Google Chrome" height="32px" />
-            </div>
-        {:else if os === 'iOS'}
-        <p>Use Bluefy on iOS/iPad OS.</p>
-            <div class="browser-icons">
-                <a href="https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055">
-                <img src={bluefy.src} alt="Bluefy" title="Bluefy" height="32px" />
-                </a>
-            </div>
-        {:else}
-        <p>Browser support may be limited on your operating system.</p>
-            <div class="browser-icons">
-                <img src={unknown.src} alt="Unknown browser" title="Unknown browser" height="32px" />
+                {#each support.recs as rec}
+                    {#if rec.url}
+                        <a href={rec.url} target="_blank" rel="noreferrer">
+                            <img src={iconFor(rec.id).src} alt={rec.name} title={rec.name} height="32px" />
+                        </a>
+                    {:else}
+                        <img src={iconFor(rec.id).src} alt={rec.name} title={rec.name} height="32px" />
+                    {/if}
+                {/each}
             </div>
         {/if}
 

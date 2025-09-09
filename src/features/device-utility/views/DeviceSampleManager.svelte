@@ -1,7 +1,7 @@
 <script>
-    import { uplaodDeviceSamples, uplaodDeviceDefaultSamples } from "~/features/device-utility/states/samplesDevice.svelte";
+    import { uplaodDeviceSamples, uplaodDeviceDefaultSamples } from "~/lib/states/samples.svelte";
     import { constructSamplePacks, packDisplayName, getSamplePack, compareDeviceSample } from "~/features/device-utility/utils/samples";
-    import { deviceSamplesState, deviceSampleTransferState, DEFAULT_SAMPLE_PACK_IDS } from "~/features/device-utility/states/samplesDevice.svelte";
+    import { deviceSamplesState, deviceSampleTransferState, DEFAULT_SAMPLE_PACK_IDS } from "~/lib/states/samples.svelte";
     import { fetchAvailableServerPacks } from "~/features/device-utility/services/serverSamplePacks";
     import { sampleParser_packSize } from "~/lib/parsers/samples_parser";
     import { compareSamplePack, getPackType } from "~/features/device-utility/utils/samples";

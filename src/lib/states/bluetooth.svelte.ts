@@ -1,4 +1,4 @@
-// bluetoothManager.svelte.js
+// bluetoothManager shared state for app-wide use
 import { BluetoothManager } from '~/lib/bluetooth/bluetoothManager';
 import { MIDIService } from '~/lib/bluetooth/MIDIService';
 import { SMPService } from '~/lib/bluetooth/SMPService';

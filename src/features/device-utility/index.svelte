@@ -2,7 +2,7 @@
     import {onMount} from 'svelte';
     import ConnectView from '~/features/device-utility/views/ConnectView.svelte';
     import Dashboard from '~/features/device-utility/views/Dashboard.svelte';
-    import { bluetoothState } from '~/features/device-utility/states/bluetooth.svelte';
+    import { bluetoothState } from '~/lib/states/bluetooth.svelte';
 
     import { loadDevMode } from '~/features/device-utility/states/devmode.svelte';
 

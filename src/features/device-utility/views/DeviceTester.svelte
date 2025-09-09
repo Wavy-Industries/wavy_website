@@ -1,6 +1,6 @@
 <script>
     import { onMount } from 'svelte';
-    import { bluetoothState } from '~/features/device-utility/states/bluetooth.svelte';
+    import { bluetoothState } from '~/lib/states/bluetooth.svelte';
     import { deviceTesterState, clearDeviceTesterState } from '~/features/device-utility/states/midiTester.svelte';
 
     // Both SMP and MIDI services work at the same level:

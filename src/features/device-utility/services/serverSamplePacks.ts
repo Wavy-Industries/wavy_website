@@ -1,5 +1,5 @@
 import { SamplePack } from "~/lib/parsers/samples_parser";
-import { getPackType, packDisplayName, SamplePackInfo } from "../utils/samples";
+import { getPackType, packDisplayName, SamplePackInfo, normalizePackId } from "../utils/samples";
 
 import { Log } from "~/lib/utils/Log";
 
@@ -7,6 +7,7 @@ const LOG_LEVEL = Log.LEVEL_INFO
 const log = new Log("serverSamplePacks", LOG_LEVEL);
 
 export const fetchServerPack = async (id: string): Promise<SamplePack | null> => {
+    id = normalizePackId(id);
     const packType = getPackType(id);
     if (!packType || (packType !== 'Official' && packType !== 'User')) {
         log.error(`Invalid pack type for cloud fetch: ${packType} (ID: ${id})`);
@@ -16,7 +17,7 @@ export const fetchServerPack = async (id: string): Promise<SamplePack | null> =>
     const DEVICE_NAME = "MONKEY"; // TODO: fetch from device info
 
     try {
-        const res = await fetch(`/samples/${DEVICE_NAME}/DRM/${id}.json`);
+        const res = await fetch(`/samples/${DEVICE_NAME}/DRM/${encodeURIComponent(id)}.json`);
         if (res.ok) {
             const pack = await res.json() as SamplePack;
             pack.name = id;

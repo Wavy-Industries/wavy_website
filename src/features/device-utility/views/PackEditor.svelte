@@ -8,7 +8,7 @@
   import MidiPreview from '~/features/device-utility/components/MidiPreview.svelte';
   import { tempoState } from '~/features/device-utility/states/tempo.svelte';
   import { validatePage, getSamplePack } from '~/features/device-utility/utils/samples';
-    import { deviceSamplesState } from '../states/samplesDevice.svelte';
+    import { deviceSamplesState } from '~/lib/states/samples.svelte';
   import NameBoxes from '~/features/device-utility/components/NameBoxes.svelte';
   import PackTypeBadge from "~/features/device-utility/components/PackTypeBadge.svelte";
   import JSONEditor from "~/features/device-utility/components/JSONEditor.svelte";

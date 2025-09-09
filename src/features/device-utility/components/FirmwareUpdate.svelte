@@ -1,5 +1,5 @@
 <script>
-    import { deviceSampleTransferState } from "~/features/device-utility/states/samplesDevice.svelte";
+    import { deviceSampleTransferState } from "~/lib/states/samples.svelte";
 
     const { stage, uploadProgress, sampleUploadProgress } = $props();
     const hasSampleProgress = $derived(typeof sampleUploadProgress === 'number');

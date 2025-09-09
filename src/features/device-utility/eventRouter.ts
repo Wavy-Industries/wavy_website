@@ -2,14 +2,13 @@
 connects modules together which relies on callbacks for event communication
 */
 
-import { bluetoothManager, bluetoothStateSetConnected, bluetoothStateSetConnecting, bluetoothStateSetDisconnected, bluetoothStateSetConnectionLoss, bluetoothStateSetConnectionReestablished } from '~/features/device-utility/states/bluetooth.svelte';
-import { refreshChangelog, refreshDeviceFirmwareVersion } from './states/firmware.svelte';
+import { bluetoothManager, bluetoothStateSetConnected, bluetoothStateSetConnecting, bluetoothStateSetDisconnected, bluetoothStateSetConnectionLoss, bluetoothStateSetConnectionReestablished, smpService, midiService } from '~/lib/states/bluetooth.svelte';
+import { refreshChangelog, refreshDeviceFirmwareVersion } from '~/lib/states/firmware.svelte';
 import { midiTesterOnNoteOn, midiTesterOnNoteOff, midiTesterOnCC } from '~/features/device-utility/states/midiTester.svelte';
-import { smpService, midiService } from './states/bluetooth.svelte';
 import { soundBackend } from '~/lib/soundBackend';
 import { refreshLocalSamples } from './states/samplesLocal.svelte';
-import { initialiseDeviceSamples, invalidateDeviceSamplesState } from './states/samplesDevice.svelte';
-import { updaterNotifyConnectionReestablished, updaterNotifyIsSupported } from './states/updater.svelte';
+import { initialiseDeviceSamples, invalidateDeviceSamplesState } from '~/lib/states/samples.svelte';
+import { updaterNotifyConnectionReestablished, updaterNotifyIsSupported } from '~/lib/states/updater.svelte';
 import { midiControlOnCC, midiControlOnNoteOff, midiControlOnNoteOn } from './states/playground.svelte';
 import { windowState, DeviceUtilityView } from './states/window.svelte';
 

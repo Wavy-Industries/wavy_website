@@ -1,15 +1,15 @@
 <script>
-    import { bluetoothManager, bluetoothState } from '~/features/device-utility/states/bluetooth.svelte';
+    import { bluetoothManager, bluetoothState } from '~/lib/states/bluetooth.svelte';
     import ConnectionStatus from '~/features/device-utility/components/ConnectionStatus.svelte';
     import DeviceUpdate from '~/features/device-utility/views/DeviceUpdate.svelte';
     import DeviceSampleManager from '~/features/device-utility/views/DeviceSampleManager.svelte';
     import DeviceTester from '~/features/device-utility/views/DeviceTester.svelte';
-    import { firmwareState } from '~/features/device-utility/states/firmware.svelte';
+    import { firmwareState } from '~/lib/states/firmware.svelte';
     import { firmwareRhsIsNewer } from '~/lib/bluetooth/smp/FirmwareManager';
     import { dev } from '~/features/device-utility/states/devmode.svelte';
     import { onMount } from 'svelte';
     import { fade } from 'svelte/transition';
-    import { deviceSamplesState } from '~/features/device-utility/states/samplesDevice.svelte';
+    import { deviceSamplesState } from '~/lib/states/samples.svelte';
     import {  windowStateInit, windowState, DeviceUtilityView } from '~/features/device-utility/states/window.svelte';
 
     onMount(async () => {
