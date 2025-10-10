@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { midiControlState, initPlaygroundSynthPersistence, resetAllSynthChannels, resetSynthChannel, playgroundUI } from '~/features/device-utility/states/playground.svelte';
-  import SynthChannelEditor from '~/features/device-utility/components/SynthChannelEditor.svelte';
+  import { midiControlState, initPlaygroundTrackPersistence, resetAllTracks, resetTrack, playgroundUI, playgroundTracks } from '~/features/device-utility/states/playground.svelte';
+  import TrackEditor from '~/features/device-utility/components/TrackEditor.svelte';
   import { onMount } from 'svelte';
 
-  const chNames = Array.from({ length: 10 }, (_, i) => (i === 9 ? 'Ch 10 (Drums)' : `Ch ${i+1}`));
+  const tracks = $derived(playgroundTracks);
   function fmtTime(ts: number) { const d = new Date(ts); return d.toLocaleTimeString(); }
   function noteName(n: number): string {
     const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -89,7 +89,7 @@
   $effect(() => () => { if (raf) cancelAnimationFrame(raf); });
 
   onMount(() => {
-    initPlaygroundSynthPersistence();
+    initPlaygroundTrackPersistence();
   });
 
   // When the dialog opens, move focus to it so ESC works immediately
@@ -99,9 +99,9 @@
     }
   });
 
-  function resetAll() { resetAllSynthChannels(); }
+  function resetAll() { resetAllTracks(); }
 
-  function resetChannel(ch: number) { resetSynthChannel(ch); }
+  function resetChannel(ch: number) { resetTrack(ch); }
 </script>
 
 <div class="content">
@@ -120,20 +120,22 @@
   <div class="pane">
     <div class="pane-header">
       <h3>Channel Activity</h3>
-      <button class="btn-reset-all" title="Reset all synth channels to defaults" onclick={resetAll}>Reset All</button>
+      <button class="btn-reset-all" title="Reset all track scripts and sliders to defaults" onclick={resetAll}>Reset All</button>
     </div>
     <div class="list">
-      {#each Array(10) as _, ch}
+      {#each tracks.slice(0, 10) as track, ch}
         <div class="row">
           <button
-            class={`label btn-chan ${ch === 9 ? 'disabled' : ''}`}
-            title={ch === 9 ? 'Drums channel — no synth editor' : 'Edit synth'}
-            onclick={() => { if (ch !== 9) selected.ch = ch; }}
+            class="label btn-chan"
+            title={track?.description ? track.description : 'Edit track'}
+            onclick={() => { selected.ch = ch; }}
           >
-            <span class="chan-text">{chNames[ch]}</span>
-            {#if ch !== 9}
-              <span class="gear" aria-hidden="true">⚙</span>
+            <span class="chan-index">Ch {ch + 1}</span>
+            <span class="chan-text">{track?.name ?? `Track ${ch + 1}`}</span>
+            {#if track?.error}
+              <span class="error" title={`Script error: ${track.error}`}>⚠</span>
             {/if}
+            <span class="gear" aria-hidden="true">⚙</span>
           </button>
           <div class="events">
             <canvas use:modCanvas={ch} class="mod-canvas-overlay"></canvas>
@@ -167,7 +169,13 @@
     onkeydown={(e) => { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') { selected.ch = null; } }}
   >
     <div class="modal-panel" role="dialog" aria-modal="true" tabindex="-1" bind:this={modalPanelEl} onclick={(e)=> e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') { selected.ch = null; } }}>
-      <SynthChannelEditor channel={selected.ch!} refreshKey={refreshKey} onReset={() => resetChannel(selected.ch!)} onClose={() => selected.ch = null} />
+      <TrackEditor
+        channel={selected.ch!}
+        track={tracks[selected.ch!]}
+        refreshKey={refreshKey}
+        onReset={() => resetChannel(selected.ch!)}
+        onClose={() => (selected.ch = null)}
+      />
     </div>
   </div>
 {/if}
@@ -194,8 +202,9 @@
   .label { font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--du-text); border-right: 1px solid black; text-align:left; }
   .btn-chan { background:#fff; padding:6px 8px; cursor:pointer; border:1px solid black; display:flex; align-items:center; gap:6px; width: 100%; justify-content: flex-start; }
   .btn-chan:hover { background:#f9fafb; }
-  .btn-chan.disabled { opacity: 0.6; cursor: default; }
-  .btn-chan .gear { margin-left: auto; font-size: 18px; color: #000; line-height: 1; }
+  .btn-chan .chan-index { font-size: 0.75rem; color: #4b5563; text-transform: uppercase; letter-spacing: .08em; }
+  .btn-chan .gear { font-size: 18px; color: #000; line-height: 1; margin-left: 8px; }
+  .btn-chan .error { margin-left: auto; color: #b91c1c; font-weight: 700; }
   .btn-reset { border:1px solid var(--du-border); background:#fff; padding:6px 8px; border-radius:6px; cursor:pointer; }
   .btn-reset:hover { background:#f3f4f6; }
   .btn-reset-all { border: 1px solid #1f2329; background: #2b2f36; color: #fff; padding:6px 12px; border-radius:6px; cursor:pointer; }

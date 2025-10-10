@@ -1,4 +1,4 @@
-import { soundBackend, type SynthChannelConfig } from '~/lib/soundBackend';
+import { soundBackend, type TrackConfigView, type TrackPersisted } from '~/lib/soundBackend';
 
 type MidiEvt =
   | { kind: 'noteon'; note: number; velocity: number; channel: number; ts: number; id?: number }
@@ -29,64 +29,61 @@ export const midiControlOnNoteOff = (note: number, velocity: number, channel: nu
 export const midiControlOnCC = (controller: number, value: number, channel: number) =>
   pushEvent({ kind: 'cc', controller, value, channel, ts: Date.now() });
 
-// ---------------- Playground synth persistence + UI helpers ----------------
-export const PLAYGROUND_STORAGE_KEY = 'wavy_playground_synth_cfg_v1';
-
-// Baseline defaults captured on first init (non-drum channels 0..8)
-const baseline: (SynthChannelConfig | null)[] = Array.from({ length: 16 }, () => null);
+// ---------------- Playground track persistence + UI helpers ----------------
+export const PLAYGROUND_STORAGE_KEY = 'wavy_playground_tracks_v1';
 
 export const playgroundUI = $state({ refreshKey: 0 });
+export const playgroundTracks = $state<TrackConfigView[]>(soundBackend.getAllTrackConfigs());
 
-export function initPlaygroundSynthPersistence() {
-  // Capture per-channel baseline before applying any saved overrides
-  for (let ch = 0; ch < 10; ch++) {
-    if (ch === 9) continue; // skip drums
-    try { baseline[ch] = soundBackend.getChannelConfig(ch); } catch {}
-  }
-  // Apply saved patches from localStorage
-  if (typeof window !== 'undefined') {
-    try {
-      const raw = localStorage.getItem(PLAYGROUND_STORAGE_KEY);
-      const saved = raw ? JSON.parse(raw) : {};
-      for (let ch = 0; ch < 10; ch++) {
-        if (ch === 9) continue;
-        const cfg = saved?.[String(ch)];
-        if (cfg && typeof cfg === 'object') {
-          soundBackend.setChannelConfig(ch, cfg);
-        }
-      }
-    } catch {}
-  }
+function persistTracks(tracks: TrackPersisted[]) {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(PLAYGROUND_STORAGE_KEY, JSON.stringify(tracks)); } catch {}
 }
 
-export function resetAllSynthChannels() {
-  // Restore baseline for all non-drum channels and clear saved overrides
-  for (let ch = 0; ch < 10; ch++) {
-    if (ch === 9) continue;
-    const def = baseline[ch];
-    if (def) {
-      try { soundBackend.setChannelConfig(ch, def); } catch {}
-    }
-  }
-  if (typeof window !== 'undefined') {
-    try { localStorage.setItem(PLAYGROUND_STORAGE_KEY, JSON.stringify({})); } catch {}
-  }
+function refreshTracks() {
+  const fresh = soundBackend.getAllTrackConfigs();
+  playgroundTracks.splice(0, playgroundTracks.length, ...fresh);
   playgroundUI.refreshKey++;
 }
 
-export function resetSynthChannel(ch: number) {
-  if (ch === 9) return; // no synth editor for drums
-  const def = baseline[ch];
-  if (def) {
+export function initPlaygroundTrackPersistence() {
+  if (typeof window !== 'undefined') {
     try {
-      soundBackend.setChannelConfig(ch, def);
-      if (typeof window !== 'undefined') {
-        const raw = localStorage.getItem(PLAYGROUND_STORAGE_KEY);
-        const obj = raw ? JSON.parse(raw) : {};
-        delete obj[String(ch)];
-        localStorage.setItem(PLAYGROUND_STORAGE_KEY, JSON.stringify(obj));
+      const raw = localStorage.getItem(PLAYGROUND_STORAGE_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (Array.isArray(saved)) {
+          soundBackend.importTracks(saved);
+        }
       }
     } catch {}
-    playgroundUI.refreshKey++;
+    const warmup = () => { soundBackend.resume().catch(() => {}); };
+    window.addEventListener('pointerdown', warmup, { once: true });
+    setTimeout(warmup, 100);
   }
+  refreshTracks();
+}
+
+export function updateTrackConfig(channel: number, updates: Partial<TrackPersisted>) {
+  soundBackend.setTrackConfig(channel, updates);
+  persistTracks(soundBackend.exportTracks());
+  refreshTracks();
+}
+
+export function setTrackSliderValue(channel: number, sliderId: string, value: number) {
+  soundBackend.setTrackSliderValue(channel, sliderId, value);
+  persistTracks(soundBackend.exportTracks());
+  refreshTracks();
+}
+
+export function resetTrack(channel: number) {
+  soundBackend.resetTrack(channel);
+  persistTracks(soundBackend.exportTracks());
+  refreshTracks();
+}
+
+export function resetAllTracks() {
+  soundBackend.resetAllTracks();
+  persistTracks(soundBackend.exportTracks());
+  refreshTracks();
 }

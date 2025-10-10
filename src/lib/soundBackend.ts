@@ -1,451 +1,989 @@
-// Sound backend library for WebAudio with MIDI-channel awareness.
-// - Channels 0-8: simple instrument voices (different timbres per channel)
-// - Channel 9: drum kit with common GM-style note mappings
-// - Exposes a small interface used by UI (device tester, MIDI editor, MIDI input)
+import type { initStrudel as InitStrudelFn } from '@strudel/web';
+import { getAudioContext, initAudioOnFirstClick, registerSynthSounds, registerZZFXSounds, superdough } from 'superdough';
 
-export type DrumSampleMap = Map<number, AudioBuffer>;
+const TOTAL_CHANNELS = 16;
 
-export type OscType = 'sine' | 'square' | 'sawtooth' | 'triangle';
-export type ModRouting = 'off' | 'mix' | 'am' | 'fm';
-export type ADSR = { attack: number; decay: number; sustain: number; release: number };
-
-export type SynthChannelConfig = {
-  osc1Type: OscType;
-  osc2Type: OscType;
-  osc2Routing: ModRouting; // off/mix/am/fm
-  osc2Ratio: number; // relative frequency of osc2 to base (e.g., 1.0)
-  osc2Level: number; // mix level (mix) or depth (am/fm), 0..1
-  voices: number; // 1..8
-  spreadCents: number; // detune spread total range in cents
-  adsr: ADSR; // seconds for a,d,r; sustain 0..1
-  masterGain: number; // 0..1
+type TrackScriptDefinition = {
+  name: string;
+  script: string;
 };
 
-export const DEFAULT_CHANNEL_CONFIG: Readonly<SynthChannelConfig> = {
-  osc1Type: 'sawtooth',
-  osc2Type: 'sine',
-  osc2Routing: 'off',
-  osc2Ratio: 2,
-  osc2Level: 0.5,
-  voices: 1,
-  spreadCents: 8,
-  adsr: { attack: 0.01, decay: 0.12, sustain: 0.6, release: 0.2 },
-  masterGain: 0.25,
+type TrackEventSpec = {
+  duration?: number;
+  offset?: number;
+  cut?: string;
+  orbit?: string | number;
+  velocity?: number;
+  gain?: number;
+  [key: string]: unknown;
+};
+
+type TrackEventResult = TrackEventSpec | TrackEventSpec[] | null | undefined;
+
+type TrackEventContext = {
+  note: number;
+  velocity: number;
+  channel: number;
+  time: number;
+  cutId: string;
+};
+
+type TrackSliderConfig = {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  step?: number;
+  default: number;
+  comment?: string;
+};
+
+type TrackEventHandler = (
+  ctx: TrackEventContext,
+  helpers: typeof helpers,
+  sliders: Record<string, number>,
+) => TrackEventResult;
+
+type TrackRuntime = {
+  name: string;
+  script: string;
+  description?: string;
+  onNoteOn?: TrackEventHandler;
+  onNoteOff?: TrackEventHandler;
+  sliders?: TrackSliderConfig[];
+};
+
+export type TrackConfigView = {
+  name: string;
+  script: string;
+  description?: string;
+  error: string | null;
+  sliders: TrackSliderConfig[];
+  sliderValues: Record<string, number>;
+};
+
+export type TrackPersisted = {
+  name: string;
+  script: string;
+  sliders?: Record<string, number>;
 };
 
 export interface ISoundBackend {
   noteOn(note: number, velocity?: number, channel?: number): void;
   noteOff(note: number, velocity?: number, channel?: number): void;
   allNotesOff(): void;
-  setDrumSample(note: number, buffer: AudioBuffer | null): void; // null to remove
-  loadDrumSample(note: number, url: string): Promise<void>;
   resume(): Promise<void>;
-  // Synth configuration per channel (0-15)
-  getChannelConfig(channel: number): SynthChannelConfig;
-  setChannelConfig(channel: number, patch: Partial<SynthChannelConfig>): void;
+  getTrackConfig(channel: number): TrackConfigView;
+  getAllTrackConfigs(): TrackConfigView[];
+  setTrackConfig(channel: number, updates: Partial<TrackPersisted>): TrackConfigView;
+  resetTrack(channel: number): TrackConfigView;
+  resetAllTracks(): TrackConfigView[];
+  exportTracks(): TrackPersisted[];
+  importTracks(data: Partial<TrackPersisted>[]): TrackConfigView[];
+  setTrackSliderValue(channel: number, sliderId: string, value: number): TrackConfigView;
 }
 
-type Voice = { stop: () => void };
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const midiToFreq = (note: number) => 440 * Math.pow(2, (note - 69) / 12);
+const velocityToUnit = (velocity: number, scale = 1) => clamp((velocity / 127) * scale, 0, 1);
 
-class WebAudioBackend implements ISoundBackend {
-  private ctx: AudioContext | null = null;
-  private playing: Set<Voice> = new Set();
-  private activeNotes: Map<string, Voice> = new Map(); // key: `${channel}:${note}`
-  private drumSamples: DrumSampleMap = new Map();
-  private channelCfg: SynthChannelConfig[] = Array.from({ length: 16 }, () => ({ ...DEFAULT_CHANNEL_CONFIG }));
-  private master: GainNode | null = null;
+const helpers = Object.freeze({
+  clamp,
+  midiToFreq,
+  velocityToUnit,
+});
 
-  constructor() {
-    // Initialize musical presets per channel (0-8 synths, 9 = drums)
-    // 0: Sine basic
-    this.channelCfg[0] = {
-      ...DEFAULT_CHANNEL_CONFIG,
-      osc1Type: 'sine', osc2Routing: 'off', voices: 1, spreadCents: 0,
-      adsr: { attack: 0.005, decay: 0.12, sustain: 0.6, release: 0.25 },
-      masterGain: 0.25,
+let cachedInitStrudel: InitStrudelFn | null = null;
+async function loadInitStrudel(): Promise<InitStrudelFn> {
+  if (!cachedInitStrudel) {
+    const mod = await import('@strudel/web');
+    cachedInitStrudel = mod.initStrudel;
+  }
+  return cachedInitStrudel;
+}
+
+const BASE_TRACKS: TrackScriptDefinition[] = [
+  {
+    name: 'Glass Keys',
+    script: `({
+  description: 'Glass keys with airy shimmer and a subtle drum-sidechain breath.',
+  sliders: [
+    { id: 'attack', label: 'Attack', min: 0.005, max: 0.45, step: 0.005, default: 0.04, comment: 'Envelope attack (seconds)' },
+    { id: 'release', label: 'Release', min: 0.2, max: 1.8, step: 0.01, default: 0.9, comment: 'Envelope release tail (seconds)' },
+    { id: 'cutoff', label: 'Cutoff', min: 700, max: 4800, step: 20, default: 2200, comment: 'Low-pass cutoff (Hz)' }
+  ],
+  // Attack softens the front edge, Release stretches the tail, Cutoff sets brightness.
+  onNoteOn({ note, velocity, cutId, channel }, helpers, sliders = {}) {
+    const level = helpers.velocityToUnit(velocity, 1.05);
+    const attack = sliders.attack ?? 0.04;
+    const release = sliders.release ?? 0.9;
+    const cutoff = sliders.cutoff ?? 2200;
+    return {
+      s: 'sine',
+      note,
+      gain: 0.78,
+      velocity: level,
+      attack,
+      decay: 0.22,
+      sustain: 0.72,
+      release,
+      cutoff,
+      resonance: 0.9,
+      room: 0.28,
+      delay: 0.22,
+      delayfeedback: 0.4,
+      duckorbit: 'drum_bus',
+      duckdepth: 0.52,
+      duckattack: 0.018,
+      orbit: \`track_\${channel + 1}\`,
+      cut: cutId,
+      duration: release + 0.6
     };
-    // 1: Pluck (short, bright)
-    this.channelCfg[1] = {
-      ...DEFAULT_CHANNEL_CONFIG,
-      osc1Type: 'sawtooth', osc2Routing: 'off', voices: 1, spreadCents: 0,
-      adsr: { attack: 0.002, decay: 0.18, sustain: 0.08, release: 0.12 },
-      masterGain: 0.25,
+  }
+})`,
+  },
+  {
+    name: 'Shimmer Pluck',
+    script: `({
+  description: 'Bright pluck with phaser shimmer and controllable detune.',
+  sliders: [
+    { id: 'decay', label: 'Decay', min: 0.08, max: 0.5, step: 0.01, default: 0.2, comment: 'Envelope decay (seconds)' },
+    { id: 'detune', label: 'Detune', min: 0, max: 18, step: 1, default: 6, comment: 'Unison detune (cents)' },
+    { id: 'cutoff', label: 'Cutoff', min: 1200, max: 7200, step: 40, default: 3600, comment: 'Low-pass cutoff (Hz)' }
+  ],
+  // Decay tightens the pluck length, Detune widens the stereo image, Cutoff brightens the stab.
+  onNoteOn({ note, velocity, cutId, channel }, helpers, sliders = {}) {
+    const decay = sliders.decay ?? 0.2;
+    const detune = sliders.detune ?? 6;
+    const cutoff = sliders.cutoff ?? 3600;
+    const level = helpers.velocityToUnit(velocity, 1.1);
+    return {
+      s: 'sawtooth',
+      note,
+      gain: 0.72,
+      velocity: level,
+      attack: 0.003,
+      decay,
+      sustain: 0.1,
+      release: 0.16,
+      spread: detune,
+      phaserrate: 0.55,
+      phaserdepth: 0.55,
+      cutoff,
+      resonance: 0.85,
+      orbit: \`track_\${channel + 1}\`,
+      delay: 0.18,
+      delayfeedback: 0.32,
+      cut: cutId,
+      duration: decay + 0.25
     };
-    // 2: Saw lead (slight unison)
-    this.channelCfg[2] = {
-      ...DEFAULT_CHANNEL_CONFIG,
-      osc1Type: 'sawtooth', osc2Routing: 'off', voices: 3, spreadCents: 12,
-      adsr: { attack: 0.01, decay: 0.16, sustain: 0.5, release: 0.22 },
-      masterGain: 0.22,
+  }
+})`,
+  },
+  {
+    name: 'Neon Saw',
+    script: `({
+  description: 'Wide saw lead with motion and drive.',
+  sliders: [
+    { id: 'spread', label: 'Spread', min: 0, max: 32, step: 1, default: 18, comment: 'Unison spread (cents)' },
+    { id: 'drive', label: 'Drive', min: 0, max: 1.2, step: 0.05, default: 0.4, comment: 'Distortion amount' },
+    { id: 'release', label: 'Release', min: 0.1, max: 0.9, step: 0.02, default: 0.36, comment: 'Release tail (seconds)' }
+  ],
+  // Spread widens unison, Drive gives grit, Release sets legato glide.
+  onNoteOn({ note, velocity, cutId, channel }, helpers, sliders = {}) {
+    const spread = sliders.spread ?? 18;
+    const drive = sliders.drive ?? 0.4;
+    const release = sliders.release ?? 0.36;
+    const level = helpers.velocityToUnit(velocity, 1.08);
+    return {
+      s: 'sawtooth',
+      note,
+      gain: 0.62,
+      velocity: level,
+      attack: 0.012,
+      decay: 0.21,
+      sustain: 0.58,
+      release,
+      spread,
+      vibrato: 0.35,
+      vibratodepth: 0.18,
+      distort: drive,
+      distortvol: 0.64,
+      duckorbit: 'drum_bus',
+      duckdepth: 0.58,
+      orbit: \`track_\${channel + 1}\`,
+      cut: cutId,
+      duration: release + 0.4
     };
-    // 3: Square organ
-    this.channelCfg[3] = {
-      ...DEFAULT_CHANNEL_CONFIG,
-      osc1Type: 'square', osc2Routing: 'off', voices: 1, spreadCents: 0,
-      adsr: { attack: 0.005, decay: 0.08, sustain: 0.8, release: 0.2 },
-      masterGain: 0.22,
+  }
+})`,
+  },
+  {
+    name: 'Chorale Organ',
+    script: `({
+  description: 'Harmonic square organ with vibrato and body.',
+  sliders: [
+    { id: 'vibrato', label: 'Vibrato Rate', min: 0, max: 8, step: 0.1, default: 3.2, comment: 'Vibrato speed (Hz)' },
+    { id: 'mix', label: 'Vibrato Depth', min: 0, max: 1, step: 0.05, default: 0.45, comment: 'Vibrato depth' },
+    { id: 'room', label: 'Room', min: 0, max: 0.6, step: 0.02, default: 0.22, comment: 'Reverb mix' }
+  ],
+  // Vibrato sliders shape the wobble; Room slider sets ambience.
+  onNoteOn({ note, velocity, cutId, channel }, helpers, sliders = {}) {
+    const vibrato = sliders.vibrato ?? 3.2;
+    const depth = sliders.mix ?? 0.45;
+    const room = sliders.room ?? 0.22;
+    const level = helpers.velocityToUnit(velocity, 0.92);
+    return {
+      s: 'square',
+      note,
+      gain: 0.56,
+      velocity: level,
+      attack: 0.006,
+      decay: 0.16,
+      sustain: 0.82,
+      release: 0.32,
+      vibrato,
+      vibratodepth: depth,
+      room,
+      cutoff: 2800,
+      orbit: \`track_\${channel + 1}\`,
+      cut: cutId,
+      duration: 0.8
     };
-    // 4: Triangle pad
-    this.channelCfg[4] = {
-      ...DEFAULT_CHANNEL_CONFIG,
-      osc1Type: 'triangle', voices: 4, spreadCents: 18,
-      adsr: { attack: 0.12, decay: 0.4, sustain: 0.7, release: 0.8 },
-      masterGain: 0.2,
+  }
+})`,
+  },
+  {
+    name: 'Silver Pad',
+    script: `({
+  description: 'Slow triangle pad that blooms with filter movement.',
+  sliders: [
+    { id: 'attack', label: 'Attack', min: 0.05, max: 0.9, step: 0.01, default: 0.22, comment: 'Envelope attack (seconds)' },
+    { id: 'release', label: 'Release', min: 0.8, max: 3.5, step: 0.05, default: 1.8, comment: 'Envelope release (seconds)' },
+    { id: 'cutoff', label: 'Cutoff', min: 400, max: 4200, step: 20, default: 1600, comment: 'Filter cutoff (Hz)' }
+  ],
+  // Attack/Release set swell speed; Cutoff controls warmth.
+  onNoteOn({ note, velocity, cutId, channel }, helpers, sliders = {}) {
+    const attack = sliders.attack ?? 0.22;
+    const release = sliders.release ?? 1.8;
+    const cutoff = sliders.cutoff ?? 1600;
+    const level = helpers.velocityToUnit(velocity, 0.78);
+    return {
+      s: 'triangle',
+      note,
+      gain: 0.58,
+      velocity: level,
+      attack,
+      decay: 0.55,
+      sustain: 0.82,
+      release,
+      cutoff,
+      resonance: 0.72,
+      room: 0.36,
+      orbit: \`track_\${channel + 1}\`,
+      cut: cutId,
+      duration: release + 0.8
     };
-    // 5: FM bell (sine carrier, sine mod)
-    this.channelCfg[5] = {
-      ...DEFAULT_CHANNEL_CONFIG,
-      osc1Type: 'sine', osc2Type: 'sine', osc2Routing: 'fm', osc2Ratio: 2.0, osc2Level: 0.55,
-      voices: 1, spreadCents: 0,
-      adsr: { attack: 0.002, decay: 0.35, sustain: 0.0, release: 1.2 },
-      masterGain: 0.2,
+  }
+})`,
+  },
+  {
+    name: 'Bell Cascade',
+    script: `({
+  description: 'Chiming metallic bell layered with airy tails.',
+  sliders: [
+    { id: 'tone', label: 'Tone Shift', min: -12, max: 12, step: 1, default: 0, comment: 'Semitone shift for sparkle' },
+    { id: 'decay', label: 'Decay', min: 0.4, max: 2.4, step: 0.05, default: 1.0, comment: 'Tail length (seconds)' },
+    { id: 'room', label: 'Room', min: 0, max: 0.7, step: 0.02, default: 0.35, comment: 'Reverb amount' }
+  ],
+  // Tone nudges the chord shimmer, Decay/Room set bell trail.
+  onNoteOn({ note, velocity, cutId, channel }, helpers, sliders = {}) {
+    const tone = sliders.tone ?? 0;
+    const decay = sliders.decay ?? 1.0;
+    const room = sliders.room ?? 0.35;
+    const level = helpers.velocityToUnit(velocity, 1.18);
+    return {
+      s: 'zzfx',
+      note: note + tone,
+      gain: 0.68,
+      velocity: level,
+      attack: 0.001,
+      decay,
+      sustain: 0,
+      release: decay,
+      room,
+      orbit: \`track_\${channel + 1}\`,
+      cut: cutId,
+      duration: decay + 0.3
     };
-    // 6: AM trem (sine carrier, slow AM)
-    this.channelCfg[6] = {
-      ...DEFAULT_CHANNEL_CONFIG,
-      osc1Type: 'sine', osc2Type: 'sine', osc2Routing: 'am', osc2Ratio: 0.02, osc2Level: 0.6,
-      voices: 1, spreadCents: 0,
-      adsr: { attack: 0.02, decay: 0.18, sustain: 0.7, release: 0.35 },
-      masterGain: 0.22,
+  }
+})`,
+  },
+  {
+    name: 'Hypno Tremor',
+    script: `({
+  description: 'Slow tremolo sine with optional wobble filter.',
+  sliders: [
+    { id: 'depth', label: 'Tremolo Depth', min: 0, max: 1, step: 0.05, default: 0.6, comment: 'Amplitude modulation depth' },
+    { id: 'rate', label: 'Tremolo Rate', min: 0.2, max: 12, step: 0.1, default: 3.6, comment: 'Modulation rate (Hz)' },
+    { id: 'cutoff', label: 'Filter Lift', min: 600, max: 4200, step: 50, default: 2400, comment: 'Low-pass cutoff (Hz)' }
+  ],
+  // Depth and Rate shape the tremolo wobble; Filter Lift brightens sustain.
+  onNoteOn({ note, velocity, cutId, channel }, helpers, sliders = {}) {
+    const depth = sliders.depth ?? 0.6;
+    const rate = sliders.rate ?? 3.6;
+    const cutoff = sliders.cutoff ?? 2400;
+    const level = helpers.velocityToUnit(velocity, 0.96);
+    return {
+      s: 'sine',
+      note,
+      gain: 0.6,
+      velocity: level,
+      attack: 0.05,
+      decay: 0.24,
+      sustain: 0.72,
+      release: 0.72,
+      tremolo: rate,
+      tremolodepth: depth,
+      cutoff,
+      orbit: \`track_\${channel + 1}\`,
+      cut: cutId,
+      duration: 1.1
     };
-    // 7: Dual mix (saw+square), wider
-    this.channelCfg[7] = {
-      ...DEFAULT_CHANNEL_CONFIG,
-      osc1Type: 'sawtooth', osc2Type: 'square', osc2Routing: 'mix', osc2Ratio: 1.0, osc2Level: 0.4,
-      voices: 5, spreadCents: 20,
-      adsr: { attack: 0.015, decay: 0.22, sustain: 0.55, release: 0.4 },
-      masterGain: 0.18,
+  }
+})`,
+  },
+  {
+    name: 'Analog Stack',
+    script: `({
+  description: 'Dual osc stack with gentle tape wobble.',
+  sliders: [
+    { id: 'blend', label: 'Blend', min: 0, max: 1, step: 0.05, default: 0.45, comment: 'Square blend inside the stack' },
+    { id: 'drive', label: 'Drive', min: 0, max: 0.9, step: 0.05, default: 0.3, comment: 'Saturation amount' },
+    { id: 'release', label: 'Release', min: 0.2, max: 1.2, step: 0.02, default: 0.52, comment: 'Release tail (seconds)' }
+  ],
+  // Blend crossfades oscillators; Drive adds grit; Release shapes tails.
+  onNoteOn({ note, velocity, cutId, channel }, helpers, sliders = {}) {
+    const blend = sliders.blend ?? 0.45;
+    const drive = sliders.drive ?? 0.3;
+    const release = sliders.release ?? 0.52;
+    const level = helpers.velocityToUnit(velocity, 0.98);
+    return {
+      s: 'sawtooth',
+      note,
+      gain: 0.6,
+      velocity: level,
+      attack: 0.015,
+      decay: 0.28,
+      sustain: 0.62,
+      release,
+      distort: drive,
+      distortvol: 0.6,
+      phaser: 0.3,
+      phaserdepth: 0.35,
+      spread: 6 + blend * 24,
+      room: 0.18 + blend * 0.1,
+      orbit: \`track_\${channel + 1}\`,
+      duckorbit: 'drum_bus',
+      duckdepth: 0.35,
+      cut: cutId,
+      duration: release + 0.4
     };
-    // 8: Wide pad
-    this.channelCfg[8] = {
-      ...DEFAULT_CHANNEL_CONFIG,
-      osc1Type: 'sawtooth', osc2Type: 'triangle', osc2Routing: 'mix', osc2Level: 0.25, osc2Ratio: 1.0,
-      voices: 6, spreadCents: 35,
-      adsr: { attack: 0.15, decay: 0.6, sustain: 0.75, release: 1.2 },
-      masterGain: 0.16,
+  }
+})`,
+  },
+  {
+    name: 'Nimbus Pad',
+    script: `({
+  description: 'Expansive pad that drifts with chorus and delay.',
+  sliders: [
+    { id: 'air', label: 'Air', min: 0, max: 1, step: 0.05, default: 0.4, comment: 'High-pass mix for clarity' },
+    { id: 'delay', label: 'Delay Mix', min: 0, max: 0.8, step: 0.02, default: 0.32, comment: 'Delay send amount' },
+    { id: 'release', label: 'Release', min: 1.0, max: 4.5, step: 0.05, default: 2.4, comment: 'Release tail (seconds)' }
+  ],
+  // Air lifts the highs, Delay mix sets the wash, Release lengthens clouds.
+  onNoteOn({ note, velocity, cutId, channel }, helpers, sliders = {}) {
+    const air = sliders.air ?? 0.4;
+    const delay = sliders.delay ?? 0.32;
+    const release = sliders.release ?? 2.4;
+    const level = helpers.velocityToUnit(velocity, 0.74);
+    return {
+      s: 'triangle',
+      note,
+      gain: 0.52,
+      velocity: level,
+      attack: 0.3,
+      decay: 0.6,
+      sustain: 0.82,
+      release,
+      delay,
+      delayfeedback: 0.46,
+      room: 0.48,
+      hcutoff: 400 + air * 4000,
+      orbit: \`track_\${channel + 1}\`,
+      cut: cutId,
+      duration: release + 1
     };
-    // Drums at 9 (synth config not used)
+  }
+})`,
+  },
+  {
+    name: 'Pulse Drums',
+    script: `({
+  description: 'Compact drum kit mapped from C3 upward (kick on C3).',
+  sliders: [
+    { id: 'kickPunch', label: 'Kick Punch', min: 0.2, max: 1.2, step: 0.02, default: 0.7, comment: 'Kick transient strength' },
+    { id: 'hatTight', label: 'Hat Tightness', min: 0.05, max: 0.6, step: 0.01, default: 0.22, comment: 'Hi-hat decay length' },
+    { id: 'room', label: 'Room', min: 0, max: 0.6, step: 0.02, default: 0.18, comment: 'Shared drum reverb' }
+  ],
+  // Kick Punch boosts the thump, Hat Tightness shortens hats, Room sets global verb.
+  onNoteOn({ note, velocity, cutId }, helpers, sliders = {}) {
+    const level = Math.min(1, velocity / 127);
+    const punch = sliders.kickPunch ?? 0.7;
+    const hat = sliders.hatTight ?? 0.22;
+    const room = sliders.room ?? 0.18;
+    const kick = {
+      s: 'sbd',
+      gain: 0.95 * punch,
+      velocity: level,
+      decay: 0.38,
+      room,
+      cut: 'kick',
+      orbit: 'drum_bus',
+      duration: 0.52,
+    };
+    if (note === 48) return kick;
+    if (note === 49) {
+      return {
+        s: 'z_noise',
+        attack: 0.001,
+        decay: 0.16,
+        sustain: 0,
+        release: 0.2,
+        gain: 0.85,
+        velocity: level,
+        cutoff: 2500,
+        room: room * 0.6,
+        orbit: 'drum_bus',
+        cut: 'rim',
+        duration: 0.24,
+      };
+    }
+    if (note === 50) {
+      return {
+        s: 'z_noise',
+        attack: 0.002,
+        decay: 0.18,
+        sustain: 0,
+        release: 0.28,
+        gain: 0.92,
+        velocity: level,
+        cutoff: 2100,
+        hcutoff: 1200,
+        room,
+        orbit: 'drum_bus',
+        cut: 'snare',
+        duration: 0.32,
+      };
+    }
+    if (note === 51) {
+      return {
+        s: 'z_noise',
+        attack: 0.001,
+        decay: 0.12,
+        sustain: 0,
+        release: 0.2,
+        gain: 0.82,
+        velocity: level,
+        cutoff: 2300,
+        room: room * 0.5,
+        orbit: 'drum_bus',
+        cut: 'clap',
+        duration: 0.24,
+      };
+    }
+    if (note === 52) {
+      return {
+        s: 'z_noise',
+        attack: 0.0006,
+        decay: hat,
+        sustain: 0,
+        release: hat * 0.8,
+        hcutoff: 9000,
+        gain: 0.58,
+        velocity: level,
+        orbit: 'drum_bus',
+        cut: 'hat',
+        duration: hat + 0.04,
+      };
+    }
+    if (note === 53) {
+      return {
+        s: 'z_noise',
+        attack: 0.001,
+        decay: hat * 2.2,
+        sustain: 0,
+        release: hat * 2.1,
+        hcutoff: 7200,
+        gain: 0.6,
+        velocity: level,
+        orbit: 'drum_bus',
+        cut: 'hat',
+        duration: hat * 2.4,
+      };
+    }
+    if (note === 54 || note === 55 || note === 56) {
+      const midi = note - 12;
+      return {
+        s: 'sine',
+        note: midi,
+        gain: 0.6,
+        velocity: level,
+        attack: 0.002,
+        decay: 0.32,
+        sustain: 0,
+        release: 0.35,
+        room: room * 0.4,
+        orbit: 'drum_bus',
+        cut: 'tom-' + note,
+        duration: 0.4,
+      };
+    }
+    if (note === 57) {
+      return {
+        s: 'z_noise',
+        attack: 0.003,
+        decay: 0.9,
+        sustain: 0,
+        release: 1,
+        gain: 0.52,
+        velocity: level,
+        room: room * 1.2,
+        orbit: 'drum_bus',
+        cut: 'crash',
+        duration: 1.1,
+      };
+    }
+    if (note === 58) {
+      return {
+        s: 'z_noise',
+        attack: 0.002,
+        decay: 0.75,
+        sustain: 0,
+        release: 0.82,
+        gain: 0.5,
+        velocity: level,
+        room: room * 0.9,
+        orbit: 'drum_bus',
+        cut: 'ride',
+        duration: 0.85,
+      };
+    }
+    if (note === 59) {
+      return {
+        s: 'z_noise',
+        attack: 0.001,
+        decay: 0.18,
+        sustain: 0,
+        release: 0.22,
+        gain: 0.52,
+        velocity: level,
+        cutoff: 3200,
+        orbit: 'drum_bus',
+        cut: 'perc',
+        duration: 0.28,
+      };
+    }
+    return {
+      s: 'z_noise',
+      attack: 0.001,
+      decay: 0.18,
+      sustain: 0,
+      release: 0.22,
+      gain: 0.5,
+      velocity: level,
+      room: room * 0.3,
+      orbit: 'drum_bus',
+      cut: cutId,
+      duration: 0.26,
+    };
+  },
+  onNoteOff({ cutId }) {
+    return {
+      cut: cutId,
+      velocity: 0,
+      gain: 0,
+      duration: 0.05,
+    };
+  }
+})`,
+  },
+];
+
+const DEFAULT_TRACKS: TrackScriptDefinition[] = [
+  ...BASE_TRACKS,
+  ...Array.from({ length: Math.max(0, TOTAL_CHANNELS - BASE_TRACKS.length) }, (_, idx) => {
+    const channelIndex = BASE_TRACKS.length + idx;
+    return {
+      name: `Track ${channelIndex + 1}`,
+      script: `({
+  onNoteOn({ note, velocity, cutId, channel }, helpers) {
+    const level = helpers.velocityToUnit(velocity, 1);
+    return {
+      s: 'sine',
+      note,
+      velocity: level,
+      gain: 0.6,
+      attack: 0.01,
+      decay: 0.2,
+      sustain: 0.6,
+      release: 0.4,
+      orbit: \`track_\${channel + 1}\`,
+      cut: cutId,
+      duration: 0.6
+    };
+  }
+})`,
+    };
+  }),
+];
+
+class StrudelBackend implements ISoundBackend {
+  private definitions: TrackScriptDefinition[] = DEFAULT_TRACKS.map((d) => ({ ...d }));
+  private errors: (string | null)[] = Array(TOTAL_CHANNELS).fill(null);
+  private sliderValues: Record<string, number>[] = Array.from({ length: TOTAL_CHANNELS }, () => ({}));
+  private runtimes: TrackRuntime[] = this.definitions.map((def, idx) => this.compileTrack(def, idx));
+  private initPromise: Promise<void> | null = null;
+  private ready = false;
+  private activeCuts: Set<string> = new Set();
+
+  noteOn(note: number, velocity = 100, channel = 0): void {
+    const idx = this.normalizeChannel(channel);
+    const runtime = this.runtimes[idx];
+    const handler = runtime?.onNoteOn;
+    if (!handler) return;
+
+    const context = this.buildContext(note, velocity, idx);
+    this.defer(() => this.invokeAndSchedule(idx, handler, context));
   }
 
-  private ensureCtx() {
-    if (!this.ctx) this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    return this.ctx!;
+  noteOff(note: number, velocity = 0, channel = 0): void {
+    const idx = this.normalizeChannel(channel);
+    const runtime = this.runtimes[idx];
+    const handler = runtime?.onNoteOff;
+    const context = this.buildContext(note, velocity, idx);
+
+    this.defer(() => {
+      if (handler) this.invokeAndSchedule(idx, handler, context, true);
+      else this.killCut(context.cutId);
+    });
+  }
+
+  allNotesOff(): void {
+    const cuts = Array.from(this.activeCuts);
+    this.defer(() => {
+      cuts.forEach((cut) => this.killCut(cut));
+      this.activeCuts.clear();
+    });
   }
 
   async resume(): Promise<void> {
-    const ctx = this.ensureCtx();
-    if (ctx.state !== 'running') await ctx.resume();
-    // lazily create master
-    if (!this.master) {
-      const g = ctx.createGain();
-      g.gain.value = 1.0;
-      g.connect(ctx.destination);
-      this.master = g;
-    }
+    await this.ensureInit();
+    try {
+      const ctx = getAudioContext();
+      if (ctx?.state === 'suspended') await ctx.resume();
+    } catch {}
   }
 
-  allNotesOff() {
-    for (const v of Array.from(this.playing)) try { v.stop(); } catch {}
-    this.playing.clear();
-    this.activeNotes.clear();
+  getTrackConfig(channel: number): TrackConfigView {
+    const idx = this.normalizeChannel(channel);
+    const def = this.definitions[idx];
+    const runtime = this.runtimes[idx];
+    return {
+      name: def.name,
+      script: def.script,
+      description: runtime?.description,
+      error: this.errors[idx],
+      sliders: runtime?.sliders ?? [],
+      sliderValues: { ...this.sliderValues[idx] },
+    };
   }
 
-  setDrumSample(note: number, buffer: AudioBuffer | null) {
-    if (!buffer) this.drumSamples.delete(note); else this.drumSamples.set(note, buffer);
+  getAllTrackConfigs(): TrackConfigView[] {
+    return this.definitions.map((_def, idx) => this.getTrackConfig(idx));
   }
 
-  async loadDrumSample(note: number, url: string): Promise<void> {
-    const ctx = this.ensureCtx();
-    const res = await fetch(url);
-    const arr = await res.arrayBuffer();
-    const buf = await ctx.decodeAudioData(arr);
-    this.drumSamples.set(note, buf);
+  setTrackConfig(channel: number, updates: Partial<TrackPersisted>): TrackConfigView {
+    const idx = this.normalizeChannel(channel);
+    const current = this.definitions[idx];
+    const next: TrackScriptDefinition = {
+      name: updates.name?.trim() || current.name,
+      script: updates.script !== undefined ? updates.script : current.script,
+    };
+    this.definitions[idx] = next;
+    this.runtimes[idx] = this.compileTrack(next, idx);
+    return this.getTrackConfig(idx);
   }
 
-  private key(channel: number, note: number) { return `${channel|0}:${note|0}`; }
-
-  getChannelConfig(channel: number): SynthChannelConfig {
-    return { ...this.channelCfg[(channel|0) & 0x0f] };
+  resetTrack(channel: number): TrackConfigView {
+    const idx = this.normalizeChannel(channel);
+    this.definitions[idx] = { ...DEFAULT_TRACKS[idx] };
+    this.runtimes[idx] = this.compileTrack(this.definitions[idx], idx);
+    return this.getTrackConfig(idx);
   }
 
-  setChannelConfig(channel: number, patch: Partial<SynthChannelConfig>) {
-    const idx = (channel|0) & 0x0f;
-    this.channelCfg[idx] = { ...this.channelCfg[idx], ...patch };
+  resetAllTracks(): TrackConfigView[] {
+    this.definitions = DEFAULT_TRACKS.map((d) => ({ ...d }));
+    this.runtimes = this.definitions.map((def, idx) => this.compileTrack(def, idx));
+    return this.getAllTrackConfigs();
   }
 
-  noteOn(note: number, velocity: number = 100, channel: number = 0) {
-    const ctx = this.ensureCtx();
-    const t = ctx.currentTime + 0.001;
-    const v = Math.max(0.01, Math.min(1, velocity / 127));
-    const k = this.key(channel, note);
-    // Simple de-dupe: stop any prior active voice for the same key
-    const prev = this.activeNotes.get(k);
-    if (prev) {
-      try { prev.stop(); } catch {}
-      this.activeNotes.delete(k);
-    }
-    let voice: Voice;
-    if ((channel|0) === 9) voice = this.playDrum(ctx, note|0, v, t);
-    else voice = this.playInstrument(ctx, channel|0, note|0, v, t);
-    this.playing.add(voice);
-    this.activeNotes.set(k, voice);
+  exportTracks(): TrackPersisted[] {
+    return this.definitions.map((d, idx) => ({
+      name: d.name,
+      script: d.script,
+      sliders: { ...this.sliderValues[idx] },
+    }));
   }
 
-  noteOff(note: number, _velocity: number = 0, channel: number = 0) {
-    const k = this.key(channel, note);
-    const voice = this.activeNotes.get(k);
-    if (voice) {
-      try { voice.stop(); } catch {}
-      this.activeNotes.delete(k);
-    }
-  }
-
-  // -------- Instruments (channels 0-8) --------
-  private playInstrument(ctx: AudioContext, channel: number, note: number, v: number, t: number): Voice {
-    const cfg = this.channelCfg[(channel|0) & 0x0f];
-    const freq = 440 * Math.pow(2, (note - 69) / 12);
-
-    const outGain = ctx.createGain();
-    outGain.gain.setValueAtTime(cfg.masterGain * v, t);
-    (this.master ?? ctx.destination) && outGain.connect(this.master ?? ctx.destination);
-
-    // Envelope gain applied to voice bus
-    const envGain = ctx.createGain();
-    envGain.gain.setValueAtTime(0.0001, t);
-    envGain.connect(outGain);
-
-    // ADSR attack/decay/sustain
-    const { attack, decay, sustain, release } = cfg.adsr;
-    envGain.gain.linearRampToValueAtTime(1, t + Math.max(0.001, attack));
-    envGain.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, sustain)), t + Math.max(0.001, attack) + Math.max(0.001, decay));
-
-    // Build detuned voices
-    const n = Math.max(1, Math.min(8, Math.floor(cfg.voices || 1)));
-    const spread = Math.max(0, Math.min(200, cfg.spreadCents || 0));
-    const subNodes: { oscs: OscillatorNode[]; stop: () => void }[] = [];
-    const mid = (n - 1) / 2;
-    for (let i = 0; i < n; i++) {
-      const pos = mid === 0 ? 0 : (i - mid) / mid; // -1..1
-      const cents = pos * spread;
-      const ratio = Math.pow(2, cents / 1200);
-      const f1 = freq * ratio;
-      const weight = mid === 0 ? 1 : 1 - 0.85 * Math.abs(pos); // louder center, quieter edges
-
-      // per-voice submix to control weighting
-      const subGain = ctx.createGain();
-      subGain.gain.setValueAtTime(weight, t);
-      subGain.connect(envGain);
-
-      // Primary oscillator
-      const osc1 = ctx.createOscillator();
-      osc1.type = cfg.osc1Type;
-      osc1.frequency.setValueAtTime(f1, t);
-
-      const voiceEnders: OscillatorNode[] = [osc1];
-
-      // Build routing
-      if (cfg.osc2Routing === 'off') {
-        osc1.connect(subGain);
-        osc1.start(t);
-      } else if (cfg.osc2Routing === 'mix') {
-        const mixGain1 = ctx.createGain(); mixGain1.gain.value = 1;
-        const mixGain2 = ctx.createGain(); mixGain2.gain.value = Math.max(0, Math.min(1, cfg.osc2Level));
-        const osc2 = ctx.createOscillator();
-        osc2.type = cfg.osc2Type;
-        osc2.frequency.setValueAtTime(f1 * Math.max(0.01, cfg.osc2Ratio || 1), t);
-        osc1.connect(mixGain1).connect(subGain);
-        osc2.connect(mixGain2).connect(subGain);
-        osc1.start(t); osc2.start(t);
-        voiceEnders.push(osc2);
-      } else if (cfg.osc2Routing === 'am') {
-        // amplitude modulation: osc1 -> amGain -> subGain. osc2 -> depth -> amGain.gain
-        const amGain = ctx.createGain();
-        const depth = Math.max(0, Math.min(1, cfg.osc2Level));
-        // Center gain around 1 - depth/2 to keep average level similar
-        amGain.gain.setValueAtTime(1 - depth * 0.5, t);
-        const depthGain = ctx.createGain(); depthGain.gain.value = depth * 0.5; // [-0.5..0.5]
-        const osc2 = ctx.createOscillator();
-        osc2.type = cfg.osc2Type;
-        osc2.frequency.setValueAtTime(f1 * Math.max(0.01, cfg.osc2Ratio || 1), t);
-        osc2.connect(depthGain).connect(amGain.gain);
-        osc1.connect(amGain).connect(subGain);
-        osc1.start(t); osc2.start(t);
-        voiceEnders.push(osc2);
-      } else { // 'fm'
-        const fmGain = ctx.createGain();
-        const depth = Math.max(0, Math.min(1, cfg.osc2Level));
-        // map depth 0..1 to a sensible Hz range relative to base
-        const maxHz = Math.max(10, Math.min(1200, f1 * 0.5));
-        fmGain.gain.setValueAtTime(depth * maxHz, t);
-        const osc2 = ctx.createOscillator();
-        osc2.type = cfg.osc2Type;
-        osc2.frequency.setValueAtTime(f1 * Math.max(0.01, cfg.osc2Ratio || 1), t);
-        osc2.connect(fmGain).connect(osc1.frequency);
-        osc1.connect(subGain);
-        osc1.start(t); osc2.start(t);
-        voiceEnders.push(osc2);
+  importTracks(data: Partial<TrackPersisted>[]): TrackConfigView[] {
+    data.forEach((entry, idx) => {
+      if (idx >= TOTAL_CHANNELS) return;
+      const prev = this.definitions[idx];
+      this.definitions[idx] = {
+        name: entry.name?.trim() || prev.name,
+        script: typeof entry.script === 'string' ? entry.script : prev.script,
+      };
+      this.runtimes[idx] = this.compileTrack(this.definitions[idx], idx);
+      if (entry.sliders && typeof entry.sliders === 'object') {
+        this.sliderValues[idx] = { ...entry.sliders };
+      } else {
+        this.sliderValues[idx] = this.buildDefaultSliderValues(this.runtimes[idx]);
       }
-
-      subNodes.push({ oscs: voiceEnders, stop: () => {
-        for (const o of voiceEnders) { try { o.stop(); } catch {} }
-      } });
-    }
-
-    const stopAt = (end: number) => {
-      const now = ctx.currentTime;
-      const relStart = Math.max(now, end);
-      envGain.gain.cancelScheduledValues(relStart);
-      envGain.gain.setTargetAtTime(0.0001, relStart, Math.max(0.001, release));
-      const stopTime = relStart + Math.max(0.02, release) + 0.05;
-      for (const s of subNodes) { try { s.oscs.forEach(o => o.stop(stopTime)); } catch {} }
-    };
-
-    const voice: Voice = { stop: () => stopAt(ctx.currentTime) };
-    // clean-up: when the last osc ends, remove from playing
-    const lastOsc = subNodes[subNodes.length - 1]?.oscs[0];
-    if (lastOsc) lastOsc.onended = () => this.playing.delete(voice);
-    return voice;
-  }
-
-  // -------- Drums (channel 9) --------
-  private playDrum(ctx: AudioContext, note: number, v: number, t: number): Voice {
-    // If a sample exists for the note, use it
-    const sample = this.drumSamples.get(note);
-    if (sample) {
-      const src = ctx.createBufferSource(); const g = ctx.createGain();
-      g.gain.setValueAtTime(0.7 * v, t);
-      src.buffer = sample; src.connect(g).connect(ctx.destination);
-      src.start(t);
-      const voice: Voice = { stop: () => { try { src.stop(); } catch {} } };
-      src.onended = () => this.playing.delete(voice);
-      return voice;
-    }
-
-    // Synthesis fallbacks
-    const drum = this.mapDrum(note);
-    switch (drum) {
-      case 'kick': return this.drumKick(ctx, t, v);
-      case 'snare': return this.drumSnare(ctx, t, v);
-      case 'clap': return this.drumClap(ctx, t, v);
-      case 'ch': return this.drumHat(ctx, t, v, false);
-      case 'oh': return this.drumHat(ctx, t, v, true);
-      case 'toml': return this.drumTom(ctx, t, v, 90);
-      case 'tomm': return this.drumTom(ctx, t, v, 140);
-      case 'tomh': return this.drumTom(ctx, t, v, 200);
-      case 'crash': return this.drumCymbal(ctx, t, v, true);
-      case 'ride': return this.drumCymbal(ctx, t, v, false);
-      default: return this.drumHat(ctx, t, v, false);
-    }
-  }
-
-  private mapDrum(note: number): 'kick'|'snare'|'clap'|'ch'|'oh'|'toml'|'tomm'|'tomh'|'crash'|'ride' {
-    // Common GM mapping
-    if (note === 35 || note === 36) return 'kick';
-    if (note === 38 || note === 40) return 'snare';
-    if (note === 39) return 'clap';
-    if (note === 42 || note === 44) return 'ch';
-    if (note === 46) return 'oh';
-    if (note === 41 || note === 43) return 'toml';
-    if (note === 45 || note === 47) return 'tomm';
-    if (note === 48 || note === 50) return 'tomh';
-    if (note === 49 || note === 57) return 'crash';
-    if (note === 51 || note === 59) return 'ride';
-    // Defaults
-    if (note <= 41) return 'kick';
-    if (note <= 45) return 'snare';
-    if (note <= 48) return 'ch';
-    if (note <= 50) return 'oh';
-    return 'ch';
-  }
-
-  private drumKick(ctx: AudioContext, t: number, v: number): Voice {
-    const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.type = 'sine'; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.12);
-    g.gain.setValueAtTime(0.9 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.3);
-    const voice: Voice = { stop: () => { try { o.stop(); } catch {} } };
-    o.onended = () => this.playing.delete(voice);
-    return voice;
-  }
-
-  private drumSnare(ctx: AudioContext, t: number, v: number): Voice {
-    const bufferSize = Math.floor(0.2 * ctx.sampleRate);
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
-    const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
-    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.setValueAtTime(1200, t);
-    const g = ctx.createGain(); g.gain.setValueAtTime(0.6 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-    noise.connect(hp).connect(g).connect(ctx.destination);
-    noise.start(t); noise.stop(t + 0.2);
-    const voice: Voice = { stop: () => { try { noise.stop(); } catch {} } };
-    noise.onended = () => this.playing.delete(voice);
-    return voice;
-  }
-
-  private drumClap(ctx: AudioContext, t: number, v: number): Voice {
-    const mkNoise = () => {
-      const bufferSize = Math.floor(0.3 * ctx.sampleRate);
-      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = noiseBuffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
-      const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer; return noise;
-    };
-    const g = ctx.createGain(); g.gain.setValueAtTime(0.5 * v, t);
-    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.setValueAtTime(800, t);
-    g.connect(ctx.destination);
-    const bursts = [0, 0.02, 0.04, 0.08];
-    bursts.forEach((d, i) => {
-      const n = mkNoise();
-      const gg = ctx.createGain(); gg.gain.setValueAtTime(0.7 * v / (i+1), t + d); gg.gain.exponentialRampToValueAtTime(0.001, t + d + 0.12);
-      n.connect(hp).connect(gg).connect(g);
-      n.start(t + d); n.stop(t + d + 0.15);
     });
-    const voice: Voice = { stop: () => { /* bursts are short-lived; nothing to stop */ } };
-    return voice;
+    return this.getAllTrackConfigs();
   }
 
-  private drumHat(ctx: AudioContext, t: number, v: number, open: boolean): Voice {
-    const bufferSize = Math.floor(0.1 * ctx.sampleRate);
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
-    const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
-    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.setValueAtTime(6000, t);
-    const g = ctx.createGain(); g.gain.setValueAtTime(0.25 * v, t);
-    const dur = open ? 0.35 : 0.06;
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    noise.connect(hp).connect(g).connect(ctx.destination);
-    noise.start(t); noise.stop(t + dur);
-    const voice: Voice = { stop: () => { try { noise.stop(); } catch {} } };
-    noise.onended = () => this.playing.delete(voice);
-    return voice;
+  setTrackSliderValue(channel: number, sliderId: string, value: number): TrackConfigView {
+    const idx = this.normalizeChannel(channel);
+    const runtime = this.runtimes[idx];
+    const slider = runtime?.sliders?.find((s) => s.id === sliderId);
+    if (!slider) return this.getTrackConfig(idx);
+    const clamped = clamp(value, slider.min, slider.max);
+    const step = slider.step ?? 0;
+    const snapped = step > 0 ? Math.round(clamped / step) * step : clamped;
+    this.sliderValues[idx][sliderId] = Number(snapped.toFixed(6));
+    return this.getTrackConfig(idx);
   }
 
-  private drumTom(ctx: AudioContext, t: number, v: number, f: number): Voice {
-    const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.type = 'sine'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.8, t + 0.08);
-    g.gain.setValueAtTime(0.4 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.25);
-    const voice: Voice = { stop: () => { try { o.stop(); } catch {} } };
-    o.onended = () => this.playing.delete(voice);
-    return voice;
+  private normalizeChannel(channel: number): number {
+    return Math.abs(channel | 0) % TOTAL_CHANNELS;
   }
 
-  private drumCymbal(ctx: AudioContext, t: number, v: number, crash: boolean): Voice {
-    const bufferSize = Math.floor(0.6 * ctx.sampleRate);
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
-    const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
-    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(crash ? 6000 : 5000, t); bp.Q.value = crash ? 0.7 : 1.2;
-    const g = ctx.createGain(); g.gain.setValueAtTime(0.2 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + (crash ? 1.2 : 0.8));
-    noise.connect(bp).connect(g).connect(ctx.destination);
-    noise.start(t); noise.stop(t + (crash ? 1.3 : 0.9));
-    const voice: Voice = { stop: () => { try { noise.stop(); } catch {} } };
-    noise.onended = () => this.playing.delete(voice);
-    return voice;
+  private buildContext(note: number, velocity: number, channel: number): TrackEventContext {
+    return {
+      note,
+      velocity,
+      channel,
+      time: this.getAudioTime(),
+      cutId: `${channel}:${note}`,
+    };
+  }
+
+  private getAudioTime(): number {
+    try {
+      return getAudioContext().currentTime;
+    } catch {
+      return 0;
+    }
+  }
+
+  private compileTrack(def: TrackScriptDefinition, index: number): TrackRuntime {
+    const runtime: TrackRuntime = {
+      name: def.name,
+      script: def.script,
+    };
+    const source = (def.script ?? '').trim();
+    if (!source) {
+      this.errors[index] = 'Empty script';
+      return runtime;
+    }
+
+    const wrapped = this.wrapScript(source);
+
+    try {
+      const fn = new Function('helpers', `'use strict';\n${wrapped}`);
+      const result = fn(helpers);
+      const normalized = this.normalizeRuntime(result);
+      runtime.onNoteOn = normalized.onNoteOn;
+      runtime.onNoteOff = normalized.onNoteOff;
+      runtime.description = normalized.description;
+      runtime.sliders = normalized.sliders;
+      this.sliderValues[index] = this.buildDefaultSliderValues(runtime, this.sliderValues[index]);
+      this.errors[index] = null;
+    } catch (err) {
+      this.errors[index] = err instanceof Error ? err.message : String(err);
+      this.sliderValues[index] = this.buildDefaultSliderValues(runtime);
+    }
+
+    return runtime;
+  }
+
+  private buildDefaultSliderValues(runtime: TrackRuntime | undefined, existing?: Record<string, number>): Record<string, number> {
+    const target: Record<string, number> = { ...(existing ?? {}) };
+    const sliders = runtime?.sliders ?? [];
+    sliders.forEach((slider) => {
+      if (typeof target[slider.id] !== 'number' || Number.isNaN(target[slider.id]!)) {
+        target[slider.id] = slider.default;
+      }
+    });
+    Object.keys(target).forEach((key) => {
+      if (!sliders.find((s) => s.id === key)) delete target[key];
+    });
+    return target;
+  }
+
+  private wrapScript(source: string): string {
+    if (/^return\b/.test(source)) return source;
+    if (/^([({\[])/.test(source)) return `return ${source};`;
+    return `return (${source});`;
+  }
+
+  private normalizeRuntime(result: unknown): Required<Pick<TrackRuntime, 'onNoteOn' | 'onNoteOff'>> & {
+    description?: string;
+    sliders?: TrackSliderConfig[];
+  } {
+    if (typeof result === 'function') {
+      return { onNoteOn: result as TrackEventHandler, onNoteOff: undefined };
+    }
+    if (Array.isArray(result) || (result && typeof result === 'object' && !('onNoteOn' in (result as any)) && !('onNoteOff' in (result as any)))) {
+      return {
+        onNoteOn: (_ctx: TrackEventContext, _helpers: typeof helpers, _sliders: Record<string, number>) => result as TrackEventResult,
+        onNoteOff: undefined,
+      };
+    }
+    if (result && typeof result === 'object') {
+      const obj = result as Record<string, unknown>;
+      return {
+        onNoteOn: typeof obj.onNoteOn === 'function'
+          ? (obj.onNoteOn as TrackEventHandler)
+          : (_ctx: TrackEventContext, _helpers: typeof helpers, _sliders: Record<string, number>) => obj.events ?? null,
+        onNoteOff: typeof obj.onNoteOff === 'function' ? (obj.onNoteOff as TrackEventHandler) : undefined,
+        description: typeof obj.description === 'string' ? obj.description : undefined,
+        sliders: Array.isArray(obj.sliders)
+          ? (obj.sliders as TrackSliderConfig[]).map((slider) => ({
+              id: String(slider.id),
+              label: slider.label ?? String(slider.id),
+              min: typeof slider.min === 'number' ? slider.min : 0,
+              max: typeof slider.max === 'number' ? slider.max : 1,
+              step: typeof slider.step === 'number' ? slider.step : undefined,
+              default: typeof slider.default === 'number' ? slider.default : 0,
+              comment: slider.comment,
+            }))
+          : undefined,
+      };
+    }
+    return {
+      onNoteOn: () => null,
+      onNoteOff: undefined,
+    };
+  }
+
+  private invokeAndSchedule(
+    channel: number,
+    handler: TrackEventHandler,
+    context: TrackEventContext,
+    isNoteOff = false,
+  ) {
+    try {
+      const result = handler(context, helpers, this.sliderValues[channel] ?? {});
+      this.scheduleResult(result, context, channel, isNoteOff);
+    } catch (err) {
+      this.errors[channel] = err instanceof Error ? err.message : String(err);
+      console.error('[soundBackend] track handler error', err);
+    }
+  }
+
+  private scheduleResult(
+    result: TrackEventResult,
+    context: TrackEventContext,
+    channel: number,
+    isNoteOff: boolean,
+  ) {
+    if (!result) {
+      if (isNoteOff) this.killCut(context.cutId);
+      return;
+    }
+    const items = Array.isArray(result) ? result : [result];
+    items.forEach((entry) => this.scheduleEntry(entry, context, channel));
+  }
+
+  private scheduleEntry(entry: TrackEventSpec, context: TrackEventContext, channel: number) {
+    if (!entry || typeof entry !== 'object') return;
+    const { duration, offset, ...rest } = entry;
+    const cut = typeof rest.cut === 'string' || typeof rest.cut === 'number' ? String(rest.cut) : context.cutId;
+    const orbit = rest.orbit ?? `track_${channel + 1}`;
+    const velocity = typeof rest.velocity === 'number' ? rest.velocity : velocityToUnit(context.velocity);
+    const gain = typeof rest.gain === 'number' ? rest.gain : undefined;
+    const eventDuration = typeof duration === 'number' && isFinite(duration) ? Math.max(0.01, duration) : 0.5;
+
+    const payload: Record<string, unknown> = {
+      ...rest,
+      cut,
+      orbit,
+      velocity,
+    };
+    if (gain !== undefined) payload.gain = gain;
+
+    this.activeCuts.add(cut);
+    this.ensureInit()
+      .then(() => {
+        const now = this.getAudioTime();
+        const baseTime = Math.max(now, context.time);
+        const eventTime = baseTime + 0.001 + (typeof offset === 'number' ? offset : 0);
+        return superdough(payload, eventTime, eventDuration);
+      })
+      .catch((err) => {
+        console.error('[soundBackend] failed to schedule event', err);
+        this.errors[channel] = err instanceof Error ? err.message : String(err);
+      });
+  }
+
+  private killCut(cut: string) {
+    const payload = { s: 'sine', gain: 0, velocity: 0, cut };
+    this.ensureInit()
+      .then(() => {
+        const time = this.getAudioTime() + 0.001;
+        return superdough(payload, time, 0.05);
+      })
+      .catch(() => {});
+    this.activeCuts.delete(cut);
+  }
+
+  private defer(fn: () => void) {
+    void this.ensureInit().then(fn).catch(() => {});
+  }
+
+  private async ensureInit(): Promise<void> {
+    if (this.ready || typeof window === 'undefined') return;
+    if (!this.initPromise) this.initPromise = this.init();
+    await this.initPromise;
+  }
+
+  private async init() {
+    try {
+      const initStrudel = await loadInitStrudel();
+      await initStrudel({});
+    } catch {}
+    try {
+      await initAudioOnFirstClick?.();
+    } catch {}
+    try {
+      registerSynthSounds?.();
+      registerZZFXSounds?.();
+    } catch {}
+    this.ready = true;
   }
 }
 
-export const soundBackend: ISoundBackend = new WebAudioBackend();
+export const soundBackend: ISoundBackend = new StrudelBackend();
