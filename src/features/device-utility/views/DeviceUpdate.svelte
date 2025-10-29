@@ -8,25 +8,34 @@
 
     import { deviceUpdate, updaterState } from "~/lib/states/updater.svelte";
     let betaEnabled = $state(false);
+    let selectedVersion = $state(null);
 
-    const updateState = $derived.by(() => {
-        if (firmwareState.firmwareVersion == null || firmwareState.changelog == null)
-            return null;
+    const availableVersions = $derived.by(() => {
+        if (!firmwareState.changelog) return [];
+        return firmwareState.changelog.versions.filter(v => !v.isObsolete && (betaEnabled || !v.isDev));
+    });
 
-        const fw = firmwareState.firmwareVersion;
-        const availableNewest = betaEnabled ? firmwareState.changelog.dev : firmwareState.changelog.release;
+    const selectedVersionDetail = $derived.by(() => availableVersions.find(v => v.version.versionString === selectedVersion) ?? null);
 
-        if (availableNewest.versionString == fw.versionString) {
-            return 'up-to-date';
-        } else if (firmwareRhsIsNewer(fw, availableNewest)) {
-            return 'upgrade';
-        } else {
-            return 'downgrade';
+    $effect(() => {
+        if (!availableVersions.length) {
+            selectedVersion = null;
+            return;
+        }
+        if (!selectedVersion || !availableVersions.some(v => v.version.versionString === selectedVersion)) {
+            selectedVersion = availableVersions[0].version.versionString;
         }
     });
 
-    const updateFirmware = $derived( betaEnabled ? firmwareState.changelog.dev.versionString : firmwareState.changelog.release.versionString)
-    
+    const updateState = $derived.by(() => {
+        const deviceFw = firmwareState.firmwareVersion;
+        if (!deviceFw || !selectedVersionDetail) return null;
+        const target = selectedVersionDetail.version;
+        if (target.versionString === deviceFw.versionString) return 'up-to-date';
+        if (firmwareRhsIsNewer(deviceFw, target)) return 'upgrade';
+        if (firmwareRhsIsNewer(target, deviceFw)) return 'downgrade';
+        return null;
+    });
 </script>
 
 <div class="content">
@@ -40,8 +49,21 @@
             <div class="subhead">Update Actions</div>
             <div class="actions-row">
                 <span class="toggle-wrap"><span class="label">Beta</span><ToggleSwitch init={false} onChange={(val) => betaEnabled = val} /></span>
-                <button class="update-buttons primary" onclick={() => deviceUpdate(updateFirmware)} disabled={!(updateState === 'upgrade') || (updaterState.stage !== 'idle' && updaterState.stage !== 'failed')}>Start update</button>
-                <button class="update-buttons caution" onclick={() => deviceUpdate(updateFirmware)} disabled={!(updateState === 'downgrade') || (updaterState.stage !== 'idle' && updaterState.stage !== 'failed')}>Start downgrade</button>
+                <label class="select-wrap">
+                    <span class="label">Firmware</span>
+                    <select
+                        bind:value={selectedVersion}
+                        disabled={!availableVersions.length || (updaterState.stage !== 'idle' && updaterState.stage !== 'failed')}
+                    >
+                        {#each availableVersions as version}
+                            <option value={version.version.versionString}>
+                                {version.version.versionString}{version.isDev ? ' (beta)' : ''}
+                            </option>
+                        {/each}
+                    </select>
+                </label>
+                <button class="update-buttons primary" onclick={() => selectedVersion && deviceUpdate(selectedVersion)} disabled={!(updateState === 'upgrade') || (updaterState.stage !== 'idle' && updaterState.stage !== 'failed')}>Start update</button>
+                <button class="update-buttons caution" onclick={() => selectedVersion && deviceUpdate(selectedVersion)} disabled={!(updateState === 'downgrade') || (updaterState.stage !== 'idle' && updaterState.stage !== 'failed')}>Start downgrade</button>
             </div>
         </div>
     </div>
@@ -101,6 +123,25 @@
     .update-buttons:disabled { background: #f3f4f6; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; }
     .toggle-wrap { display: inline-flex; align-items: center; gap: 6px; }
     .toggle-wrap .label { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #111827; }
+    .select-wrap { display: flex; flex-direction: column; gap: 4px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #111827; }
+    .select-wrap .label { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #111827; }
+    .select-wrap select {
+        min-width: 160px;
+        padding: 6px 8px;
+        border: 1px solid #2f313a;
+        border-radius: var(--du-radius);
+        font-size: 13px;
+        letter-spacing: normal;
+        text-transform: none;
+        color: var(--du-text);
+        background: #fff;
+    }
+    .select-wrap select:disabled {
+        background: #f3f4f6;
+        color: #9ca3af;
+        border-color: #e5e7eb;
+        cursor: not-allowed;
+    }
     .toolbar { display: flex; gap: 12px; align-items: flex-end; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--du-border); }
     .toolbar .left { display: flex; flex-direction: column; }
     .toolbar .left .muted { color: var(--du-muted); font-size: 0.9em; }

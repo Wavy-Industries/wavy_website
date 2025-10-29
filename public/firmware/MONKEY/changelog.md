@@ -93,3 +93,6 @@ This release branch introduced the CC Touch modulation surface
 - Mute/unmute multiple channels from looper when longpress SHIFT+CH
 - Looper now starts from the beginning each time it starts playing
 - Fix: not all notes are released on device reset
+
+# 0.0.1
+- Test firmware
