@@ -8,18 +8,18 @@ import LinkButton from '~/components/LinkButton.astro';
 import TagContainer from '~/components/TagContainer.astro';
 import Tag from '~/components/Tag.astro';
 
+import monkeyDarkImg from '~/assets/monkey/monkey_dark_crop.png';
 import monkeyRevealVideo from '~/assets/monkey/monkey_front_reveal_LED_compressed.mp4';
 import monkeyRevealPlaceholder from '~/assets/monkey/monkey_reveal_placeholder.png';
-import monkeyPackagingImg from '~/assets/monkey/packaging/Monkey with packaging.jpg';
-// import monkeyPackagingImg from '~/assets/monkey/packaging/Monkey with packaging_5.jpg';
+import nyaMonkeyImg from '~/assets/monkey/Nya MONKEY.png';
+import monkeyGrainyImg from '~/assets/monkey/monkey_grainy.png';
 
 import steinbergProfile from '~/assets/monkey/profiles/floyd_steinberg.jpg';
 import haqProfile from '~/assets/monkey/profiles/jakob_haq.jpg';
 import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
-import TopBannerAlert from '~/components/TopBannerAlert.astro';
 ---
 
-<Layout title="Wavy Industries: MONKEY" description='Discover MONKEY by Wavy Industries, the ultimate Bluetooth MIDI companion for musicians and producers. Compact, versatile, and designed for seamless music creation.'>
+<Layout title="Wavy Industries - MONKEY" description='Discover MONKEY by Wavy Industries, the ultimate Bluetooth MIDI companion for musicians and producers. Compact, versatile, and designed for seamless music creation.'>
 	<meta slot="meta" property="og:title" content="WAVY MONKEY, An ultra-portable wireless music making device">
 	<meta slot="meta" property="og:description" content="Compact, versatile Bluetooth MIDI keyboard designed for musicians, producers, and anyone eager to start exploring music creation. Perfect for casual music creation wherever you are!">
 	<meta slot="meta" property="og:image" content="https://wavyindustries.com/monkey_reveal.png">
@@ -28,63 +28,144 @@ import TopBannerAlert from '~/components/TopBannerAlert.astro';
 			MONKEY price will increase to €79 on 24. January
 		</TopBannerAlert> -->
 		<Header textColor='white' />
-		<section class="text-white">
-			<h1>MON<span style="font-weight: 400;" >KEY</span></h1>
-			<TagContainer>
-				<Tag href={routes.monkeyGettingStarted}>Getting started</Tag>
-				<Tag href={routes.monkeyManual}>Manual</Tag>
-			</TagContainer>
-			<div class="sub-title-block" >
-				<p class="catch-phrase">An ultra-portable wireless music making device</p>
-				<LinkButton href={routes.monkeyPurchase} type="highlight" >Buy now €79</LinkButton>
+		<!-- Only keeping Highlights and What users have to say sections -->
+		<section class="hero">
+			<div class="hero-inner">
+				<h1>MON<span style="font-weight: 400;" >KEY</span></h1>
+				<p class="tagline">An ultra-portable wireless music making device</p>
+				<div class="hero-actions">
+					<TagContainer>
+						<Tag href={routes.monkeyGettingStarted}>Getting started</Tag>
+						<Tag href={routes.monkeyManual}>Manual</Tag>
+					</TagContainer>
+				</div>
 			</div>
+		</section>
 
+		<div class="hero-image">
 			<video id="monkey-reveal-video" width="100%" autoplay muted playsinline onended="this.pause()">
 				<source src={monkeyRevealVideo} type="video/mp4">
 				<img src={monkeyRevealPlaceholder.src} alt="Monkey reveal placeholder">
 			</video>
-			<p>MON<b>KEY</b> is a two octave Bluetooth MIDI keyboard which literally fits in your pocket. Bluetooth in MIDI keyboards is nothing new. But ultra long battery life of several months is. This is what enables Bluetooth to actually be practical to use, together with low latency communication.</p>
-			<p>Through the SHIFT key on MON<b>KEY</b> you get access to all the features written under and above the keys. MON<b>KEY</b> features 6 MIDI effects, each offering 10 unique presets. Furthermore it includes a loop recorder for you to record your ideas with up to 10 instruments! </p>
-			<p>
-				<h3>Highlights</h3>
-				<ul>
-					<li><u>Several months</u> of battery life. Replaceable CR2032 battery</li>
-					<li>Two octave keybed with low operating force</li>
-					<li>6 MIDI effects each with 10 presets</li>
-					<li>Loop recorder with up to 10 instruments simultaneously</li>
-					<li>Pressure sensitive touch surface for modulation</li>
-					<li>Low latency Bluetooth MIDI</li>
-					<li>Ultra compact form factor of 150mm x 50mm</li>
-					<li>Compatible with many configurations, including macOS, iOS/iPadOS, Android, Windows, CME WIDI and more</li>
-				</ul>
-			</p>
-			<p>
-				<h3>What users have to say</h3>
-				<blockquote><span class="profile-ref"><img src={steinbergProfile.src} alt="Floyd Steinberg profile"><span><b>Floyd Steinberg</b> - <i>"I can full heartedly recommend this. It’s the most fun I have had in a very long time with a new piece of gear." <sup><a href="#footnote-floyd-steinberg">[1]</a></sup></i></span></span></blockquote>
-				<blockquote><span class="profile-ref"><img src={haqProfile.src} alt="Jakob Haq profile" /><span><b>Jakob Haq</b> - <i>"I’ve been using the Monkey for many hours every day since I got it delivered. The biggest use case has been “on the run” when working on presets/patches." <sup><a href="#footnote-jakob-haq">[2]</a></sup></i></span></span></blockquote>
-			</p>
-			<p>
-				<h3>Accolades</h3>
-				<blockquote><span class="profile-ref"><img src={sonicstateProfile.src} alt="Sonicstate profile" /><span>Wavy Industries' Monkey was awarded with Sonicstate's Superbooth 2024 "Value for Money" award during its product debut.<sup><a href="#footnote-sonicstate-award">[3]</a></sup></span></span></blockquote>
-			</p>
-			<p>
-				<h3>Additional resources</h3>
-				<ul>
-					<li>Sonicstate Superbooth 2024: <a target="_blank" href="https://www.youtube.com/watch?v=HYZFWqDJWl8">https://www.youtube.com/watch?v=HYZFWqDJWl8</a></li>
-					<li>Demo usage together with Mobile/Tablet app N-track for Mobile: <a target="_blank" href="https://www.youtube.com/watch?v=dwjfR09K39M">https://www.youtube.com/watch?v=dwjfR09K39M</a></li>
-				</ul>
-			</p>
-			<br />
-			<br />
+		</div>
+
+		<section class="intro">
+			<div class="container">
+				<div class="intro-content">
+					<p>MON<b>KEY</b> gives you the freedom to create music anywhere. At the kitchen table, in the park, or on long adventures. Through the <b>SHIFT</b> key, its full potential unfolds, unlocking expressive MIDI effects, a range of creative presets, a drum engine, and a looper capable of playing up to ten instruments at once.  
+						With its wireless connection, you can link MON<b>KEY</b> to a compact portable setup, your phone, laptop, or other external gear.  </p>
+						<p>It’s a platform built for creative exploration, playful experimentation, and to give you focus.</p>
+						<br/>
+						<br/>
+						<LinkButton href={routes.monkeyPurchase} type="highlight" >Buy now €79</LinkButton>
+				</div>
+			</div>
 		</section>
-		<img src={monkeyPackagingImg.src} alt="Monkey with packaging" />
+
+		<section class="highlights">
+			<div class="container">
+				<h2 class="section-title">Highlights</h2>
+				<div class="highlights-grid">
+					<div class="highlight-item">
+						<div class="highlight-label">Battery Life</div>
+						<div class="highlight-value">Several months</div>
+						<div class="highlight-desc">Replaceable CR2032 battery</div>
+					</div>
+					<div class="highlight-item">
+						<div class="highlight-label">Keybed</div>
+						<div class="highlight-value">Two octave</div>
+						<div class="highlight-desc">Low operating force</div>
+					</div>
+					<div class="highlight-item">
+						<div class="highlight-label">MIDI Effects</div>
+						<div class="highlight-value">6 MIDI effects</div>
+						<div class="highlight-desc">Each with 10 unique presets</div>
+					</div>
+					<div class="highlight-item">
+						<div class="highlight-label">Loop Recorder</div>
+						<div class="highlight-value">Record up to 10 instruments</div>
+						<div class="highlight-desc">Simultaneous recording</div>
+					</div>
+					<div class="highlight-item">
+						<div class="highlight-label">Drum Loops</div>
+						<div class="highlight-value">Configurable</div>
+						<div class="highlight-desc">Up to 150 unique drum loops</div>
+					</div>
+					<div class="highlight-item">
+						<div class="highlight-label">Touch Surface</div>
+						<div class="highlight-value">Pressure sensitive</div>
+						<div class="highlight-desc">Real-time modulation</div>
+					</div>
+					<div class="highlight-item">
+						<div class="highlight-label">Bluetooth MIDI</div>
+						<div class="highlight-value">Low latency</div>
+						<div class="highlight-desc">Reliable connectivity</div>
+					</div>
+					<div class="highlight-item">
+						<div class="highlight-label">Form Factor</div>
+						<div class="highlight-value">150mm × 50mm</div>
+						<div class="highlight-desc">Ultra compact</div>
+					</div>
+					<div class="highlight-item">
+						<div class="highlight-label">Compatibility</div>
+						<div class="highlight-value">Universal</div>
+						<div class="highlight-desc">macOS, iOS, Android, Windows, CME WIDI, external gear</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section class="testimonials">
+			<div class="container">
+				<h2 class="section-title">What users have to say</h2>
+				<div class="testimonials-grid">
+					<blockquote class="testimonial-card">
+						<div class="testimonial-header">
+							<img src={steinbergProfile.src} alt="Floyd Steinberg profile">
+							<div class="testimonial-author">
+								<strong>Floyd Steinberg</strong>
+								<span class="testimonial-role">Music Producer</span>
+							</div>
+						</div>
+						<p class="testimonial-text">"I can full heartedly recommend this. It's the most fun I have had in a very long time with a new piece of gear." <sup><a href="#footnote-floyd-steinberg">[1]</a></sup></p>
+					</blockquote>
+					<blockquote class="testimonial-card">
+						<div class="testimonial-header">
+							<img src={haqProfile.src} alt="Jakob Haq profile" />
+							<div class="testimonial-author">
+								<strong>Jakob Haq</strong>
+								<span class="testimonial-role">Musician</span>
+							</div>
+						</div>
+						<p class="testimonial-text">"I've been using the Monkey for many hours every day since I got it delivered. The biggest use case has been 'on the run' when working on presets/patches." <sup><a href="#footnote-jakob-haq">[2]</a></sup></p>
+					</blockquote>
+					<blockquote class="testimonial-card testimonial-card-accolade">
+						<div class="testimonial-header">
+							<img src={sonicstateProfile.src} alt="Sonicstate profile" />
+							<div class="testimonial-author">
+								<strong>Sonicstate</strong>
+								<span class="testimonial-role">Superbooth 2024</span>
+							</div>
+						</div>
+						<p class="testimonial-text">Wavy Industries' Monkey was awarded with Sonicstate's Superbooth 2024 "Value for Money" award during its product debut.<sup><a href="#footnote-sonicstate-award">[3]</a></sup></p>
+					</blockquote>
+				</div>
+			</div>
+		</section>
+
+		 <section>
+		<div class="grainy">
+			<img src={monkeyGrainyImg.src} alt="Monkey grainy" />
+		</div>
+		 </section>
+
 		<section class="footnotes">
 			<p id="footnote-floyd-steinberg">[1] Mentioned on his YouTube channel <i>Floyd Steinberg</i> in video titled <a target="_blank" href="https://youtu.be/V6iA643FbLM?si=EDgtCntUDnTKQBLL&t=657">"The Wavy Industries Monkey is the tiniest MIDI master keyboard"</a> at 10:57, published Apr 28, 2024</p>
 			<p id="footnote-jakob-haq">[2] Written in <a href={routes['wavy-discord']}>Wavy discord</a> in channel "General" at 06/17/2024 7:15 PM</p>
 			<p id="footnote-sonicstate-award">[3] Receiving the award: <a href="https://youtu.be/m3RDgtmtsr4?si=1xh5rUM6on2upPp6&t=423">https://youtu.be/m3RDgtmtsr4?si=1xh5rUM6on2upPp6&t=423</a></p>
-			<p>★ Thanks to Glenn Frey for doing the 3D renderings on this page</p>
 		</section>
-		<Footer />
+
+		<Footer variant="dark" />
 	</main>
 </Layout>
 
@@ -101,56 +182,318 @@ img {
 	width: 100%;
 }
 
-#monkey-reveal-video {
-	padding: 120px 0;
+/* Container */
+.container {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 0 24px;
 }
 
-.text-white {
+/* Hero Section */
+.hero {
+	width: 100%;
+	padding: 40px 24px 32px;
 	color: #f0f0f0;
 }
 
-section {
-	width: 100%;
-	padding: 0 20px;
+.hero-inner {
+	max-width: 1200px;
+	margin: 0 auto;
 }
 
 h1 {
-	margin-block-start: 0em;
-	margin-block-end: 0em;
+	margin: 0 0 8px 0;
+	font-weight: 300;
+	font-size: 64px;
+	line-height: 1.1;
 }
 
-p {
-	max-width: 800px;
+.tagline {
+	font-size: 18px;
+	font-weight: 300;
+	color: #bbb;
+	margin: 0 0 24px 0;
+	line-height: 1.4;
 }
 
-.sub-title-block {
+.hero-actions {
 	display: flex;
-	flex-direction: row;
 	align-items: center;
-	justify-content: space-between;
+	gap: 16px;
 	flex-wrap: wrap;
-	gap: 10px;
 }
 
-.catch-phrase {
+/* Purchase Button Styling */
+
+
+/* Hero Image */
+.hero-image {
+	width: 100%;
+	padding: 0;
+	/* background-color: #101010; */
+}
+
+#monkey-reveal-video {
+    width: 100%;
+    padding: 50px 10%;
+    display: block;
+}
+
+/* Intro Section */
+.intro {
+	width: 100%;
+	padding: 48px 0;
+}
+
+.intro-content {
+	max-width: 680px;
+	margin: 0 auto;
+	text-align: center;
+	font-weight: 300;
+	color: #ddd;
+}
+
+.intro-content p {
+	font-size: 17px;
+	line-height: 1.6;
+	margin: 0 0 20px 0;
+	color: #d0d0d0;
+}
+
+.intro-content p:last-child {
+	margin-bottom: 0;
+}
+
+/* Highlights Section */
+.highlights {
+	width: 100%;
+	padding: 48px 0;
+	color: #f0f0f0;
+}
+
+.section-title {
+	font-size: 28px;
+	font-weight: 300;
+	margin: 0 0 32px 0;
+	letter-spacing: -0.5px;
+	color: #fff;
+}
+
+.highlights-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	gap: 24px;
+}
+
+.highlight-item {
+	padding: 20px;
+	background-color: rgba(255, 255, 255, 0.02);
+	border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+
+
+.highlight-label {
+	font-size: 12px;
+	font-weight: 400;
+	color: #888;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	margin-bottom: 8px;
+}
+
+.highlight-value {
 	font-size: 20px;
 	font-weight: 300;
-	margin-block-start: 0em;
-	margin-block-end: 0em;
+	color: #fff;
+	margin-bottom: 6px;
+	line-height: 1.3;
 }
 
+.highlight-desc {
+	font-size: 14px;
+	color: #aaa;
+	line-height: 1.4;
+}
+
+/* Testimonials Section */
+.testimonials {
+	width: 100%;
+	padding: 48px 0;
+	color: #f0f0f0;
+}
+
+.testimonials-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+	gap: 24px;
+}
+
+.testimonial-card {
+	margin: 0;
+	padding: 24px;
+	background-color: rgba(255, 255, 255, 0.02);
+	border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.testimonial-header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.testimonial-header img {
+	width: 40px;
+	height: 40px;
+	object-fit: cover;
+	flex-shrink: 0;
+}
+
+.testimonial-author {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.testimonial-author strong {
+	font-size: 15px;
+	font-weight: 500;
+	color: #fff;
+}
+
+.testimonial-role {
+	font-size: 12px;
+	color: #888;
+}
+
+.testimonial-text {
+	margin: 0;
+	font-size: 15px;
+	line-height: 1.6;
+	color: #d0d0d0;
+}
+
+.testimonial-text sup {
+	font-size: 0.75em;
+}
+
+.testimonial-text sup a {
+	color: #888;
+	border-bottom: 1px solid rgba(136, 136, 136, 0.3);
+	text-decoration: none;
+}
+
+.testimonial-text sup a:hover {
+	color: #aaa;
+	border-bottom-color: rgba(170, 170, 170, 0.6);
+}
+
+/* Packaging */
+.packaging {
+	width: 100%;
+	padding: 48px 0;
+	/* background-color: #101010; */
+}
+
+.packaging img {
+	max-width: 1400px;
+	margin: 0 auto;
+	display: block;
+	padding: 0 24px;
+}
+
+/* Grainy bottom image */
+.grainy {
+	width: 100%;
+	padding: 32px 0 0;
+	/* background-color: #101010; */
+}
+
+.grainy img {
+	max-width: 1600px;
+	margin: 0 auto;
+	display: block;
+	padding: 0 24px;
+}
+
+/* Footnotes */
 .footnotes {
 	font-size: 12px;
-	background-color: darkgray;
+	background-color: #0a0a0a;
+	color: #777;
+	padding: 32px 24px;
+	margin-top: 0;
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.profile-ref {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
+.footnotes p {
+	max-width: 1200px;
+	margin: 0 auto 12px;
+	line-height: 1.5;
 }
-.profile-ref img {
-	width: 30px;
-	border-radius: 50%;
+
+.footnotes p:last-child {
+	margin-bottom: 0;
+	margin-top: 20px;
+	color: #666;
+}
+
+.footnotes a {
+	color: #777;
+	border-bottom: 1px solid rgba(119, 119, 119, 0.2);
+	text-decoration: none;
+}
+
+.footnotes a:hover {
+	color: #999;
+	border-bottom-color: rgba(153, 153, 153, 0.4);
+}
+
+.footnotes i {
+	font-style: normal;
+	color: #888;
+}
+
+@media (max-width: 768px) {
+	h1 {
+		font-size: 48px;
+	}
+
+	.tagline {
+		font-size: 16px;
+	}
+
+	.container {
+		padding: 0 20px;
+	}
+
+	.hero {
+		padding: 32px 20px 24px;
+	}
+
+	.intro,
+	.highlights,
+	.testimonials {
+		padding: 40px 0;
+	}
+
+	.highlights-grid,
+	.testimonials-grid {
+		grid-template-columns: 1fr;
+		gap: 20px;
+	}
+
+	.packaging {
+		padding: 40px 0;
+	}
+
+	.packaging img {
+		padding: 0 20px;
+	}
+
+	.footnotes {
+		padding: 28px 20px;
+	}
 }
 </style>

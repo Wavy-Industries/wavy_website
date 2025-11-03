@@ -1,6 +1,13 @@
 ---
 import '../styles/global.css';
 import { routes } from '../routes';
+import type { HTMLAttributes } from 'astro/types';
+
+interface Props extends HTMLAttributes<'footer'> {
+    variant?: 'light' | 'dark';
+}
+
+const { variant = 'light', ...rest } = Astro.props as Props;
 
 // get the current year
 let year = new Date().getFullYear();
@@ -11,7 +18,7 @@ import instagramImg from '../assets/icons/instagram.svg';
 import mailImg from '../assets/icons/newspaper.svg';
 ---
 
-<footer>
+<footer class={variant} {...rest}>
     <div>
         <span>Wavy Industries AS © {year} Org nr. 935955335</span>
         <span>📍Norway</span>
@@ -24,12 +31,8 @@ import mailImg from '../assets/icons/newspaper.svg';
 
 <style>
 footer {
-    /* flex-grow: 2; */
-    /* padding: 20px 0; */
     display: flex;
     align-items: end;
-
-    transition: all 0.3s;
     height: auto;
 }
 
@@ -39,35 +42,52 @@ footer[hide] {
     overflow: hidden;
 }
 
+/* Shared structure */
 footer > div {
-    background-color: #f5f5f5;
     width: 100vw;
-    font-style: italic;
-    font-size: 12px;
+    font-style: normal;
+    font-size: 13px;
     font-weight: 300;
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 16px;
     flex-wrap: wrap;
-    padding: 0.5rem;
+    padding: 16px 20px;
+}
+
+/* Light theme (default) */
+footer.light > div {
+    background-color: #ffffff;
+    color: #333;
+    border-top: 1px solid #eaeaea;
+}
+
+footer.light img {
+    filter: brightness(0%);
+}
+
+/* Dark theme */
+footer.dark > div {
+    background-color: #0d0d0d;
+    color: #bdbdbd;
+    border-top: 1px solid #1f1f1f;
+}
+
+footer.dark img {
+    filter: none; /* show original brand colors on dark footer */
 }
 
 footer > div > * {
     padding: 0.5rem 1rem;
 }
 
-img {
-    filter: brightness(0%);
-    height: 12px;
-}
-
-a:hover img {
-    filter: brightness(100%);
-}
+img { height: 12px; }
 
 span {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
 }
 
 a:hover span {
