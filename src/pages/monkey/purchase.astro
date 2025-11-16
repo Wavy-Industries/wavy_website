@@ -4,7 +4,6 @@ import Layout from "~/layouts/Layout.astro";
 import StockSubscribe from '~/components/StockSubscribe.astro';
 
 import logoImg from '~/assets/logo.svg';
-import arrowRightImg from '~/assets/icons/arrow.right.svg';
 import { routes } from '~/routes';
 ---
 
@@ -14,30 +13,148 @@ import { routes } from '~/routes';
     <div>
       <div class="content">
         <h4>WAVY MONKEY</h4>
-        <p>Price: <b>€79</b> <span id="VAT" >ex. VAT</span><br/><i class="shipping-info">Depending on your country, import taxes may apply.</i></p>
+        <p>
+          Price: <b id="product-price">Loading price…</b> <span id="VAT">ex. VAT</span><br/>
+          <i class="shipping-info">Depending on your country, import taxes may apply. We collect duties for you in the EU and UK, so you will not have to pay additionally upon delivery.</i>
+        </p>
         <p>MONKEY ships within a few days of your order, but delays may occur if it is out of stock.</p>
-        <div id="shipping-status"></div>
-        <div id="shipping-status-leadtime" class="shipping-info"></div>
+          <!-- <div id="shipping-status"></div>
+          <div id="shipping-status-leadtime" class="shipping-info"></div> -->
       </div>
       <hr />
-      <div class="content">
-        <p>Choose shipping region:</p>
-        <div>
-          <input type="radio" id="european-option" name="shipping" value="european" checked>
-          <label for="european-option">European (€10)</label>
-          <p class="hidden shipping-info" id="european-info">Not all European contries are included. Select international shipping for those countries.</p>
-          <br />
-          <input type="radio" id="international-option" name="shipping" value="international">
-          <label for="international-option">International (€14)</label>
-          <br />
-          <input type="radio" id="pickup-option" name="shipping" value="pickup">
-          <label for="pickup-option">Pickup in <i>Trondheim, Norway</i> (free)</label>
-          <p class="hidden shipping-info" id="pickup-info">Local pickup in Trondheim, Norway. We contact you to arrange a time for pickup.</p>
-        </div>
-      </div>
     </div>
-    <!-- <hr /> -->
-    <a href="" id="checkout-link" class="chechout-button" target="_self">Proceed to checkout <img height="10px" src={arrowRightImg.src} alt="arrow right" /></a>
+     <!-- <hr /> -->
+     <center>
+
+<div id="buy-now-wrapper">
+  <button id="buy-now-button" class="chechout-button" disabled>Loading…</button>
+  <p id="buy-error" class="shipping-info hidden"></p>
+</div>
+
+<script type="text/javascript">
+(function () {
+  var scriptURL = 'https://sdks.shopifycdn.com/buy-button/latest/buy-button-storefront.min.js';
+  // Shopify Storefront API expects global IDs (gid://shopify/Product/<id>)
+  var productId = 'gid://shopify/Product/14798616985972';
+  var domain = 'gz6v0f-4p.myshopify.com';
+  var token = '3f43932f0e0e93973efb1da30bd44f74';
+  var storefrontApi = 'https://' + domain + '/api/2024-01/graphql.json';
+
+  var buyButton = document.getElementById('buy-now-button');
+  var errorEl = document.getElementById('buy-error');
+  var priceEl = document.getElementById('product-price');
+  var client;
+  var variantId;
+
+  function setButtonState(disabled, text) {
+    if (!buyButton) return;
+    buyButton.disabled = !!disabled;
+    buyButton.textContent = text;
+  }
+
+  function showError(message) {
+    if (errorEl) {
+      errorEl.textContent = message;
+      errorEl.classList.remove('hidden');
+    }
+    setButtonState(true, 'Unavailable');
+  }
+
+  function guessCountryCode() {
+    var locale = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+    var parts = locale.split('-');
+    if (parts.length > 1 && parts[1]) {
+      return parts[1].toUpperCase();
+    }
+    return null;
+  }
+
+  function fetchProductData() {
+    var countryCode = guessCountryCode();
+    var query = countryCode
+      ? "query productPrice($id: ID!, $country: CountryCode) @inContext(country: $country) { product(id: $id) { variants(first: 1) { edges { node { id price { amount currencyCode } priceV2 { amount currencyCode } } } } } }"
+      : "query productPrice($id: ID!) { product(id: $id) { variants(first: 1) { edges { node { id price { amount currencyCode } priceV2 { amount currencyCode } } } } } }";
+
+    var variables = countryCode ? { id: productId, country: countryCode } : { id: productId };
+
+    return fetch(storefrontApi, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Storefront-Access-Token': token,
+      },
+      body: JSON.stringify({ query: query, variables: variables }),
+    }).then(function (res) { return res.json(); }).then(function (resp) {
+      if (!resp || !resp.data || !resp.data.product || !resp.data.product.variants.edges.length) {
+        throw new Error('No product data returned');
+      }
+      var variant = resp.data.product.variants.edges[0].node;
+      variantId = variant.id;
+      var priceObj = variant.priceV2 || variant.price;
+      if (priceObj && priceObj.amount && priceObj.currencyCode && priceEl) {
+        var formatter = new Intl.NumberFormat(undefined, { style: 'currency', currency: priceObj.currencyCode });
+        priceEl.textContent = formatter.format(priceObj.amount);
+      }
+      setButtonState(false, 'Buy now');
+    });
+  }
+
+  function loadScript() {
+    var script = document.createElement('script');
+    script.async = true;
+    script.src = scriptURL;
+    script.onload = initShopify;
+    (document.head || document.body).appendChild(script);
+  }
+
+  function initShopify() {
+    if (!window.ShopifyBuy || !window.ShopifyBuy.buildClient) {
+      showError('Failed to load store client.');
+      return;
+    }
+
+    client = window.ShopifyBuy.buildClient({
+      domain: domain,
+      storefrontAccessToken: token,
+    });
+
+    fetchProductData().catch(function (err) {
+      console.error(err);
+      showError('Product unavailable right now.');
+    });
+  }
+
+  function handleBuy() {
+    if (!client || !variantId) {
+      showError('Product unavailable right now.');
+      return;
+    }
+
+    setButtonState(true, 'Redirecting…');
+    client.checkout.create().then(function (checkout) {
+      return client.checkout.addLineItems(checkout.id, [{
+        variantId: variantId,
+        quantity: 1,
+      }]);
+    }).then(function (checkout) {
+      window.location.href = checkout.webUrl;
+    }).catch(function (err) {
+      console.error(err);
+      showError('Could not start checkout.');
+    });
+  }
+
+  if (buyButton) {
+    buyButton.addEventListener('click', handleBuy);
+  }
+
+  if (window.ShopifyBuy && window.ShopifyBuy.buildClient) {
+    initShopify();
+  } else {
+    loadScript();
+  }
+})();
+</script>
     <p class="shipping-info">By proceeding you agree to our sales <a target="_blank" href={routes.termsAndConditions}>terms & conditions.</a> </p>
     <br/>
    <div id="stock-notify-form" class="content hidden">
@@ -135,51 +252,6 @@ input {
 </style>
 
 <script>
-type ShippingOptions = 'european' | 'international' | 'pickup';
-
-let shippingUrl = {
-  european: 'https://buy.stripe.com/7sI9Co9Mwb8a6WIbIJ',
-  international: 'https://buy.stripe.com/cN2cOAaQA2BEgxidQS',
-  pickup: 'https://buy.stripe.com/5kA15S0bW2BEch28wz',
-}
-
-let checkoutLink = document.getElementById('checkout-link') as HTMLAnchorElement;
-function updateUrl(val: ShippingOptions) {
-  switch (val) {
-    case 'european':
-      document.getElementById('european-info').classList.remove('hidden');
-      document.getElementById('pickup-info').classList.add('hidden');
-      break;
-    case 'international':
-      document.getElementById('european-info').classList.add('hidden');
-      document.getElementById('pickup-info').classList.add('hidden');
-      break;
-    case 'pickup':
-      document.getElementById('pickup-info').classList.remove('hidden');
-      document.getElementById('european-info').classList.add('hidden');
-      break;
-  }
-
-  checkoutLink.href = shippingUrl[val];
-}
-
-
-window.addEventListener('pageshow', function() {
-  const radios = document.querySelectorAll('input[type="radio"][name="shipping"]') as NodeListOf<HTMLInputElement>;
-
-  // Event listener for radio button changes
-  radios.forEach(radio => {
-    if (radio.checked)
-      updateUrl(radio.value as ShippingOptions);
-
-    radio.addEventListener('change', function(e) {
-      const target = e.target as HTMLInputElement;
-      let shippingMethod = target.value as ShippingOptions;
-      updateUrl(shippingMethod);
-    });
-  });
-});
-
 async function getStockStatus() {
   try {
     const response = await fetch('https://server.wavyindustries.com/api/product/getStock/WIMKY001');
@@ -200,7 +272,7 @@ async function getStockStatus() {
         break;
       case 'out of stock':
         shippingStatus.classList.add('out-of-stock');
-        shippingLeadtime.innerHTML = 'Lead time: Next batch 15. November';
+        shippingLeadtime.innerHTML = 'Lead time: 5. November';
 
         const notifyForm = document.getElementById('stock-notify-form');
         if (notifyForm) {
