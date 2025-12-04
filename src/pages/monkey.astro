@@ -17,6 +17,7 @@ import monkeyGrainyImg from '~/assets/monkey/monkey_grainy.png';
 import steinbergProfile from '~/assets/monkey/profiles/floyd_steinberg.jpg';
 import haqProfile from '~/assets/monkey/profiles/jakob_haq.jpg';
 import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
+import shopifyUtilUrl from '~/lib/utils/shopify-util.js?url';
 ---
 
 <Layout title="Wavy Industries - MONKEY" description='Discover MONKEY by Wavy Industries, the ultimate Bluetooth MIDI companion for musicians and producers. Compact, versatile, and designed for seamless music creation.'>
@@ -35,7 +36,12 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 						<Tag href={routes.monkeyGettingStarted}>Getting started</Tag>
 						<Tag href={routes.monkeyManual}>Manual</Tag>
 					</TagContainer>
-					<LinkButton href={routes.monkeyPurchase} type="highlight" >Buy now €79</LinkButton>
+					<LinkButton id="monkey-buy-button" class="monkey-buy-button" href={routes.monkeyPurchase} type="highlight">
+						<span class="monkey-buy-label">
+							<span>Buy now</span>
+							<span id="monkey-price" class="monkey-price monkey-price--loading"></span>
+						</span>
+					</LinkButton>
 				</div>
 			</div>
 		</section>
@@ -219,8 +225,50 @@ h1 {
 }
 
 /* Purchase Button Styling */
+.monkey-buy-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+}
 
+.monkey-buy-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
 
+.monkey-price {
+	display: inline-block;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.monkey-price--loading {
+	position: relative;
+	min-width: 4ch;
+	color: transparent;
+}
+
+.monkey-price--loading::before {
+	content: '';
+	display: inline-block;
+	width: 100%;
+	height: 0.8em;
+	border-radius: 999px;
+	background: linear-gradient(90deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0.2) 100%);
+	background-size: 200% 100%;
+	animation: monkey-price-shimmer 1.1s infinite;
+}
+
+@keyframes monkey-price-shimmer {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
+}
 /* Hero Image */
 .hero-image {
 	width: 100%;
@@ -492,3 +540,59 @@ h1 {
 	}
 }
 </style>
+
+<script type="module" define:vars={{ shopifyUtilUrl }}>
+const priceEl = document.getElementById('monkey-price');
+
+if (priceEl) {
+  (async () => {
+    const {
+      PRODUCT_ID,
+      TOKEN,
+      STOREFRONT_API,
+      buildProductPriceQuery,
+      formatShopifyPrice,
+      guessCountryCode,
+    } = await import(shopifyUtilUrl);
+
+    const productId = PRODUCT_ID;
+    const token = TOKEN;
+    const storefrontApi = STOREFRONT_API;
+
+    function fetchProductData() {
+      const countryCode = guessCountryCode ? guessCountryCode() : null;
+      const queryConfig = buildProductPriceQuery
+        ? buildProductPriceQuery(countryCode)
+        : { query: '', variables: { id: productId } };
+
+      return fetch(storefrontApi, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Storefront-Access-Token': token,
+        },
+        body: JSON.stringify({ query: queryConfig.query, variables: queryConfig.variables }),
+      }).then(function (res) { return res.json(); }).then(function (resp) {
+        if (!resp || !resp.data || !resp.data.product || !resp.data.product.variants.edges.length) {
+          throw new Error('No product data returned');
+        }
+        const variant = resp.data.product.variants.edges[0].node;
+        const priceObj = variant.priceV2 || variant.price;
+        if (priceObj && priceObj.amount && priceObj.currencyCode) {
+          const formatted = formatShopifyPrice
+            ? formatShopifyPrice(priceObj.currencyCode, priceObj.amount)
+            : (priceObj.amount + ' ' + priceObj.currencyCode);
+          priceEl.textContent = formatted;
+          priceEl.classList.remove('monkey-price--loading');
+        }
+      }).catch(function () {
+        // Fallback to known price if anything goes wrong
+        priceEl.textContent = '€79';
+        priceEl.classList.remove('monkey-price--loading');
+      });
+    }
+
+    fetchProductData();
+  })();
+}
+</script>
