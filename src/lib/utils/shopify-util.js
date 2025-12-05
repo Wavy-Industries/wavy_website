@@ -1,23 +1,100 @@
+import {
+  getTaxConfigForCountry as getTaxConfigOverride,
+  getDefaultIncludedTaxRate as getDefaultIncludedTaxRateOverride,
+} from '../config/tax-config.js';
+
 const PRODUCT_ID = 'gid://shopify/Product/14798616985972';
 const DOMAIN = 'checkout.wavyindustries.com';
 const TOKEN = '3f43932f0e0e93973efb1da30bd44f74';
 const STOREFRONT_API = 'https://' + DOMAIN + '/api/2024-01/graphql.json';
 
-function guessCountryCode() {
-  const locale =
-    (typeof navigator !== 'undefined' && ((navigator.languages && navigator.languages[0]) || navigator.language)) || '';
-  const parts = locale.split('-');
-  if (parts.length > 1 && parts[1]) {
-    return parts[1].toUpperCase();
+async function guessCountryCode() {
+  function localeFallback() {
+    var locale = '';
+
+    if (typeof navigator !== 'undefined') {
+      if (Array.isArray(navigator.languages) && navigator.languages.length) {
+        locale = navigator.languages[0];
+      } else if (navigator.language) {
+        locale = navigator.language;
+      }
+    }
+
+    if (!locale && typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
+      var resolved = Intl.DateTimeFormat().resolvedOptions();
+      if (resolved && resolved.locale) {
+        locale = resolved.locale;
+      }
+    }
+
+    if (typeof locale === 'string') {
+      var cleaned = locale.replace('_', '-');
+      var parts = cleaned.split('-');
+      if (parts.length > 1 && parts[parts.length - 1]) {
+        var countryPart = parts[parts.length - 1].replace(/[^A-Za-z]/g, '');
+        if (countryPart.length === 2) {
+          return countryPart.toUpperCase();
+        }
+      }
+    }
+
+    return null;
   }
-  return null;
+
+  var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var timeoutId = null;
+
+  try {
+    if (typeof fetch !== 'function') {
+      return localeFallback();
+    }
+
+    if (controller) {
+      timeoutId = setTimeout(function () {
+        try {
+          controller.abort();
+        } catch (err) {
+          // swallow
+        }
+      }, 1500);
+    }
+
+    var response = await fetch('https://ipwho.is/?fields=country_code', {
+      signal: controller ? controller.signal : undefined,
+    });
+
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+
+    if (response && response.ok) {
+      var data = await response.json();
+      if (data && typeof data.country_code === 'string' && data.country_code.length === 2) {
+        return data.country_code.toUpperCase();
+      }
+    }
+  } catch (err) {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  return localeFallback();
 }
 
-function buildProductPriceQuery(countryCode) {
+function buildProductPriceQuery(countryCode, includeLocalization) {
+  var includeLoc = typeof includeLocalization === 'boolean' ? includeLocalization : true;
+
+  var baseFields =
+    "product(id: $id) { variants(first: 1) { edges { node { id availableForSale quantityAvailable price { amount currencyCode } priceV2 { amount currencyCode } } } } }" +
+    (includeLoc ? " localization { country { isoCode } }" : '');
+
   if (countryCode) {
     return {
       query:
-        "query productPrice($id: ID!, $country: CountryCode) @inContext(country: $country) { product(id: $id) { variants(first: 1) { edges { node { id price { amount currencyCode } priceV2 { amount currencyCode } } } } } }",
+        "query productPrice($id: ID!, $country: CountryCode) @inContext(country: $country) { " +
+        baseFields +
+        " }",
       variables: {
         id: PRODUCT_ID,
         country: countryCode,
@@ -26,8 +103,7 @@ function buildProductPriceQuery(countryCode) {
   }
 
   return {
-    query:
-      "query productPrice($id: ID!) { product(id: $id) { variants(first: 1) { edges { node { id price { amount currencyCode } priceV2 { amount currencyCode } } } } } }",
+    query: "query productPrice($id: ID!) { " + baseFields + " }",
     variables: {
       id: PRODUCT_ID,
     },
@@ -36,15 +112,25 @@ function buildProductPriceQuery(countryCode) {
 
 function formatShopifyPrice(currencyCode, amount) {
   if (!currencyCode) {
-    return String(amount);
+    return String(Math.round(typeof amount === 'number' ? amount : parseFloat(amount)));
   }
   const numeric = typeof amount === 'number' ? amount : parseFloat(amount);
   if (isNaN(numeric)) {
     return String(amount);
   }
 
-  const isInteger = Math.abs(numeric - Math.round(numeric)) < 0.005;
+  const rounded = Math.round(numeric);
   const code = String(currencyCode).toUpperCase();
+  const suffixMap = {
+    NOK: 'kr',
+    SEK: 'kr',
+    DKK: 'kr',
+  };
+
+  if (suffixMap[code]) {
+    return rounded + ' ' + suffixMap[code];
+  }
+
   const symbolMap = {
     USD: '$',
     EUR: '€',
@@ -54,18 +140,12 @@ function formatShopifyPrice(currencyCode, amount) {
     CAD: '$',
     AUD: '$',
     NZD: '$',
-    NOK: 'kr',
-    SEK: 'kr',
-    DKK: 'kr',
     CHF: 'CHF',
   };
 
   const symbol = symbolMap[code];
   if (symbol) {
-    if (isInteger) {
-      return symbol + Math.round(numeric);
-    }
-    return symbol + numeric.toFixed(2);
+    return symbol + rounded;
   }
 
   const formatter =
@@ -73,11 +153,12 @@ function formatShopifyPrice(currencyCode, amount) {
       ? new Intl.NumberFormat(undefined, {
           style: 'currency',
           currency: code,
-          ...(isInteger ? { maximumFractionDigits: 0 } : {}),
+          maximumFractionDigits: 0,
+          minimumFractionDigits: 0,
         })
       : null;
 
-  return formatter ? formatter.format(numeric) : String(numeric);
+  return formatter ? formatter.format(rounded) : String(rounded);
 }
 
 export {
@@ -88,4 +169,14 @@ export {
   guessCountryCode,
   buildProductPriceQuery,
   formatShopifyPrice,
+  getTaxConfigForCountry,
+  getDefaultIncludedTaxRate,
 };
+
+function getTaxConfigForCountry(countryCode) {
+  return getTaxConfigOverride ? getTaxConfigOverride(countryCode) : null;
+}
+
+function getDefaultIncludedTaxRate() {
+  return getDefaultIncludedTaxRateOverride ? getDefaultIncludedTaxRateOverride() : 0.2;
+}

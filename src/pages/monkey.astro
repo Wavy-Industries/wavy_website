@@ -553,18 +553,15 @@ if (priceEl) {
       buildProductPriceQuery,
       formatShopifyPrice,
       guessCountryCode,
+      getTaxConfigForCountry,
+      getDefaultIncludedTaxRate,
     } = await import(shopifyUtilUrl);
 
     const productId = PRODUCT_ID;
     const token = TOKEN;
     const storefrontApi = STOREFRONT_API;
 
-    function fetchProductData() {
-      const countryCode = guessCountryCode ? guessCountryCode() : null;
-      const queryConfig = buildProductPriceQuery
-        ? buildProductPriceQuery(countryCode)
-        : { query: '', variables: { id: productId } };
-
+    function requestProduct(queryConfig) {
       return fetch(storefrontApi, {
         method: 'POST',
         headers: {
@@ -577,19 +574,107 @@ if (priceEl) {
           throw new Error('No product data returned');
         }
         const variant = resp.data.product.variants.edges[0].node;
-        const priceObj = variant.priceV2 || variant.price;
-        if (priceObj && priceObj.amount && priceObj.currencyCode) {
-          const formatted = formatShopifyPrice
-            ? formatShopifyPrice(priceObj.currencyCode, priceObj.amount)
-            : (priceObj.amount + ' ' + priceObj.currencyCode);
-          priceEl.textContent = formatted;
-          priceEl.classList.remove('monkey-price--loading');
-        }
-      }).catch(function () {
-        // Fallback to known price if anything goes wrong
-        priceEl.textContent = '€79';
-        priceEl.classList.remove('monkey-price--loading');
+        const localization = resp.data.localization && resp.data.localization.country ? resp.data.localization.country : null;
+        const taxRate = null;
+        const taxName = 'VAT';
+        return {
+          variant,
+          countryIsoCode: localization ? localization.isoCode : null,
+          taxRate: null,
+          taxName,
+          taxesIncluded: null,
+        };
       });
+    }
+
+    function renderPrice(productData) {
+      const variant = productData.variant;
+      const priceObj = variant.priceV2 || variant.price;
+      if (priceObj && priceObj.amount && priceObj.currencyCode) {
+        const currencyCode = priceObj.currencyCode;
+        const unitPriceAmount = parseFloat(priceObj.amount);
+        const taxConfigOverride = getTaxConfigForCountry ? getTaxConfigForCountry(productData.countryIsoCode) : null;
+        let effectiveTaxRate = null;
+        if (taxConfigOverride && typeof taxConfigOverride.taxRate === 'number') {
+          effectiveTaxRate = taxConfigOverride.taxRate;
+        } else if (typeof productData.taxRate === 'number') {
+          effectiveTaxRate = productData.taxRate;
+        } else if (taxConfigOverride && taxConfigOverride.taxesIncluded === true) {
+          effectiveTaxRate = getDefaultIncludedTaxRate ? getDefaultIncludedTaxRate() : 0.2;
+        }
+
+        const taxesIncluded = taxConfigOverride && typeof taxConfigOverride.taxesIncluded === 'boolean'
+          ? taxConfigOverride.taxesIncluded
+          : productData.taxesIncluded;
+
+        let unitNet = unitPriceAmount;
+        if (effectiveTaxRate !== null && taxesIncluded === true) {
+          unitNet = unitPriceAmount / (1 + effectiveTaxRate);
+        }
+
+        const formatted = formatShopifyPrice
+          ? formatShopifyPrice(currencyCode, unitNet)
+          : (unitNet + ' ' + currencyCode);
+        priceEl.textContent = formatted;
+        priceEl.classList.remove('monkey-price--loading');
+      }
+    }
+
+    async function fetchProductData() {
+      let countryCode = null;
+      if (guessCountryCode) {
+        try {
+          countryCode = await guessCountryCode();
+        } catch (err) {
+          countryCode = null;
+        }
+      }
+
+      const queryConfig = buildProductPriceQuery
+        ? buildProductPriceQuery(countryCode, true)
+        : { query: '', variables: { id: productId } };
+
+      try {
+        const productData = await requestProduct(queryConfig);
+        renderPrice(productData);
+        return;
+      } catch (err) {
+        console.warn('Locale-based Shopify price failed, retrying without localization.', err);
+
+        if (buildProductPriceQuery) {
+          try {
+            const productData = await requestProduct(buildProductPriceQuery(countryCode, false));
+            renderPrice(productData);
+            return;
+          } catch (noLocErr) {
+            console.warn('Country query without localization failed, trying default market.', noLocErr);
+          }
+        }
+
+        try {
+          const productData = await requestProduct(
+            buildProductPriceQuery ? buildProductPriceQuery(null, true) : { query: '', variables: { id: productId } }
+          );
+          renderPrice(productData);
+          return;
+        } catch (fallbackErr) {
+          if (buildProductPriceQuery) {
+            try {
+              const productData = await requestProduct(buildProductPriceQuery(null, false));
+              renderPrice(productData);
+              return;
+            } catch (finalErr) {
+              console.error('Default Shopify price fetch failed after removing localization.', finalErr);
+            }
+          } else {
+            console.error('Default Shopify price fetch failed.', fallbackErr);
+          }
+        }
+      }
+
+      // Fallback to known price if anything goes wrong
+      priceEl.textContent = '€79';
+      priceEl.classList.remove('monkey-price--loading');
     }
 
     fetchProductData();
