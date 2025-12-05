@@ -68,8 +68,9 @@ import shopifyUtilUrl from '~/lib/utils/shopify-util.js?url';
       buildProductPriceQuery,
       formatShopifyPrice,
       guessCountryCode,
-      getTaxConfigForCountry,
-      getDefaultIncludedTaxRate,
+      resolveTaxSettings,
+      computeNetAndTax,
+      formatTaxAmount,
     } = await import(shopifyUtilUrl);
 
     var scriptURL = 'https://sdks.shopifycdn.com/buy-button/latest/buy-button-storefront.min.js';
@@ -98,7 +99,6 @@ import shopifyUtilUrl from '~/lib/utils/shopify-util.js?url';
     var notifyForm = document.getElementById('stock-notify-form');
     var client;
     var variantId;
-    var unitPriceAmount = 0;
     var unitNetAmount = 0;
     var unitTaxAmount = null;
     var currencyCode = null;
@@ -205,17 +205,9 @@ import shopifyUtilUrl from '~/lib/utils/shopify-util.js?url';
       });
     }
 
-    function inferTaxIncluded(taxesIncludedFlag, taxOverride) {
-      if (taxOverride && typeof taxOverride.taxesIncluded === 'boolean') {
-        return taxOverride.taxesIncluded;
-      }
-      if (taxesIncludedFlag === true) {
-        return true;
-      }
-      if (taxesIncludedFlag === false) {
-        return false;
-      }
-      return null;
+    function requestBaselineProduct() {
+      var baselineConfig = buildProductPriceQuery ? buildProductPriceQuery(null, false) : { query: '', variables: { id: productId } };
+      return requestProduct(baselineConfig);
     }
 
     async function fetchProductData() {
@@ -270,9 +262,8 @@ import shopifyUtilUrl from '~/lib/utils/shopify-util.js?url';
       var taxRate = productData ? productData.taxRate : null;
       var taxName = productData && productData.taxName ? productData.taxName : 'VAT';
       var localizedCountry = productData && productData.countryIsoCode ? productData.countryIsoCode : countryCode;
-      var taxConfigOverride = getTaxConfigForCountry ? getTaxConfigForCountry(localizedCountry) : null;
-      var taxNameToUse = taxConfigOverride && taxConfigOverride.taxName ? taxConfigOverride.taxName : taxName;
-      taxNameForDisplay = taxNameToUse;
+      var taxSettings = resolveTaxSettings(localizedCountry, taxesIncludedFlag, taxRate, taxName);
+      taxNameForDisplay = taxSettings.taxName;
 
       variantId = variant.id;
       isAvailableForSale = variant.availableForSale !== false;
@@ -289,35 +280,38 @@ import shopifyUtilUrl from '~/lib/utils/shopify-util.js?url';
       var priceObj = variant.priceV2 || variant.price;
       if (priceObj && priceObj.amount && priceObj.currencyCode && priceEl) {
         currencyCode = priceObj.currencyCode;
-        unitPriceAmount = parseFloat(priceObj.amount);
-        var effectiveTaxRate = null;
-        if (taxConfigOverride && typeof taxConfigOverride.taxRate === 'number') {
-          effectiveTaxRate = taxConfigOverride.taxRate;
-        } else if (typeof taxRate === 'number') {
-          effectiveTaxRate = taxRate;
-        } else if (taxConfigOverride && taxConfigOverride.taxesIncluded === true) {
-          effectiveTaxRate = getDefaultIncludedTaxRate ? getDefaultIncludedTaxRate() : 0.2;
+        var grossAmount = parseFloat(priceObj.amount);
+        var netTax = computeNetAndTax(grossAmount, taxSettings);
+        var baselineNet = null;
+
+        try {
+          var baselineData = await requestBaselineProduct();
+          var baselineVariant = baselineData && baselineData.variant ? baselineData.variant : null;
+          var baselinePriceObj = baselineVariant ? (baselineVariant.priceV2 || baselineVariant.price) : null;
+          if (
+            baselinePriceObj &&
+            baselinePriceObj.amount &&
+            baselinePriceObj.currencyCode &&
+            baselinePriceObj.currencyCode === currencyCode
+          ) {
+            baselineNet = parseFloat(baselinePriceObj.amount);
+          }
+        } catch (baselineErr) {
+          console.warn('Baseline price fetch failed, using localized tax settings.', baselineErr);
         }
 
-        var taxesIncluded = taxConfigOverride && typeof taxConfigOverride.taxesIncluded === 'boolean'
-          ? taxConfigOverride.taxesIncluded
-          : taxesIncludedFlag;
-
-        if (effectiveTaxRate !== null && taxesIncluded === true) {
-          unitNetAmount = unitPriceAmount / (1 + effectiveTaxRate);
-          unitTaxAmount = unitPriceAmount - unitNetAmount;
-        } else if (effectiveTaxRate !== null && taxesIncluded === false) {
-          unitNetAmount = unitPriceAmount;
-          unitTaxAmount = unitPriceAmount * effectiveTaxRate;
+        if (baselineNet !== null && baselineNet < grossAmount) {
+          unitNetAmount = baselineNet;
+          unitTaxAmount = grossAmount - baselineNet;
         } else {
-          unitNetAmount = unitPriceAmount;
-          unitTaxAmount = null;
+          unitNetAmount = netTax.net;
+          unitTaxAmount = netTax.tax;
         }
 
         var formatter = formatShopifyPrice;
         console.info('Shopify price', {
           currencyCode: currencyCode,
-          amount: unitPriceAmount,
+          amount: grossAmount,
         });
         var formatted = formatter
           ? formatter(currencyCode, unitNetAmount)
@@ -337,14 +331,13 @@ import shopifyUtilUrl from '~/lib/utils/shopify-util.js?url';
         regionLabelEl.textContent = regionLabel;
       }
 
-      var taxesIncluded = inferTaxIncluded(taxesIncludedFlag, taxConfigOverride);
+      var taxesIncluded = unitTaxAmount && unitTaxAmount > 0 ? true : (taxSettings ? taxSettings.taxesIncluded : null);
       if (vatLabelEl) {
-        if (taxesIncluded === true) {
-          vatLabelEl.textContent = 'incl. ' + taxNameToUse;
-        } else if (taxesIncluded === false) {
-          vatLabelEl.textContent = 'ex. ' + taxNameToUse;
+        if (unitTaxAmount !== null) {
+          // We display the net price, so label as exclusive even if Shopify includes tax in the gross.
+          vatLabelEl.textContent = 'ex. ' + taxNameForDisplay;
         } else {
-          vatLabelEl.textContent = taxNameToUse + ' info at checkout';
+          vatLabelEl.textContent = taxNameForDisplay + ' info at checkout';
         }
       }
 
@@ -425,46 +418,6 @@ import shopifyUtilUrl from '~/lib/utils/shopify-util.js?url';
     quantityEl.value = next;
     updateTotal();
     updateQuantityButtons();
-  }
-
-  function formatTaxAmount(currencyCode, amount) {
-    if (typeof amount !== 'number' || isNaN(amount)) {
-      return String(amount);
-    }
-    var code = currencyCode ? String(currencyCode).toUpperCase() : '';
-    var suffixMap = {
-      NOK: 'kr',
-      SEK: 'kr',
-      DKK: 'kr',
-    };
-    if (suffixMap[code]) {
-      return amount.toFixed(2) + ' ' + suffixMap[code];
-    }
-    var symbolMap = {
-      USD: '$',
-      EUR: '€',
-      GBP: '£',
-      JPY: '¥',
-      CNY: '¥',
-      CAD: '$',
-      AUD: '$',
-      NZD: '$',
-      CHF: 'CHF',
-    };
-    var symbol = symbolMap[code];
-    if (symbol) {
-      return symbol + amount.toFixed(2);
-    }
-    var formatter =
-      typeof Intl !== 'undefined'
-        ? new Intl.NumberFormat(undefined, {
-            style: 'currency',
-            currency: code || 'USD',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })
-        : null;
-    return formatter ? formatter.format(amount) : String(amount.toFixed ? amount.toFixed(2) : amount);
   }
 
   function loadScript() {

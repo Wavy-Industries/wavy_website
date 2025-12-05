@@ -553,8 +553,8 @@ if (priceEl) {
       buildProductPriceQuery,
       formatShopifyPrice,
       guessCountryCode,
-      getTaxConfigForCountry,
-      getDefaultIncludedTaxRate,
+      resolveTaxSettings,
+      computeNetAndTax,
     } = await import(shopifyUtilUrl);
 
     const productId = PRODUCT_ID;
@@ -587,29 +587,51 @@ if (priceEl) {
       });
     }
 
+    function requestBaselineProduct() {
+      const baselineConfig = buildProductPriceQuery ? buildProductPriceQuery(null, false) : { query: '', variables: { id: productId } };
+      return requestProduct(baselineConfig);
+    }
+
     function renderPrice(productData) {
       const variant = productData.variant;
       const priceObj = variant.priceV2 || variant.price;
       if (priceObj && priceObj.amount && priceObj.currencyCode) {
         const currencyCode = priceObj.currencyCode;
-        const unitPriceAmount = parseFloat(priceObj.amount);
-        const taxConfigOverride = getTaxConfigForCountry ? getTaxConfigForCountry(productData.countryIsoCode) : null;
-        let effectiveTaxRate = null;
-        if (taxConfigOverride && typeof taxConfigOverride.taxRate === 'number') {
-          effectiveTaxRate = taxConfigOverride.taxRate;
-        } else if (typeof productData.taxRate === 'number') {
-          effectiveTaxRate = productData.taxRate;
-        } else if (taxConfigOverride && taxConfigOverride.taxesIncluded === true) {
-          effectiveTaxRate = getDefaultIncludedTaxRate ? getDefaultIncludedTaxRate() : 0.2;
-        }
+        const gross = parseFloat(priceObj.amount);
+        const taxSettings = resolveTaxSettings(productData.countryIsoCode, productData.taxesIncluded, productData.taxRate, productData.taxName);
+        const netTax = computeNetAndTax(gross, taxSettings);
+        let unitNet = netTax.net;
 
-        const taxesIncluded = taxConfigOverride && typeof taxConfigOverride.taxesIncluded === 'boolean'
-          ? taxConfigOverride.taxesIncluded
-          : productData.taxesIncluded;
-
-        let unitNet = unitPriceAmount;
-        if (effectiveTaxRate !== null && taxesIncluded === true) {
-          unitNet = unitPriceAmount / (1 + effectiveTaxRate);
+        try {
+          requestBaselineProduct().then(function (baselineData) {
+            const baselineVariant = baselineData && baselineData.variant ? baselineData.variant : null;
+            const baselinePriceObj = baselineVariant ? (baselineVariant.priceV2 || baselineVariant.price) : null;
+            if (
+              baselinePriceObj &&
+              baselinePriceObj.amount &&
+              baselinePriceObj.currencyCode &&
+              baselinePriceObj.currencyCode === currencyCode
+            ) {
+              const baselineNet = parseFloat(baselinePriceObj.amount);
+              if (baselineNet < gross) {
+                unitNet = baselineNet;
+              }
+            }
+            const formatted = formatShopifyPrice
+              ? formatShopifyPrice(currencyCode, unitNet)
+              : (unitNet + ' ' + currencyCode);
+            priceEl.textContent = formatted;
+            priceEl.classList.remove('monkey-price--loading');
+          }).catch(function () {
+            const formatted = formatShopifyPrice
+              ? formatShopifyPrice(currencyCode, unitNet)
+              : (unitNet + ' ' + currencyCode);
+            priceEl.textContent = formatted;
+            priceEl.classList.remove('monkey-price--loading');
+          });
+          return;
+        } catch (err) {
+          // fall through to default render
         }
 
         const formatted = formatShopifyPrice
