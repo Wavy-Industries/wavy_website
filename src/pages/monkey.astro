@@ -18,7 +18,6 @@ import monkeyGrainyImg from '~/assets/monkey/monkey_grainy.png';
 import steinbergProfile from '~/assets/monkey/profiles/floyd_steinberg.jpg';
 import haqProfile from '~/assets/monkey/profiles/jakob_haq.jpg';
 import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
-import shopifyUtilUrl from '~/lib/utils/shopify-util.js?url';
 ---
 
 <Layout title="Wavy Industries - MONKEY" description='Discover MONKEY by Wavy Industries, the ultimate Bluetooth MIDI companion for musicians and producers. Compact, versatile, and designed for seamless music creation.'>
@@ -28,7 +27,6 @@ import shopifyUtilUrl from '~/lib/utils/shopify-util.js?url';
 	<main>
 		<!-- <TopBannerAlert>BLACK FRIDAY sale: 15% off with code <b>BLACKFRIDAY2025</b></TopBannerAlert> -->
 		<Header textColor='white' />
-		<!-- Only keeping Highlights and What users have to say sections -->
 		<section class="hero">
 			<div class="hero-inner">
 				<h1>MON<span style="font-weight: 400;" >KEY</span></h1>
@@ -49,10 +47,10 @@ import shopifyUtilUrl from '~/lib/utils/shopify-util.js?url';
 		</section>
 
 		<div class="hero-image">
-			<video id="monkey-reveal-video" width="100%" autoplay muted playsinline onended="this.pause()">
+			<!-- <video id="monkey-reveal-video" width="100%" autoplay muted playsinline onended="this.pause()">
 				<source src={monkeyRevealVideo} type="video/mp4">
-				<img src={monkeyRevealPlaceholder.src} alt="Monkey reveal placeholder">
-			</video>
+			</video> -->
+			<img src={monkeyRevealPlaceholder.src} alt="Monkey reveal placeholder">
 		</div>
 
 		<section class="intro">
@@ -274,7 +272,8 @@ h1 {
 /* Hero Image */
 .hero-image {
 	width: 100%;
-	padding: 0;
+	padding: 50px 10%;
+	/* padding: 0; */
 	/* background-color: #101010; */
 }
 
@@ -543,165 +542,4 @@ h1 {
 }
 </style>
 
-<script type="module" define:vars={{ shopifyUtilUrl }}>
-const priceEl = document.getElementById('monkey-price');
-
-if (priceEl) {
-  (async () => {
-    const {
-      PRODUCT_ID,
-      TOKEN,
-      STOREFRONT_API,
-      buildProductPriceQuery,
-      formatShopifyPrice,
-      guessCountryCode,
-      resolveTaxSettings,
-      computeNetAndTax,
-    } = await import(shopifyUtilUrl);
-
-    const productId = PRODUCT_ID;
-    const token = TOKEN;
-    const storefrontApi = STOREFRONT_API;
-
-    function requestProduct(queryConfig) {
-      return fetch(storefrontApi, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Storefront-Access-Token': token,
-        },
-        body: JSON.stringify({ query: queryConfig.query, variables: queryConfig.variables }),
-      }).then(function (res) { return res.json(); }).then(function (resp) {
-        if (!resp || !resp.data || !resp.data.product || !resp.data.product.variants.edges.length) {
-          throw new Error('No product data returned');
-        }
-        const variant = resp.data.product.variants.edges[0].node;
-        const localization = resp.data.localization && resp.data.localization.country ? resp.data.localization.country : null;
-        const taxRate = null;
-        const taxName = 'VAT';
-        return {
-          variant,
-          countryIsoCode: localization ? localization.isoCode : null,
-          taxRate: null,
-          taxName,
-          taxesIncluded: null,
-        };
-      });
-    }
-
-    function requestBaselineProduct() {
-      const baselineConfig = buildProductPriceQuery ? buildProductPriceQuery(null, false) : { query: '', variables: { id: productId } };
-      return requestProduct(baselineConfig);
-    }
-
-    function renderPrice(productData) {
-      const variant = productData.variant;
-      const priceObj = variant.priceV2 || variant.price;
-      if (priceObj && priceObj.amount && priceObj.currencyCode) {
-        const currencyCode = priceObj.currencyCode;
-        const gross = parseFloat(priceObj.amount);
-        const taxSettings = resolveTaxSettings(productData.countryIsoCode, productData.taxesIncluded, productData.taxRate, productData.taxName);
-        const netTax = computeNetAndTax(gross, taxSettings);
-        let unitNet = netTax.net;
-
-        try {
-          requestBaselineProduct().then(function (baselineData) {
-            const baselineVariant = baselineData && baselineData.variant ? baselineData.variant : null;
-            const baselinePriceObj = baselineVariant ? (baselineVariant.priceV2 || baselineVariant.price) : null;
-            if (
-              baselinePriceObj &&
-              baselinePriceObj.amount &&
-              baselinePriceObj.currencyCode &&
-              baselinePriceObj.currencyCode === currencyCode
-            ) {
-              const baselineNet = parseFloat(baselinePriceObj.amount);
-              if (baselineNet < gross) {
-                unitNet = baselineNet;
-              }
-            }
-            const formatted = formatShopifyPrice
-              ? formatShopifyPrice(currencyCode, unitNet)
-              : (unitNet + ' ' + currencyCode);
-            priceEl.textContent = formatted;
-            priceEl.classList.remove('monkey-price--loading');
-          }).catch(function () {
-            const formatted = formatShopifyPrice
-              ? formatShopifyPrice(currencyCode, unitNet)
-              : (unitNet + ' ' + currencyCode);
-            priceEl.textContent = formatted;
-            priceEl.classList.remove('monkey-price--loading');
-          });
-          return;
-        } catch (err) {
-          // fall through to default render
-        }
-
-        const formatted = formatShopifyPrice
-          ? formatShopifyPrice(currencyCode, unitNet)
-          : (unitNet + ' ' + currencyCode);
-        priceEl.textContent = formatted;
-        priceEl.classList.remove('monkey-price--loading');
-      }
-    }
-
-    async function fetchProductData() {
-      let countryCode = null;
-      if (guessCountryCode) {
-        try {
-          countryCode = await guessCountryCode();
-        } catch (err) {
-          countryCode = null;
-        }
-      }
-
-      const queryConfig = buildProductPriceQuery
-        ? buildProductPriceQuery(countryCode, true)
-        : { query: '', variables: { id: productId } };
-
-      try {
-        const productData = await requestProduct(queryConfig);
-        renderPrice(productData);
-        return;
-      } catch (err) {
-        console.warn('Locale-based Shopify price failed, retrying without localization.', err);
-
-        if (buildProductPriceQuery) {
-          try {
-            const productData = await requestProduct(buildProductPriceQuery(countryCode, false));
-            renderPrice(productData);
-            return;
-          } catch (noLocErr) {
-            console.warn('Country query without localization failed, trying default market.', noLocErr);
-          }
-        }
-
-        try {
-          const productData = await requestProduct(
-            buildProductPriceQuery ? buildProductPriceQuery(null, true) : { query: '', variables: { id: productId } }
-          );
-          renderPrice(productData);
-          return;
-        } catch (fallbackErr) {
-          if (buildProductPriceQuery) {
-            try {
-              const productData = await requestProduct(buildProductPriceQuery(null, false));
-              renderPrice(productData);
-              return;
-            } catch (finalErr) {
-              console.error('Default Shopify price fetch failed after removing localization.', finalErr);
-            }
-          } else {
-            console.error('Default Shopify price fetch failed.', fallbackErr);
-          }
-        }
-      }
-
-      // Fallback to known price if anything goes wrong
-      priceEl.textContent = '€79';
-      priceEl.classList.remove('monkey-price--loading');
-    }
-
-    fetchProductData();
-  })();
-}
-</script>
+<script src="../scripts/monkey/hero-price.js"></script>
