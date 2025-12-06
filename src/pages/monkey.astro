@@ -27,7 +27,6 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 	<main>
 		<!-- <TopBannerAlert>BLACK FRIDAY sale: 15% off with code <b>BLACKFRIDAY2025</b></TopBannerAlert> -->
 		<Header textColor='white' />
-		<!-- Only keeping Highlights and What users have to say sections -->
 		<section class="hero">
 			<div class="hero-inner">
 				<h1>MON<span style="font-weight: 400;" >KEY</span></h1>
@@ -37,16 +36,21 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 						<Tag href={routes.monkeyGettingStarted}>Getting started</Tag>
 						<Tag href={routes.monkeyManual}>Manual</Tag>
 					</TagContainer>
-					<LinkButton href={routes.monkeyPurchase} type="highlight" >Buy now €79</LinkButton>
+					<LinkButton id="monkey-buy-button" class="monkey-buy-button" href={routes.monkeyPurchase} type="highlight">
+						<span class="monkey-buy-label">
+							<span>Buy now</span>
+							<span id="monkey-price" class="monkey-price monkey-price--loading"></span>
+						</span>
+					</LinkButton>
 				</div>
 			</div>
 		</section>
 
 		<div class="hero-image">
-			<video id="monkey-reveal-video" width="100%" autoplay muted playsinline onended="this.pause()">
+			<!-- <video id="monkey-reveal-video" width="100%" autoplay muted playsinline onended="this.pause()">
 				<source src={monkeyRevealVideo} type="video/mp4">
-				<img src={monkeyRevealPlaceholder.src} alt="Monkey reveal placeholder">
-			</video>
+			</video> -->
+			<img src={monkeyRevealPlaceholder.src} alt="Monkey reveal placeholder">
 		</div>
 
 		<section class="intro">
@@ -221,12 +225,55 @@ h1 {
 }
 
 /* Purchase Button Styling */
+.monkey-buy-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+}
 
+.monkey-buy-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
 
+.monkey-price {
+	display: inline-block;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.monkey-price--loading {
+	position: relative;
+	min-width: 4ch;
+	color: transparent;
+}
+
+.monkey-price--loading::before {
+	content: '';
+	display: inline-block;
+	width: 100%;
+	height: 0.8em;
+	border-radius: 999px;
+	background: linear-gradient(90deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0.2) 100%);
+	background-size: 200% 100%;
+	animation: monkey-price-shimmer 1.1s infinite;
+}
+
+@keyframes monkey-price-shimmer {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
+}
 /* Hero Image */
 .hero-image {
 	width: 100%;
-	padding: 0;
+	padding: 50px 10%;
+	/* padding: 0; */
 	/* background-color: #101010; */
 }
 
@@ -494,3 +541,5 @@ h1 {
 	}
 }
 </style>
+
+<script src="../scripts/monkey/hero-price.js"></script>

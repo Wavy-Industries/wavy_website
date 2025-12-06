@@ -3,43 +3,61 @@ import '~/styles/global.css';
 import Layout from "~/layouts/Layout.astro";
 import StockSubscribe from '~/components/StockSubscribe.astro';
 
+import monkeyFaceImg from '~/assets/monkey/monkey_face.svg';
 import logoImg from '~/assets/logo.svg';
-import arrowRightImg from '~/assets/icons/arrow.right.svg';
 import { routes } from '~/routes';
 ---
 
 <Layout title="Wavy Industries: Monkey purchase">
-  <section>
+  <div id="purchase-loading" class="page-loading">
+    <div class="spinner" aria-hidden="true"></div>
+    <!-- <p>Loading price and availability…</p> -->
+  </div>
+  <section id="purchase-section" class="hidden">
     <div class="banner"><img src={logoImg.src} /></div>
     <div>
-      <div class="content">
+    <div class="content">
+      <div style="display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
         <h4>WAVY MONKEY</h4>
-        <p>Price: <b>€79</b> <span id="VAT" >ex. VAT</span>
-          <!-- <br/><i class="shipping-info">(with promo code <b>BLACKFRIDAY2025</b>)</i> -->
-          <br/><i class="shipping-info">Depending on your country, import taxes may apply.</i></p>
-        <p>MONKEY ships within a few days of your order, but delays may occur if it is out of stock.</p>
-        <div id="shipping-status"></div>
-        <div id="shipping-status-leadtime" class="shipping-info"></div>
+        <img src={monkeyFaceImg.src} width="50" alt="Monkey face" />
       </div>
-      <hr />
-      <div class="content">
-        <p>Choose shipping region:</p>
-        <div>
-          <input type="radio" id="european-option" name="shipping" value="european" checked>
-          <label for="european-option">European (€10)</label>
-          <p class="hidden shipping-info" id="european-info">Not all European contries are included. Select international shipping for those countries.</p>
-          <br />
-          <input type="radio" id="international-option" name="shipping" value="international">
-          <label for="international-option">International (€14)</label>
-          <br />
-          <input type="radio" id="pickup-option" name="shipping" value="pickup">
-          <label for="pickup-option">Pickup in <i>Trondheim, Norway</i> (free)</label>
-          <p class="hidden shipping-info" id="pickup-info">Local pickup in Trondheim, Norway. We contact you to arrange a time for pickup.</p>
+      <p>
+        Price: <b id="product-price">Loading price…</b> <span id="VAT">Checking VAT…</span> <small id="price-meta" class="price-meta"></small><br/>
+        <small id="region-label" class="region-label"></small><br/>
+        <i class="shipping-info">Depending on your country, import taxes may apply. We collect duties for you in the EU, so you will not have to pay additionally upon delivery.</i>
+      </p>
+      <!-- <p>MONKEY ships within a few days of your order when in stock.</p> -->
+      <div id="shipping-status"></div>
+      <div id="shipping-status-leadtime" class="shipping-info"></div>
+    </div>
+    <hr />
+    <div class="content quantity-card">
+      <div class="quantity-row">
+        <span>Quantity</span>
+        <div class="quantity-controls">
+          <button type="button" id="quantity-decrease" class="quantity-button">-</button>
+          <span id="quantity-display" class="quantity-value">1</span>
+          <input id="quantity" type="hidden" value="1" />
+          <button type="button" id="quantity-increase" class="quantity-button">+</button>
         </div>
       </div>
+      <div class="quantity-total-row">
+        <span>Total (excl. tax)</span>
+        <span id="total-price" class="quantity-total">Loading…</span>
+      </div>
+      <div class="quantity-total-row tax-row">
+        <span id="tax-label">Taxes</span>
+        <span id="tax-amount" class="quantity-total">Calculating…</span>
+      </div>
     </div>
-    <!-- <hr /> -->
-    <a href="" id="checkout-link" class="chechout-button" target="_self">Proceed to checkout <img height="10px" src={arrowRightImg.src} alt="arrow right" /></a>
+    </div>
+    <center>
+      <div id="buy-now-wrapper">
+        <button id="buy-now-button" class="chechout-button" disabled>Continue to checkout</button>
+        <p id="buy-error" class="shipping-info hidden"></p>
+      </div>
+    </center>
+    <script src="../../scripts/monkey/purchase.js"></script>
     <p class="shipping-info">By proceeding you agree to our sales <a target="_blank" href={routes.termsAndConditions}>terms & conditions.</a> </p>
     <br/>
    <div id="stock-notify-form" class="content hidden">
@@ -51,11 +69,40 @@ import { routes } from '~/routes';
 
 <style>  
 section {
-  margin: 75px auto;
+  margin: 20px auto;
   width: 400px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.page-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 60vh;
+  text-align: center;
+  color: #1f1f1f;
+}
+
+.spinner {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  border-top-color: #000000;
+  animation: spin 0.5s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
   
 hr {
@@ -80,6 +127,62 @@ input {
   /* min-height: 300px; */
 }
 
+.quantity-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.quantity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #333;
+}
+
+.quantity-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quantity-button {
+  border: 1px solid #ccc;
+  background-color: #fff;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.quantity-button:hover {
+  background-color: #f0f0f0;
+}
+
+.quantity-value {
+  min-width: 1.5ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.quantity-total-row {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px dashed #ccc;
+  padding-top: 4px;
+  margin-top: 4px;
+}
+
+.quantity-total {
+  font-variant-numeric: tabular-nums;
+}
+
+.tax-row {
+  color: #555;
+  font-size: 14px;
+}
+
 #VAT {
   font-size: 12px;
   margin-left: 5px;
@@ -101,6 +204,14 @@ input {
   background-color: #4378ff;
   /* cursor: pointer; */
   text-decoration: none;
+}
+.price-meta {
+  font-size: 11px;
+  color: #444;
+}
+.region-label {
+  font-size: 11px;
+  color: #444;
 }
 
 /* add stock status classes with light background colors */
@@ -135,89 +246,3 @@ input {
   display: none;
 }
 </style>
-
-<script>
-type ShippingOptions = 'european' | 'international' | 'pickup';
-
-let shippingUrl = {
-  european: 'https://buy.stripe.com/7sI9Co9Mwb8a6WIbIJ',
-  international: 'https://buy.stripe.com/cN2cOAaQA2BEgxidQS',
-  pickup: 'https://buy.stripe.com/5kA15S0bW2BEch28wz',
-}
-
-let checkoutLink = document.getElementById('checkout-link') as HTMLAnchorElement;
-function updateUrl(val: ShippingOptions) {
-  switch (val) {
-    case 'european':
-      document.getElementById('european-info').classList.remove('hidden');
-      document.getElementById('pickup-info').classList.add('hidden');
-      break;
-    case 'international':
-      document.getElementById('european-info').classList.add('hidden');
-      document.getElementById('pickup-info').classList.add('hidden');
-      break;
-    case 'pickup':
-      document.getElementById('pickup-info').classList.remove('hidden');
-      document.getElementById('european-info').classList.add('hidden');
-      break;
-  }
-
-  checkoutLink.href = shippingUrl[val];
-}
-
-
-window.addEventListener('pageshow', function() {
-  const radios = document.querySelectorAll('input[type="radio"][name="shipping"]') as NodeListOf<HTMLInputElement>;
-
-  // Event listener for radio button changes
-  radios.forEach(radio => {
-    if (radio.checked)
-      updateUrl(radio.value as ShippingOptions);
-
-    radio.addEventListener('change', function(e) {
-      const target = e.target as HTMLInputElement;
-      let shippingMethod = target.value as ShippingOptions;
-      updateUrl(shippingMethod);
-    });
-  });
-});
-
-async function getStockStatus() {
-  try {
-    const response = await fetch('https://server.wavyindustries.com/api/product/getStock/WIMKY001');
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-    const stock_status = data.stock_status;
-    let shippingStatus = document.getElementById('shipping-status');
-    let shippingLeadtime = document.getElementById('shipping-status-leadtime');
-    shippingStatus.innerHTML = 'Status: ' + stock_status;
-    shippingLeadtime.innerHTML = '';
-
-    // add status class based on status, using switch
-    switch (stock_status) {
-      case 'in stock':
-        shippingStatus.classList.add('in-stock');
-        break;
-      case 'out of stock':
-        shippingStatus.classList.add('out-of-stock');
-        shippingLeadtime.innerHTML = 'Lead time: Next batch 25. November';
-
-        const notifyForm = document.getElementById('stock-notify-form');
-        if (notifyForm) {
-          notifyForm.classList.remove('hidden');
-        }
-        break;
-      case 'low stock':
-        shippingStatus.classList.add('low-stock');
-        break;
-      default:
-        shippingStatus.classList.add('unknown-stock');
-    }
-  } catch (error) {
-    console.error('Error:', error);
-  }
-}
-getStockStatus();
-</script>

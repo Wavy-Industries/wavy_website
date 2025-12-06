@@ -8,6 +8,16 @@ import LinkButton from '~/components/LinkButton.astro';
 
 // images
 import midiConnectImg from '~/assets/midi_connect/screenshot 2.png';
+
+
+// const ratings = [
+//     {
+//         rating: 5,
+//         title: "Thanks for existing",
+//         text: "I would buy you a coffee, share a link",
+//         date: "2025-11-07"
+//     }
+// ]
 ---
 
 <Layout title="Wavy Industries - MIDI Connect">
@@ -20,7 +30,8 @@ import midiConnectImg from '~/assets/midi_connect/screenshot 2.png';
 				<LinkButton href={routes.midiConnectAppStore} type="highlight" >Download on App Store</LinkButton>
 			</div>
             <img src={midiConnectImg.src} alt="MIDI connect view" />
-            <p>We developed this simple macOS app to make it easy for you to connect to and manage our Bluetooth MIDI devices. But we also make it available for use with other MIDI devices as well.</p>
+            <p>We developed this simple macOS app to make it super easy for you to manage your Bluetooth MIDI devices. And it's not just for Wavy devices, it's for any Bluetooth MIDI device.</p>
+
         </section>
 	</main>
     <Footer />
