@@ -185,7 +185,7 @@
 <div class="content">
   <div class="beta-banner">
     <span class="beta-badge">BETA</span>
-    <span>This feature is in beta — please report issues to <a href="mailto:hello@wavyindustries.com">hello@wavyindustries.com</a> or contribute on <a href="https://github.com/Wavy-Industries/wavy_website">GitHub</a>.</span>
+    <span>This feature is in beta — please report issues to <a href="mailto:hello@wavyindustries.com">hello@wavyindustries.com</a>.</span>
   </div>
   <div class="toolbar">
     <div class="left">
