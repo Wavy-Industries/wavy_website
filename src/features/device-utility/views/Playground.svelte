@@ -3,7 +3,18 @@
   import SynthChannelEditor from '~/features/device-utility/components/SynthChannelEditor.svelte';
   import { onMount } from 'svelte';
 
-  const chNames = Array.from({ length: 10 }, (_, i) => (i === 9 ? 'Ch 10 (Drums)' : `Ch ${i+1}`));
+  const chNames = [
+    'CH 1 (SOFT BELL)',
+    'CH 2 (PLUCK)',
+    'CH 3 (SAW LEAD)',
+    'CH 4 (SQUARE ORGAN)',
+    'CH 5 (MELLOW PAD)',
+    'CH 6 (REED ORGAN)',
+    'CH 7 (SYNTH BASS)',
+    'CH 8 (SYNTH PAD)',
+    'CH 9 (WIDE PAD)',
+    'CH 0 (DRUMS)'
+  ];
   function fmtTime(ts: number) { const d = new Date(ts); return d.toLocaleTimeString(); }
   function noteName(n: number): string {
     const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -123,15 +134,18 @@
       <button class="btn-reset-all" title="Reset all synth channels to defaults" onclick={resetAll}>Reset All</button>
     </div>
     <div class="list">
-      {#each Array(10) as _, ch}
+      {#each Array(10) as _, idx}
+        {@const ch = idx < 9 ? idx : 9}
+        {@const isDrums = ch === 9}
         <div class="row">
           <button
-            class={`label btn-chan ${ch === 9 ? 'disabled' : ''}`}
-            title={ch === 9 ? 'Drums channel — no synth editor' : 'Edit synth'}
-            onclick={() => { if (ch !== 9) selected.ch = ch; }}
+            class={`label btn-chan ${isDrums ? 'disabled' : ''}`}
+            title={isDrums ? 'Drums channel' : 'Edit synth'}
+            onclick={() => { if (!isDrums) selected.ch = ch; }}
           >
-            <span class="chan-text">{chNames[ch]}</span>
-            {#if ch !== 9}
+            <span class="indicator {midiControlState.activeChannels[ch] ? 'active' : ''}" aria-label={midiControlState.activeChannels[ch] ? 'Active' : 'Inactive'}></span>
+            <span class="chan-text">{chNames[idx]}</span>
+            {#if !isDrums}
               <span class="gear" aria-hidden="true">⚙</span>
             {/if}
           </button>
@@ -185,17 +199,24 @@
   .toolbar .left h1 { position: relative; display: inline-block; padding-bottom: 6px; margin: 0; }
   .toolbar .left h1::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; border-radius: 0; }
   .toolbar .right { display:flex; align-items:center; gap:8px; }
-  .status { display:flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--du-muted); font-size: 0.9em; }
+  .status { display:flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 0.95em; }
+  .status-item { display: flex; gap: 6px; align-items: baseline; }
+  .status-label { color: var(--du-muted); font-weight: 500; }
+  .status-value { color: var(--du-text); font-weight: 600; font-family: monospace; font-size: 1.05em; }
 
   .pane { display: flex; flex-direction: column; gap: 8px; }
   .pane-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .list { display: flex; flex-direction: column; gap: 6px; }
-  .row { display: grid; grid-template-columns: 180px 1fr; align-items: center; gap: 8px; padding: 10px; border: 1px solid #2f313a; border-radius: var(--du-radius); background: #fcfcfd; box-shadow: none; }
+.row { display: grid; grid-template-columns: 260px 1fr; align-items: center; gap: 8px; padding: 10px; border: 1px solid #2f313a; border-radius: var(--du-radius); background: #fcfcfd; box-shadow: none; }
+@media (max-width: 860px) { .row { grid-template-columns: 1fr; } }
   .label { font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--du-text); border-right: 1px solid black; text-align:left; }
   .btn-chan { background:#fff; padding:6px 8px; cursor:pointer; border:1px solid black; display:flex; align-items:center; gap:6px; width: 100%; justify-content: flex-start; }
   .btn-chan:hover { background:#f9fafb; }
   .btn-chan.disabled { opacity: 0.6; cursor: default; }
   .btn-chan .gear { margin-left: auto; font-size: 18px; color: #000; line-height: 1; }
+.chan-text { white-space: nowrap; }
+  .indicator { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; transition: background 0.15s ease; flex-shrink: 0; }
+  .indicator.active { background: #10b981; box-shadow: 0 0 4px rgba(16, 185, 129, 0.5); }
   .btn-reset { border:1px solid var(--du-border); background:#fff; padding:6px 8px; border-radius:6px; cursor:pointer; }
   .btn-reset:hover { background:#f3f4f6; }
   .btn-reset-all { border: 1px solid #1f2329; background: #2b2f36; color: #fff; padding:6px 12px; border-radius:6px; cursor:pointer; }
@@ -210,5 +231,5 @@
   .hint { color: #888; font-size: 12px; padding: 2px 0; }
   
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index: 1000; padding: 20px; }
-  .modal-panel { max-width: 98vw; max-height: 92vh; overflow: auto; padding: 4px; }
+.modal-panel { max-width: 98vw; max-height: 92vh; overflow: auto; padding: 4px; background:#fff; border-radius:10px; }
 </style>

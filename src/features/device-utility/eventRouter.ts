@@ -11,6 +11,7 @@ import { initialiseDeviceSamples, invalidateDeviceSamplesState } from '~/lib/sta
 import { updaterNotifyConnectionReestablished, updaterNotifyIsSupported } from '~/lib/states/updater.svelte';
 import { midiControlOnCC, midiControlOnNoteOff, midiControlOnNoteOn } from './states/playground.svelte';
 import { windowState, DeviceUtilityView } from './states/window.svelte';
+import { setDeviceOctave, setDeviceBPM } from './states/deviceState.svelte';
 
 export const callbacksSet = () => {
 
@@ -61,9 +62,10 @@ export const callbacksSet = () => {
     /* MIDI event router */
     midiService.onNoteOn = (note: number, velocity: number, channel: number) => {
         try { soundBackend.resume?.(); } catch {}
-        soundBackend.noteOn(note, velocity, channel);
+        const vel = 100; // MONKEY default: fixed velocity
+        soundBackend.noteOn(note, vel, channel);
 
-        midiControlOnNoteOn(note, velocity, channel);
+        midiControlOnNoteOn(note, vel, channel);
 
         if (windowState.hash === DeviceUtilityView.DeviceTester)
             midiTesterOnNoteOn(note, velocity, channel);
@@ -79,7 +81,22 @@ export const callbacksSet = () => {
     }
 
     midiService.onControlChange = (_controller: number, _value: number, _channel: number) => {
+        soundBackend.setCC(_controller, _value, _channel);
+        
         midiControlOnCC(_controller, _value, _channel);
+        
+        // Track device octave and BPM from specific CCs
+        // CC 102: Octave (MONKEY uses CC102 for octave, value 0-6 maps to -3 to +3)
+        if (_controller === 102) {
+            const octave = Math.max(-3, Math.min(3, _value - 3));
+            setDeviceOctave(octave);
+        }
+        // CC 103: BPM (MONKEY uses CC103, value 0-127 scaled to BPM range)
+        // Typical BPM range: 40-240, scaled from 0-127
+        if (_controller === 103) {
+            const bpm = Math.round(40 + (_value / 127) * 200);
+            setDeviceBPM(bpm);
+        }
 
         if (windowState.hash === DeviceUtilityView.DeviceTester)
             midiTesterOnCC(_controller, _value, _channel);
