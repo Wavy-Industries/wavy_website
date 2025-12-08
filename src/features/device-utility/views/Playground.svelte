@@ -1,6 +1,7 @@
 <script lang="ts">
   import { midiControlState, initPlaygroundSynthPersistence, resetAllSynthChannels, resetSynthChannel, playgroundUI } from '~/features/device-utility/states/playground.svelte';
   import SynthChannelEditor from '~/features/device-utility/components/SynthChannelEditor.svelte';
+  import { deviceState } from '~/features/device-utility/states/deviceState.svelte';
   import { onMount } from 'svelte';
 
   const chNames = [
@@ -126,6 +127,12 @@
       <h1>Playground</h1>
       <span class="muted">Go ahead, play on your MONKEY.</span>
     </div>
+    <div class="right">
+      <div class="status-item">
+        <span class="status-label">Octave:</span>
+        <span class="status-value">{deviceState.octave >= 0 ? '+' : ''}{deviceState.octave}</span>
+      </div>
+    </div>
   </div>
 
   <div class="pane">
@@ -198,6 +205,10 @@
   .toolbar .left .muted { color: var(--du-muted); font-size: 0.9em; }
   .toolbar .left h1 { position: relative; display: inline-block; padding-bottom: 6px; margin: 0; }
   .toolbar .left h1::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; border-radius: 0; }
+  .toolbar .right { display: flex; gap: 16px; align-items: center; }
+  .status-item { display: flex; gap: 6px; align-items: baseline; font-size: 0.95em; }
+  .status-label { color: var(--du-muted); }
+  .status-value { font-weight: 600; font-variant-numeric: tabular-nums; }
   .toolbar .right { display:flex; align-items:center; gap:8px; }
   .status { display:flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 0.95em; }
   .status-item { display: flex; gap: 6px; align-items: baseline; }

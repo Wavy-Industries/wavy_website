@@ -11,7 +11,7 @@ import { initialiseDeviceSamples, invalidateDeviceSamplesState } from '~/lib/sta
 import { updaterNotifyConnectionReestablished, updaterNotifyIsSupported } from '~/lib/states/updater.svelte';
 import { midiControlOnCC, midiControlOnNoteOff, midiControlOnNoteOn } from './states/playground.svelte';
 import { windowState, DeviceUtilityView } from './states/window.svelte';
-import { setDeviceOctave, setDeviceBPM } from './states/deviceState.svelte';
+import { deviceState, setDeviceOctave, setDeviceBPM } from './states/deviceState.svelte';
 
 export const callbacksSet = () => {
 
@@ -66,6 +66,15 @@ export const callbacksSet = () => {
         soundBackend.noteOn(note, vel, channel);
 
         midiControlOnNoteOn(note, vel, channel);
+        
+        // Infer octave from note range (assuming middle C = 60)
+        // MONKEY default octave plays notes around C4 (60), so we can detect shifts
+        if (channel !== 9) { // Skip drums
+            const octave = Math.floor((note - 60) / 12);
+            if (octave !== deviceState.octave) {
+                setDeviceOctave(octave);
+            }
+        }
 
         if (windowState.hash === DeviceUtilityView.DeviceTester)
             midiTesterOnNoteOn(note, velocity, channel);
@@ -85,18 +94,8 @@ export const callbacksSet = () => {
         
         midiControlOnCC(_controller, _value, _channel);
         
-        // Track device octave and BPM from specific CCs
-        // CC 102: Octave (MONKEY uses CC102 for octave, value 0-6 maps to -3 to +3)
-        if (_controller === 102) {
-            const octave = Math.max(-3, Math.min(3, _value - 3));
-            setDeviceOctave(octave);
-        }
-        // CC 103: BPM (MONKEY uses CC103, value 0-127 scaled to BPM range)
-        // Typical BPM range: 40-240, scaled from 0-127
-        if (_controller === 103) {
-            const bpm = Math.round(40 + (_value / 127) * 200);
-            setDeviceBPM(bpm);
-        }
+        // Track BPM from CC if device sends it
+        // (Note: may not be sent by device, BPM detection would need sequence timing analysis)
 
         if (windowState.hash === DeviceUtilityView.DeviceTester)
             midiTesterOnCC(_controller, _value, _channel);

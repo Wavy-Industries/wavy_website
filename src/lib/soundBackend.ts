@@ -188,17 +188,19 @@ class WebAudioBackend implements ISoundBackend {
       osc1Type: 'sine', osc2Type: 'sine', osc2Routing: 'fm', osc2Ratio: 2.5, osc2Level: 0.4,
       voices: 1, spreadCents: 0,
       adsr: { attack: 0.001, decay: 0.5, sustain: 0.1, release: 1.8 },
-      masterGain: 0.16,
+      masterGain: 0.08,
       filterType: 'lowpass', filterFrequency: 2800, filterQ: 1.2, filterEnvAmount: 0.25,
+      eqLowGain: -4,
       mod: { cutoff: 0.7, vibrato: 0.25, tremolo: 0, osc2Depth: 0.45, spread: 0 },
     };
-    // CH1 (MIDI 1): PLUCK
+    // CH1 (MIDI 1): PLUCK (with chorus for spatial effect)
     this.channelCfg[1] = {
       ...DEFAULT_CHANNEL_CONFIG,
       osc1Type: 'sawtooth', osc2Routing: 'off', voices: 1, spreadCents: 0,
       adsr: { attack: 0.001, decay: 0.15, sustain: 0.05, release: 0.18 },
-      masterGain: 0.22,
+      masterGain: 0.08,
       filterType: 'lowpass', filterFrequency: 5000, filterQ: 1.5, filterEnvAmount: 0.5,
+      chorusMix: 0.25, chorusDepthMs: 2.5, chorusRateHz: 1.2,
       mod: { cutoff: 0.8, vibrato: 0.0, tremolo: 0.0, osc2Depth: 0, spread: 0 },
     };
     // CH2 (MIDI 2): SAW LEAD (monophonic)
@@ -227,7 +229,7 @@ class WebAudioBackend implements ISoundBackend {
       osc1Type: 'triangle', osc2Routing: 'off', voices: 4, spreadCents: 15,
       adsr: { attack: 0.2, decay: 0.4, sustain: 0.7, release: 1.2 },
       masterGain: 0.16,
-      filterType: 'lowpass', filterFrequency: 1700, filterQ: 0.9, filterEnvAmount: 0.25,
+      filterType: 'lowpass', filterFrequency: 8000, filterQ: 0.9, filterEnvAmount: 0.25,
       mod: { cutoff: 0.7, vibrato: 0.4, tremolo: 0.2, osc2Depth: 0, spread: 0.2 },
     };
     // CH5 (MIDI 5): REED ORGAN
@@ -246,7 +248,7 @@ class WebAudioBackend implements ISoundBackend {
       osc1Type: 'sawtooth', osc2Type: 'square', osc2Routing: 'mix', osc2Ratio: 1.0, osc2Level: 0.3,
       voices: 1, spreadCents: 0,
       adsr: { attack: 0.002, decay: 0.18, sustain: 0.55, release: 0.18 },
-      masterGain: 0.24,
+      masterGain: 0.08,
       filterType: 'lowpass', filterFrequency: 700, filterQ: 4.0, filterEnvAmount: 0.65,
       monophonic: true,
       portamentoSec: 0.045,
@@ -258,7 +260,7 @@ class WebAudioBackend implements ISoundBackend {
       osc1Type: 'triangle', osc2Type: 'square', osc2Routing: 'mix', osc2Ratio: 2.0, osc2Level: 0.25,
       voices: 4, spreadCents: 12,
       adsr: { attack: 0.18, decay: 0.35, sustain: 0.72, release: 1.1 },
-      masterGain: 0.16,
+      masterGain: 0.23,
       filterType: 'bandpass', filterFrequency: 1600, filterQ: 2.2, filterEnvAmount: 0.2,
       monophonic: false,
       mod: { cutoff: 0.6, vibrato: 0.2, tremolo: 0.5, osc2Depth: 0.2, spread: 0.1 },
@@ -269,7 +271,7 @@ class WebAudioBackend implements ISoundBackend {
       osc1Type: 'sawtooth', osc2Type: 'triangle', osc2Routing: 'mix', osc2Level: 0.28, osc2Ratio: 1.0,
       voices: 6, spreadCents: 35,
       adsr: { attack: 0.22, decay: 0.5, sustain: 0.78, release: 1.9 },
-      masterGain: 0.09,
+      masterGain: 0.04,
       filterType: 'lowpass', filterFrequency: 2200, filterQ: 1.0, filterEnvAmount: 0.25,
       mod: { cutoff: 0.8, vibrato: 0.6, tremolo: 0.0, osc2Depth: 0, spread: 0.3 },
     };
