@@ -16,7 +16,7 @@ DEPLOY_REMOTE_DIR - Remote directory to deploy to
 (opt)DEPLOY_HASH_FILE  - Hash file name (defaults to _hashes.json)
 """
 
-import hashlib, json, os, io, pathlib
+import hashlib, json, os, io, pathlib, subprocess
 from ftplib import FTP_TLS, error_perm
 from dotenv import load_dotenv
 
@@ -123,8 +123,30 @@ def upload_file(ftp: FTP_TLS, local_base: pathlib.Path, rel_path: str):
         ftp.storbinary(f"STOR {remote_path}", f)
     print("  PUT      ", rel_path)
 
+def maybe_commit(user_message: str, changed_files: list[str], repo_root: pathlib.Path):
+    """
+    Optionally create a git commit with the provided message and the file list.
+    """
+    if not user_message:
+        return
+
+    full_message = user_message
+    if changed_files:
+        full_message += "\n\nFiles:\n" + "\n".join(f"- {path}" for path in changed_files)
+
+    try:
+        subprocess.run(["git", "add", "-A"], cwd=repo_root, check=False)
+        result = subprocess.run(["git", "commit", "-m", full_message], cwd=repo_root, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"Commit skipped: {result.stderr.strip() or result.stdout.strip()}")
+        else:
+            print(result.stdout.strip())
+    except FileNotFoundError:
+        print("Git not available; skipping commit.")
+
 # ---------- main ----------
 def main():
+    repo_root = pathlib.Path(__file__).resolve().parent.parent
     local_hashes  = build_hash_map(LOCAL_DIR)
     print(f"Local files: {len(local_hashes)} hashed")
 
@@ -138,43 +160,57 @@ def main():
     print(f"Remote baseline: {len(remote_hashes)} entries")
 
     # diff sets
-    to_upload = [p for p, h in local_hashes.items() if remote_hashes.get(p) != h]
-    to_delete = [p for p in remote_hashes.keys() if p not in local_hashes]
+    to_upload  = [p for p, h in local_hashes.items() if remote_hashes.get(p) != h]
+    to_delete  = [p for p in remote_hashes.keys() if p not in local_hashes]
+    new_files       = [p for p in to_upload if p not in remote_hashes]
+    modified_files  = [p for p in to_upload if p in remote_hashes]
 
-    
     print("\nFiles to process:")
-    for path in to_upload:
-        if path in remote_hashes:
-            print(f"  🔄 {path}  (modified)")
-        else:
-            print(f"  ✨ {path}  (new)")
-            
-    for path in to_delete:
-        print(f"  🗑️  {path}  (delete)")
+    if new_files:
+        print("  New:")
+        for path in new_files:
+            print(f"    ✨ {path}")
+    if modified_files:
+        print("  Modified:")
+        for path in modified_files:
+            print(f"    🔄 {path}")
+    if to_delete:
+        print("  Delete:")
+        for path in to_delete:
+            print(f"    🗑️  {path}")
 
-    print(f"Changed/new: {len(to_upload)} → upload")
-    print(f"Obsolete   : {len(to_delete)} → delete")
+    print(f"New       : {len(new_files)} → upload")
+    print(f"Modified  : {len(modified_files)} → upload")
+    print(f"Obsolete  : {len(to_delete)} → delete")
     if not to_upload and not to_delete:
         print("\nNo changes detected. Nothing to deploy.")
         ftp.quit()
         return
 
-    input("Press ENTER to continue:")
+    proceed = input("Press ENTER to continue, or type 'esc' to abort: ").strip().lower()
+    if proceed == "esc":
+        print("Aborted by user.")
+        ftp.quit()
+        return
+
+    commit_msg = input("Optional commit message (ENTER to skip): ").strip()
     
     print("Starting deployment:")
-
-    # delete
-    for rel in to_delete:
-        delete_remote_path(ftp, rel)
 
     # upload
     for rel in to_upload:
         upload_file(ftp, LOCAL_DIR, rel)
 
+    # delete
+    for rel in to_delete:
+        delete_remote_path(ftp, rel)
+
     # update hashes.json
     upload_hash_json(ftp, local_hashes)
     ftp.quit()
     print("✅  Deploy complete")
+
+    maybe_commit(commit_msg, new_files + modified_files + to_delete, repo_root)
 
 if __name__ == "__main__":
     main()
