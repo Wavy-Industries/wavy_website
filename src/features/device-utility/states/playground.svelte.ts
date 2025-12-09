@@ -10,6 +10,8 @@ const MAX_PER_CH = 50;
 // Playground UI only needs channels 0..15 but we display 0..9; keep 16 for safety
 export const midiControlState = $state({
   events: Array.from({ length: 16 }, () => [] as MidiEvt[]),
+  activeChannels: Array.from({ length: 16 }, () => false),
+  activeNoteCounts: Array.from({ length: 16 }, () => new Map<number, number>()), // channel -> note -> count
 });
 
 let _id = 1;
@@ -22,17 +24,30 @@ function pushEvent(evt: MidiEvt) {
   midiControlState.events = [...midiControlState.events];
 }
 
-export const midiControlOnNoteOn = (note: number, velocity: number, channel: number) =>
+export const midiControlOnNoteOn = (note: number, velocity: number, channel: number) => {
   pushEvent({ kind: 'noteon', note, velocity, channel, ts: Date.now() });
-export const midiControlOnNoteOff = (note: number, velocity: number, channel: number) =>
+  const ch = Math.max(0, Math.min(15, channel | 0));
+  const noteMap = midiControlState.activeNoteCounts[ch];
+  noteMap.set(note, (noteMap.get(note) || 0) + 1);
+  midiControlState.activeChannels[ch] = noteMap.size > 0;
+};
+
+export const midiControlOnNoteOff = (note: number, velocity: number, channel: number) => {
   pushEvent({ kind: 'noteoff', note, velocity, channel, ts: Date.now() });
+  const ch = Math.max(0, Math.min(15, channel | 0));
+  const noteMap = midiControlState.activeNoteCounts[ch];
+  const count = (noteMap.get(note) || 0) - 1;
+  if (count <= 0) noteMap.delete(note);
+  else noteMap.set(note, count);
+  midiControlState.activeChannels[ch] = noteMap.size > 0;
+};
 export const midiControlOnCC = (controller: number, value: number, channel: number) =>
   pushEvent({ kind: 'cc', controller, value, channel, ts: Date.now() });
 
 // ---------------- Playground synth persistence + UI helpers ----------------
 export const PLAYGROUND_STORAGE_KEY = 'wavy_playground_synth_cfg_v1';
 
-// Baseline defaults captured on first init (non-drum channels 0..8)
+// Baseline defaults captured on first init (synth channels 0-8)
 const baseline: (SynthChannelConfig | null)[] = Array.from({ length: 16 }, () => null);
 
 export const playgroundUI = $state({ refreshKey: 0 });
@@ -49,7 +64,7 @@ export function initPlaygroundSynthPersistence() {
       const raw = localStorage.getItem(PLAYGROUND_STORAGE_KEY);
       const saved = raw ? JSON.parse(raw) : {};
       for (let ch = 0; ch < 10; ch++) {
-        if (ch === 9) continue;
+        if (ch === 9) continue; // skip drums
         const cfg = saved?.[String(ch)];
         if (cfg && typeof cfg === 'object') {
           soundBackend.setChannelConfig(ch, cfg);
@@ -60,9 +75,9 @@ export function initPlaygroundSynthPersistence() {
 }
 
 export function resetAllSynthChannels() {
-  // Restore baseline for all non-drum channels and clear saved overrides
+  // Restore baseline for synth channels and clear saved overrides
   for (let ch = 0; ch < 10; ch++) {
-    if (ch === 9) continue;
+    if (ch === 9) continue; // skip drums
     const def = baseline[ch];
     if (def) {
       try { soundBackend.setChannelConfig(ch, def); } catch {}
@@ -75,7 +90,7 @@ export function resetAllSynthChannels() {
 }
 
 export function resetSynthChannel(ch: number) {
-  if (ch === 9) return; // no synth editor for drums
+  if (ch === 9) return; // drums not editable
   const def = baseline[ch];
   if (def) {
     try {
