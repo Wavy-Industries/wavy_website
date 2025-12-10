@@ -45,6 +45,15 @@
             pack && totalSnapshot ? (sampleParser_packSize(pack) / totalSnapshot) * 100 : null;
           const outOfSync =
             pack && page ? compareSamplePack(pack, page) : null;
+            // Log.debug(`Out of sync: ${outOfSync}`);
+            // Log.debug(`Pack: ${JSON.stringify(pack)}`);
+            // Log.debug(`Page: ${JSON.stringify(page)}`);
+            if (outOfSync?.areIdentical === false) {
+              console.log('Out of sync');
+            console.log(outOfSync);
+              console.log(`Pack: ${JSON.stringify(pack)}`);
+              console.log(`Page: ${JSON.stringify(page)}`);
+            }
           return { data: pack, percentageUsage, outOfSync };
         })();
       });

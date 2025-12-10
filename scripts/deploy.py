@@ -130,7 +130,7 @@ def maybe_commit(user_message: str, changed_files: list[str], repo_root: pathlib
     if not user_message:
         return
 
-    full_message = user_message
+    full_message = "DEPLOY: " + user_message
     if changed_files:
         full_message += "\n\nFiles:\n" + "\n".join(f"- {path}" for path in changed_files)
 

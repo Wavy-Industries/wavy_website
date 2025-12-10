@@ -153,7 +153,10 @@ export const compareSamplePack = (a: SamplePack, b: SamplePack | null): SamplePa
 
     const packsIdentical: boolean[] = a.loops.map((loop, idx) => {
         const otherLoop = b.loops[idx];
-        if (loop === null || otherLoop === null) return null;
+        if (loop === null) {
+            if (otherLoop === null) return true;
+            return null;
+        }
         if (JSON.stringify(canonicalize(loop)) === JSON.stringify(canonicalize(otherLoop))) return true;
         return false;
     });
