@@ -34,6 +34,11 @@
       const ids = selectedPacks.ids;
       const total = deviceSamplesState.storageTotal;
       const pages = deviceSamplesState.deviceSamples?.pages ?? [];
+      if (!Array.isArray(ids)) {
+        selectedPacks.display = Array(10).fill(null);
+        selectedPacks.asyncData = Array(10).fill(null);
+        return;
+      }
       selectedPacks.display = ids.map((id) => id ? packDisplayName(id) : {});
       selectedPacks.asyncData = ids.map((id, idx) => {
         if (!id) return null;
@@ -151,21 +156,21 @@
     }
 
     const moveUp = (idx) => {
-      if (!selectedPacks) return;
+      if (!Array.isArray(selectedPacks?.ids)) return;
       const id = selectedPacks.ids[idx];
       selectedPacks.ids[idx] = selectedPacks.ids[idx - 1];
       selectedPacks.ids[idx - 1] = id;
     }
     
     const moveDown = (idx) => {
-      if (!selectedPacks) return;
+      if (!Array.isArray(selectedPacks?.ids)) return;
       const id = selectedPacks.ids[idx];
       selectedPacks.ids[idx] = selectedPacks.ids[idx + 1];
       selectedPacks.ids[idx + 1] = id;
     }
 
     const addToSelected = (id) => {
-      if (!selectedPacks.ids) return;
+      if (!Array.isArray(selectedPacks?.ids)) return;
       const nullIndex = selectedPacks.ids.findIndex(id => id === null);
       if (nullIndex === -1) {
         log.warning("No empty slots found in selected packs");
@@ -247,8 +252,8 @@
         {#if selectedPacks.ids?.[i]}
           <div class="row">
             <span class="index">{i < 9 ? i + 1 : 0}</span>
-            <PackTypeBadge type={selectedPacks.display[i]?.type} />
-            <span class="name"><NameBoxes value={selectedPacks.display[i]?.name || ''} />
+            <PackTypeBadge type={selectedPacks.display?.[i]?.type} />
+            <span class="name"><NameBoxes value={selectedPacks.display?.[i]?.name || ''} />
               {#if selectedPacks.asyncData?.[i]}
                 {#await selectedPacks.asyncData?.[i]}
                   <span class=""></span>
@@ -278,7 +283,7 @@
               <button class="btn" title="Move up"    onclick={() => moveUp(i)}>Move up</button>
               <button class="btn" title="Move down"  onclick={() => moveDown(i)}>Move down</button>
               <button class="btn" title="Remove"     onclick={() => selectedPacks.ids[i] = null}>Remove</button>
-              {#if selectedPacks.display[i]?.type === 'Local'}
+              {#if selectedPacks.display?.[i]?.type === 'Local'}
                 <button class="btn" title="Edit local pack" onclick={() => openPackEditorForId(selectedPacks.ids[i])}>Edit</button>
               {:else}
                 <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorForId(selectedPacks.ids[i])}>Mutate</button>
