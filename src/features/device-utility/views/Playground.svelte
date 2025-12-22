@@ -2,20 +2,152 @@
   import { midiControlState, initPlaygroundSynthPersistence, resetAllSynthChannels, resetSynthChannel, playgroundUI } from '~/features/device-utility/states/playground.svelte';
   import SynthChannelEditor from '~/features/device-utility/components/SynthChannelEditor.svelte';
   import { deviceState } from '~/features/device-utility/states/deviceState.svelte';
+  import { soundBackend, type EffectInstance, type EffectType, type TrackId } from '~/lib/soundBackend';
   import { onMount } from 'svelte';
 
-  const chNames = [
-    'CH 1 (SOFT BELL)',
-    'CH 2 (PLUCK)',
-    'CH 3 (SAW LEAD)',
-    'CH 4 (SQUARE ORGAN)',
-    'CH 5 (MELLOW PAD)',
-    'CH 6 (REED ORGAN)',
-    'CH 7 (SYNTH BASS)',
-    'CH 8 (SYNTH PAD)',
-    'CH 9 (WIDE PAD)',
-    'CH 0 (DRUMS)'
+  type TrackDefinition = {
+    id: string;
+    label: string;
+    channel: number | null;
+    isDrums?: boolean;
+    isMaster?: boolean;
+    canOpenSettings?: boolean;
+  };
+
+  const trackDefinitions: TrackDefinition[] = [
+    { id: '0', label: 'CH 1 (SOFT BELL)', channel: 0, canOpenSettings: true },
+    { id: '1', label: 'CH 2 (PLUCK)', channel: 1, canOpenSettings: true },
+    { id: '2', label: 'CH 3 (SAW LEAD)', channel: 2, canOpenSettings: true },
+    { id: '3', label: 'CH 4 (SQUARE ORGAN)', channel: 3, canOpenSettings: true },
+    { id: '4', label: 'CH 5 (MELLOW PAD)', channel: 4, canOpenSettings: true },
+    { id: '5', label: 'CH 6 (REED ORGAN)', channel: 5, canOpenSettings: true },
+    { id: '6', label: 'CH 7 (SYNTH BASS)', channel: 6, canOpenSettings: true },
+    { id: '7', label: 'CH 8 (SYNTH PAD)', channel: 7, canOpenSettings: true },
+    { id: '8', label: 'CH 9 (WIDE PAD)', channel: 8, canOpenSettings: true },
+    { id: '9', label: 'CH 0 (DRUMS)', channel: 9, isDrums: true, canOpenSettings: false },
+    { id: 'master', label: 'MASTER', channel: null, isMaster: true, canOpenSettings: false },
   ];
+
+  type EffectControl = { key: string; label: string; min: number; max: number; step: number };
+  type EffectDefinition = {
+    label: string;
+    shortLabel: string;
+    color: string;
+    defaults: Record<string, number>;
+    controls: EffectControl[];
+  };
+
+  const effectDefinitions: Record<EffectType, EffectDefinition> = {
+    reverb: {
+      label: 'Reverb',
+      shortLabel: 'R',
+      color: '#d0393a',
+      defaults: { mix: 0.3, time: 1.6, decay: 3.0, preDelay: 0.02 },
+      controls: [
+        { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01 },
+        { key: 'time', label: 'Time', min: 0.2, max: 4, step: 0.05 },
+        { key: 'preDelay', label: 'Pre-delay', min: 0, max: 0.2, step: 0.01 },
+      ],
+    },
+    delay: {
+      label: 'Delay',
+      shortLabel: 'D',
+      color: '#3a6ed0',
+      defaults: { mix: 0.25, time: 0.35, feedback: 0.4 },
+      controls: [
+        { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01 },
+        { key: 'time', label: 'Time', min: 0.05, max: 0.8, step: 0.01 },
+        { key: 'feedback', label: 'Feedback', min: 0, max: 0.9, step: 0.01 },
+      ],
+    },
+    chorus: {
+      label: 'Chorus',
+      shortLabel: 'C',
+      color: '#2d9d6a',
+      defaults: { mix: 0.2, depth: 0.4, rate: 1.4 },
+      controls: [
+        { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01 },
+        { key: 'depth', label: 'Depth', min: 0, max: 1, step: 0.01 },
+        { key: 'rate', label: 'Rate', min: 0.1, max: 5, step: 0.1 },
+      ],
+    },
+  };
+
+  let effectInstanceCounter = 0;
+  function createEffectInstance(type: EffectType): EffectInstance {
+    const definition = effectDefinitions[type];
+    effectInstanceCounter += 1;
+    return {
+      id: `${type}-${effectInstanceCounter}`,
+      type,
+      settings: { ...definition.defaults } as EffectInstance['settings'],
+    };
+  }
+
+  const initialEffectsByTrack = Object.fromEntries(
+    trackDefinitions.map((track) => [track.id, []]),
+  ) as Record<string, EffectInstance[]>;
+  const effectsByTrack = $state<Record<string, EffectInstance[]>>(initialEffectsByTrack);
+
+  let effectMenuTrackKey = $state<string | null>(null);
+  const effectPanelState = $state<{ trackKey: string | null; effectId: string | null }>({
+    trackKey: null,
+    effectId: null,
+  });
+
+  const trackDefinitionById = new Map(trackDefinitions.map((track) => [track.id, track]));
+  function resolveTrackId(trackKey: string): TrackId | null {
+    const definition = trackDefinitionById.get(trackKey);
+    if (!definition) return null;
+    if (definition.isMaster) return 'master';
+    if (typeof definition.channel === 'number') return definition.channel;
+    return null;
+  }
+
+  function syncTrackEffects(trackKey: string) {
+    const trackId = resolveTrackId(trackKey);
+    if (trackId === null) return;
+    const effects = effectsByTrack[trackKey] ?? [];
+    soundBackend.setTrackEffects(trackId, effects);
+  }
+
+  function toggleEffectMenu(trackKey: string) {
+    effectMenuTrackKey = effectMenuTrackKey === trackKey ? null : trackKey;
+  }
+
+  function addEffectToTrack(trackKey: string, type: EffectType) {
+    const next = [...(effectsByTrack[trackKey] ?? []), createEffectInstance(type)];
+    effectsByTrack[trackKey] = next;
+    syncTrackEffects(trackKey);
+    effectMenuTrackKey = null;
+  }
+
+  function removeEffectFromTrack(trackKey: string, effectId: string) {
+    effectsByTrack[trackKey] = (effectsByTrack[trackKey] ?? []).filter((effect) => effect.id !== effectId);
+    syncTrackEffects(trackKey);
+    if (effectPanelState.trackKey === trackKey && effectPanelState.effectId === effectId) {
+      effectPanelState.trackKey = null;
+      effectPanelState.effectId = null;
+    }
+  }
+
+  function toggleEffectPanel(trackKey: string, effectId: string) {
+    if (effectPanelState.trackKey === trackKey && effectPanelState.effectId === effectId) {
+      effectPanelState.trackKey = null;
+      effectPanelState.effectId = null;
+      return;
+    }
+    effectPanelState.trackKey = trackKey;
+    effectPanelState.effectId = effectId;
+  }
+
+  function updateEffectSetting(trackKey: string, effectId: string, key: string, value: number) {
+    effectsByTrack[trackKey] = (effectsByTrack[trackKey] ?? []).map((effect) => {
+      if (effect.id !== effectId) return effect;
+      return { ...effect, settings: { ...effect.settings, [key]: value } };
+    });
+    syncTrackEffects(trackKey);
+  }
   function fmtTime(ts: number) { const d = new Date(ts); return d.toLocaleTimeString(); }
   function noteName(n: number): string {
     const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -102,6 +234,11 @@
 
   onMount(() => {
     initPlaygroundSynthPersistence();
+    for (const track of trackDefinitions) {
+      const trackId = resolveTrackId(track.id);
+      if (trackId === null) continue;
+      effectsByTrack[track.id] = soundBackend.getTrackEffects(trackId);
+    }
   });
 
   // When the dialog opens, move focus to it so ESC works immediately
@@ -141,36 +278,113 @@
       <button class="btn-reset-all" title="Reset all synth channels to defaults" onclick={resetAll}>Reset All</button>
     </div>
     <div class="list">
-      {#each Array(10) as _, idx}
-        {@const ch = idx < 9 ? idx : 9}
-        {@const isDrums = ch === 9}
+      {#each trackDefinitions as track}
+        {@const trackKey = track.id}
+        {@const channel = track.channel}
+        {@const isMaster = track.isMaster ?? false}
+        {@const isDrums = track.isDrums ?? false}
+        {@const canOpenSettings = track.canOpenSettings ?? false}
+        {@const isActive = isMaster ? true : (channel !== null ? midiControlState.activeChannels[channel] : false)}
         <div class="row">
-          <button
-            class={`label btn-chan ${isDrums ? 'disabled' : ''}`}
-            title={isDrums ? 'Drums channel' : 'Edit synth'}
-            onclick={() => { if (!isDrums) selected.ch = ch; }}
-          >
-            <span class="indicator {midiControlState.activeChannels[ch] ? 'active' : ''}" aria-label={midiControlState.activeChannels[ch] ? 'Active' : 'Inactive'}></span>
-            <span class="chan-text">{chNames[idx]}</span>
-            {#if !isDrums}
-              <span class="gear" aria-hidden="true">⚙</span>
-            {/if}
-          </button>
-          <div class="events">
-            <canvas use:modCanvas={ch} class="mod-canvas-overlay"></canvas>
-            <div class="strip">
-              {#each midiControlState.events[ch] as ev (ev.id)}
-                {#if eventIsNote(ev)}
-                  <div class="evt {ev.kind}"
-                       style={`--a:${Math.max(0, Math.min(1, (ev.velocity ?? 0) / 127))}; --dur:${3000}ms;`}
-                       title={fmtTime(ev.ts)}
-                       onanimationend={() => removeEvent(ch, ev.id)}>{fmtEvent(ev)}</div>
+          <div class="track-cell">
+            <div class="track-controls">
+              <button
+                class={`label btn-chan ${canOpenSettings ? '' : 'disabled'}`}
+                title={isMaster ? 'Master track' : (isDrums ? 'Drums channel' : 'Edit synth')}
+                onclick={() => { if (canOpenSettings && channel !== null) selected.ch = channel; }}
+              >
+                <span class="indicator {isActive ? 'active' : ''}" aria-label={isActive ? 'Active' : 'Inactive'}></span>
+                <span class="chan-text">{track.label}</span>
+                <span class={`gear ${canOpenSettings ? '' : 'muted'}`} aria-hidden="true">⚙</span>
+              </button>
+              <div class="fx-controls">
+                <button class="btn-fx-add" title="Add effect" aria-label="Add effect" onclick={() => toggleEffectMenu(trackKey)}>+</button>
+                {#if effectMenuTrackKey === trackKey}
+                  <select
+                    class="fx-select"
+                    aria-label="Select effect"
+                    onchange={(e) => {
+                      const selectedEffectType = (e.currentTarget as HTMLSelectElement).value as EffectType;
+                      if (selectedEffectType) addEffectToTrack(trackKey, selectedEffectType);
+                    }}
+                    onblur={() => { effectMenuTrackKey = null; }}
+                  >
+                    <option value="" selected disabled>Add effect</option>
+                    {#each Object.entries(effectDefinitions) as [key, definition]}
+                      <option value={key}>{definition.label}</option>
+                    {/each}
+                  </select>
                 {/if}
-              {/each}
-              {#if midiControlState.events[ch].filter(eventIsNote).length === 0}
-                <div class="hint">No events</div>
-              {/if}
+                <div class="fx-rack">
+                  {#each effectsByTrack[trackKey] ?? [] as effect (effect.id)}
+                    {@const definition = effectDefinitions[effect.type]}
+                    <button
+                      class="fx-chip"
+                      style={`--fx-color: ${definition.color};`}
+                      title={definition.label}
+                      onclick={() => toggleEffectPanel(trackKey, effect.id)}
+                    >
+                      {definition.shortLabel}
+                    </button>
+                  {/each}
+                </div>
+              </div>
             </div>
+            {#if effectPanelState.trackKey === trackKey}
+              {@const activeEffect = (effectsByTrack[trackKey] ?? []).find((effect) => effect.id === effectPanelState.effectId)}
+              {#if activeEffect}
+                {@const activeDefinition = effectDefinitions[activeEffect.type]}
+                <div class="fx-panel">
+                  <div class="fx-panel-header">
+                    <span>{activeDefinition.label} settings</span>
+                    <button
+                      class="fx-panel-close"
+                      aria-label="Close settings"
+                      onclick={() => { effectPanelState.trackKey = null; effectPanelState.effectId = null; }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div class="fx-controls-grid">
+                    {#each activeDefinition.controls as control}
+                      <label class="fx-control">
+                        <span>{control.label}</span>
+                        <input
+                          type="range"
+                          min={control.min}
+                          max={control.max}
+                          step={control.step}
+                          value={activeEffect.settings[control.key]}
+                          oninput={(e) => updateEffectSetting(trackKey, activeEffect.id, control.key, parseFloat(e.currentTarget.value))}
+                        />
+                        <span class="fx-value">{activeEffect.settings[control.key].toFixed(2)}</span>
+                      </label>
+                    {/each}
+                  </div>
+                  <button class="fx-remove" onclick={() => removeEffectFromTrack(trackKey, activeEffect.id)}>Delete effect</button>
+                </div>
+              {/if}
+            {/if}
+          </div>
+          <div class={`events ${isMaster ? 'master' : ''}`}>
+            {#if isMaster}
+              <div class="master-strip">Master output</div>
+            {:else if channel !== null}
+              <canvas use:modCanvas={channel} class="mod-canvas-overlay"></canvas>
+              <div class="strip">
+                {#each midiControlState.events[channel] as ev (ev.id)}
+                  {#if eventIsNote(ev)}
+                    <div class="evt {ev.kind}"
+                         style={`--a:${Math.max(0, Math.min(1, (ev.velocity ?? 0) / 127))}; --dur:${3000}ms;`}
+                         title={fmtTime(ev.ts)}
+                         onanimationend={() => removeEvent(channel, ev.id)}>{fmtEvent(ev)}</div>
+                  {/if}
+                {/each}
+                {#if midiControlState.events[channel].filter(eventIsNote).length === 0}
+                  <div class="hint">No events</div>
+                {/if}
+              </div>
+            {/if}
           </div>
         </div>
       {/each}
@@ -218,13 +432,16 @@
   .pane { display: flex; flex-direction: column; gap: 8px; }
   .pane-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .list { display: flex; flex-direction: column; gap: 6px; }
-.row { display: grid; grid-template-columns: 260px 1fr; align-items: center; gap: 8px; padding: 10px; border: 1px solid #2f313a; border-radius: var(--du-radius); background: #fcfcfd; box-shadow: none; }
-@media (max-width: 860px) { .row { grid-template-columns: 1fr; } }
-  .label { font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--du-text); border-right: 1px solid black; text-align:left; }
-  .btn-chan { background:#fff; padding:6px 8px; cursor:pointer; border:1px solid black; display:flex; align-items:center; gap:6px; width: 100%; justify-content: flex-start; }
+  .row { display: grid; grid-template-columns: 360px 1fr; align-items: start; gap: 8px; padding: 10px; border: 1px solid #2f313a; border-radius: var(--du-radius); background: #fcfcfd; box-shadow: none; }
+  @media (max-width: 860px) { .row { grid-template-columns: 1fr; } }
+  .track-cell { display: flex; flex-direction: column; gap: 8px; }
+  .track-controls { display: flex; align-items: center; gap: 8px; }
+  .label { font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--du-text); text-align:left; }
+  .btn-chan { background:#fff; padding:6px 8px; cursor:pointer; border:1px solid black; display:flex; align-items:center; gap:6px; width: 100%; justify-content: flex-start; flex: 1; }
   .btn-chan:hover { background:#f9fafb; }
   .btn-chan.disabled { opacity: 0.6; cursor: default; }
   .btn-chan .gear { margin-left: auto; font-size: 18px; color: #000; line-height: 1; }
+  .btn-chan .gear.muted { opacity: 0.5; }
 .chan-text { white-space: nowrap; }
   .indicator { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; transition: background 0.15s ease; flex-shrink: 0; }
   .indicator.active { background: #10b981; box-shadow: 0 0 4px rgba(16, 185, 129, 0.5); }
@@ -235,11 +452,33 @@
 
   .field { display: inline-flex; align-items: center; gap: 6px; }
   .events { flex: 1; overflow: hidden; position: relative; height: 28px; }
+  .events.master { height: auto; }
   .mod-canvas-overlay { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: transparent; pointer-events: none; z-index: 0; }
   .strip { position: absolute; inset: 0; z-index: 1; }
   .evt { position: absolute; left: 0; top: 6px; animation: flow-right var(--dur, 3000ms) linear forwards; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; padding: 0 3px; border: none; background: #fff; color: rgba(17, 24, 39, var(--a, 1)); white-space: nowrap; border-radius: 2px; }
   @keyframes flow-right { from { left: 0; } to { left: calc(100% + 100px); } }
   .hint { color: #888; font-size: 12px; padding: 2px 0; }
+
+  .master-strip { font-size: 12px; color: #666; border: 1px dashed #c7cad1; border-radius: 4px; padding: 6px 8px; width: 100%; }
+
+  .fx-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .btn-fx-add { width: 24px; height: 24px; border-radius: 4px; border: 1px solid #1f2329; background: #fff; font-weight: 700; line-height: 1; cursor: pointer; }
+  .btn-fx-add:hover { background: #f4f4f7; }
+  .fx-select { border: 1px solid #1f2329; border-radius: 4px; padding: 2px 6px; font-size: 12px; background: #fff; }
+  .fx-rack { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .fx-chip { width: 24px; height: 24px; border-radius: 4px; border: 1px solid #1f2329; background: var(--fx-color, #111); color: #fff; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .fx-chip:hover { filter: brightness(0.95); }
+
+  .fx-panel { border: 1px solid #1f2329; border-radius: 6px; background: #fff; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .fx-panel-header { display: flex; align-items: center; justify-content: space-between; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
+  .fx-panel-close { border: 1px solid #1f2329; background: #fff; width: 22px; height: 22px; border-radius: 4px; line-height: 1; cursor: pointer; }
+  .fx-panel-close:hover { background: #f4f4f7; }
+  .fx-controls-grid { display: grid; gap: 6px; }
+  .fx-control { display: grid; grid-template-columns: 1fr 140px 44px; align-items: center; gap: 8px; font-size: 12px; color: #2b2f36; }
+  .fx-control input[type="range"] { width: 100%; }
+  .fx-value { font-variant-numeric: tabular-nums; font-size: 11px; text-align: right; color: #555; }
+  .fx-remove { align-self: flex-start; border: 1px solid #1f2329; background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+  .fx-remove:hover { background: #f4f4f7; }
   
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index: 1000; padding: 20px; }
 .modal-panel { max-width: 98vw; max-height: 92vh; overflow: auto; padding: 4px; background:#fff; border-radius:10px; }
