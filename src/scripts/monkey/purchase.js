@@ -10,6 +10,7 @@ import {
   computeNetAndTax,
   formatTaxAmount,
 } from '~/lib/utils/shopify-util.js';
+import { trackEvent } from '~/lib/utils/metaPixel';
 
 var scriptURL = 'https://sdks.shopifycdn.com/buy-button/latest/buy-button-storefront.min.js';
 var productId = PRODUCT_ID;
@@ -401,6 +402,23 @@ function handleBuy() {
     if (quantity < 1) quantity = 1;
     if (quantity > MAX_QUANTITY) quantity = MAX_QUANTITY;
   }
+
+  var eventParams = {
+    content_ids: [productId],
+    content_name: 'MONKEY',
+    content_type: 'product',
+    num_items: quantity,
+  };
+
+  if (currencyCode) {
+    eventParams.currency = currencyCode;
+  }
+
+  if (typeof unitNetAmount === 'number' && !isNaN(unitNetAmount) && unitNetAmount > 0) {
+    eventParams.value = unitNetAmount * quantity;
+  }
+
+  trackEvent('InitiateCheckout', eventParams);
 
   showLoadingView();
   setButtonState(true);

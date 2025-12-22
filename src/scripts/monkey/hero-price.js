@@ -8,6 +8,7 @@ import {
   resolveTaxSettings,
   computeNetAndTax,
 } from '~/lib/utils/shopify-util.js';
+import { trackEvent } from '~/lib/utils/metaPixel';
 
 const productId = PRODUCT_ID;
 const token = TOKEN;
@@ -143,3 +144,14 @@ export async function loadHeroPrice(priceEl) {
 
 const priceEl = document.getElementById('monkey-price');
 loadHeroPrice(priceEl);
+
+const buyButton = document.getElementById('monkey-buy-button');
+if (buyButton) {
+  buyButton.addEventListener('click', function () {
+    trackEvent('AddToCart', {
+      content_ids: [productId],
+      content_name: 'MONKEY',
+      content_type: 'product',
+    });
+  });
+}
