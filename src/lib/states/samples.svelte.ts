@@ -121,22 +121,70 @@ export const uplaodDeviceDefaultSamples = async () => {
 }
 
 export const initialiseDeviceSamples = async () => {
-  log.debug('Initialising device samples...');
-  const support = await checkDeviceSampleSupport();
-  if (!support.supported) { log.debug('Device does not support samples, aborting initialisation.'); return; }
-  if (support.isSet !== true) {
-    log.debug('Uploading default samples to device...');
-    const didUpload = await uplaodDeviceDefaultSamples();
-    if (!didUpload) { log.error('Failed to upload default samples during initialisation.'); deviceSampleTransferState.upload = { type: 'error', message: 'Failed to upload default samples during initialisation' }; return; }
-    log.debug('Re-checking device samples after upload...');
-    const supportAfter = await checkDeviceSampleSupport();
-    if (!supportAfter.supported || !supportAfter.isSet) { log.error('Device samples still not set after uploading defaults.'); deviceSampleTransferState.supportCheck = { type: 'error', message: 'Device samples still not set after uploading defaults' }; return; }
-  } else {
-    log.debug('Device samples already set, no need to upload defaults.');
-  }
-  log.debug("Now, let's download the samples from the device...");
-  await downloadDeviceSamples();
-}
+    log.debug('Initialising device samples...');
+
+    // 1. HARD RESET: Ensure the manager isn't stuck from a previous failed attempt
+    if (sampleManager) {
+        sampleManager.resetState();
+    }
+
+    // 2. WINDOWS STABILITY DELAY: 
+    // Wait 1 second after connection before sending the first GATT command.
+    // This allows the Windows BLE stack to finish service discovery.
+    await new Promise(r => setTimeout(r, 1000));
+
+    try {
+        const support = await checkDeviceSampleSupport();
+        
+        if (!support.supported) {
+            log.debug('Device does not support samples, aborting initialisation.');
+            return;
+        }
+
+        if (support.isSet !== true) {
+            log.debug('Uploading default samples to device...');
+            
+            // Give the radio a 500ms breather before the heavy upload
+            await new Promise(r => setTimeout(r, 500));
+            
+            const didUpload = await uplaodDeviceDefaultSamples();
+            
+            if (!didUpload) {
+                log.error('Failed to upload default samples during initialisation.');
+                deviceSampleTransferState.upload = { 
+                    type: 'error', 
+                    message: 'Failed to upload default samples during initialisation' 
+                };
+                return;
+            }
+
+            // WINDOWS CRITICAL: Wait 1 second after a large upload before re-checking support.
+            // Windows needs time to flush its internal buffers.
+            log.debug('Waiting for buffer flush before re-check...');
+            await new Promise(r => setTimeout(r, 1000));
+
+            const supportAfter = await checkDeviceSampleSupport();
+            if (!supportAfter.supported || !supportAfter.isSet) {
+                log.error('Device samples still not set after uplaoding defaults.');
+                deviceSampleTransferState.supportCheck = { 
+                    type: 'error', 
+                    message: 'Device samples still not set after uplaoding defaults' 
+                };
+                return;
+            }
+        } else {
+            log.debug('Device samples already set, no need to upload defaults.');
+        }
+
+        log.debug("Now, let's download the samples from the device...");
+        // Final breather before the bulk download
+        await new Promise(r => setTimeout(r, 500));
+        await downloadDeviceSamples();
+
+    } catch (err) {
+        log.error("Initialization sequence failed:", err);
+    }
+};
 
 export const waitForUploadToFinish = async () => {
   while (deviceSampleTransferState.supportCheck.type === 'transferring' || deviceSampleTransferState.download.type === 'transferring' || deviceSampleTransferState.upload.type === 'transferring') {
