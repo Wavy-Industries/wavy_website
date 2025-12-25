@@ -146,197 +146,89 @@ export class SampleManager {
     }
 
     // Start the image upload process
-    async uploadSamples(image: DeviceSamples, uploadProgressUpdate?: (percent: Number) => void): Promise<boolean> {
-        log.debug('Starting sample upload process');
-        if (this.state !== _STATE.IDLE) {
-            log.error('Cant start upload when not in idle state');
-            return Promise.reject('Cant start upload when not in idle state');
-        }
+async uploadSamples(image: DeviceSamples, uploadProgressUpdate?: (percent: number) => void): Promise<boolean> {
+        log.debug('Starting sample uplaod process');
+        if (this.state !== _STATE.IDLE) return Promise.reject('Manager not idle');
 
-        this.state = _STATE.UPLOADING; // start upload state
-
-        const maxPayloadSize = this.smpBluetoothCharacteristic.maxPayloadSize; // Max payload size from MCUManager
+        this.state = _STATE.UPLOADING;
+        const maxPayloadSize = this.smpBluetoothCharacteristic.maxPayloadSize;
         const samplesBlob = samplesParser_encode(image);
-        console.log("samplesBlob:")
-        console.log(samplesBlob)
-
         const totalLength = samplesBlob.byteLength;
         let offset = 0;
         
-        while (this.state === _STATE.UPLOADING && offset < totalLength) {
-            log.debug(`Current offset: ${offset}, Total length: ${totalLength}`);
+        try {
+            while (this.state === _STATE.UPLOADING && offset < totalLength) {
+                let payload: UploadRequest = { off: offset, data: new Uint8Array([]), len: totalLength };
+                let payloadEncoded = this._payloadUploadEncode(payload);
 
-            // Prepare the initial payload
-            let payload: UploadRequest = {
-                off: offset,
-                data: new Uint8Array([]),
-                len: totalLength,
-            };
-            let payloadEncoded = this._payloadUploadEncode(payload);
-            log.debug(`Initial payload size (without data): ${payloadEncoded.byteLength} bytes`);
+                // Windows Fix: Increased padding to 32 bytes to ensure headers never exceed MTU
+                const maxDataSize = maxPayloadSize - payloadEncoded.byteLength - 32;
 
-            // Calculate the maximum data size that fits within the MTU
-            const maxDataSize = maxPayloadSize - payloadEncoded.byteLength - 20;
-            log.debug(`Max data size for this chunk: ${maxDataSize} bytes`);
+                if (maxDataSize <= 0) throw new Error('MTU too small');
 
-            if (maxDataSize <= 0) {
-                log.error('MTU too small to send data');
-                this.state = _STATE.IDLE;
-                this._notifyUploadFinished();
-                return false;
-            }
+                const dataEnd = Math.min(offset + maxDataSize, totalLength);
+                payload.data = new Uint8Array(samplesBlob.slice(offset, dataEnd));
+                payloadEncoded = this._payloadUploadEncode(payload);
 
-            // Get the data chunk to send
-            const dataEnd = Math.min(offset + maxDataSize, totalLength);
-            const dataChunk = new Uint8Array(samplesBlob.slice(offset, dataEnd));
-            log.debug(`Data chunk length: ${dataChunk.byteLength} bytes (from offset ${offset} to ${dataEnd})`);
-
-            // Re-encode the payload with the data included
-            payload.data = dataChunk;
-            payloadEncoded = this._payloadUploadEncode(payload);
-            log.debug(`Payload size after adding data: ${payloadEncoded.byteLength} bytes`);
-
-            if (payloadEncoded.byteLength > maxPayloadSize) {
-                log.warning(`Payload too large: ${payloadEncoded.byteLength} > ${maxPayloadSize}`);
-                this.state = _STATE.IDLE;
-                this._notifyUploadFinished();
-                return false;
-            }
-
-            try {
-                log.debug('Sending payload to smpBluetoothCharacteristic');
                 const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.WRITE, this.GROUP_ID, _MGMT_ID.UPLOAD, payloadEncoded) as UploadResponse | ResponseError;
-                log.debug('Received response from smpBluetoothCharacteristic');
 
-                // Check for errors in response
                 if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) {
-                    log.error(`Error response received, rc: ${(response as ResponseError).rc}`);
-                    this.state = _STATE.IDLE;
-                    this._notifyUploadFinished();
-                    return false;
+                    throw new Error(`Upload error rc: ${(response as ResponseError).rc}`);
                 }
 
-                const responseSuccess = response as UploadResponse;
-                log.debug(`Response success, new offset: ${responseSuccess.off}`);
+                offset = (response as UploadResponse).off;
+                uploadProgressUpdate?.(Math.floor((offset / totalLength) * 100));
 
-                // Update the offset
-                offset = responseSuccess.off;
-
-                // Call progress callback if defined
-                const progress = Math.floor((offset / totalLength) * 100);
-                log.debug(`Upload progress: ${progress}%`);
-                uploadProgressUpdate?.(progress);
-
-                // Check if upload is complete
-                if (offset >= totalLength) {
-                    log.debug('Upload complete');
-                    this.state = _STATE.IDLE;
-                    this._notifyUploadFinished();
-                    break;
-                }
-
-            } catch (error) {
-                log.error(`Error during upload: ${error}`);
-                this.state = _STATE.IDLE;
-                this._notifyUploadFinished();
-                return false;
+                // Windows Fix: 15ms delay to allow the Bluetooth stack to flush the chunk
+                await new Promise(r => setTimeout(r, 15));
             }
+            return true;
+        } catch (error) {
+            log.error(`uplaod failed: ${error}`);
+            return false;
+        } finally {
+            this.state = _STATE.IDLE;
+            this._notifyUploadFinished();
         }
-
-        log.debug('Successfully uploaded samples');
-        return true;
     }
 
-    async downloadSamples(uploadProgressUpdate?: (percent: Number) => void): Promise<DeviceSamples | null> {
-        log.debug('Starting sample download process');
-        if (this.state !== _STATE.IDLE) {
-            log.error(`Cant start download when not in idle state, state: ${this.state}`);
-            // return error
-            return Promise.reject('Cant start download when not in idle state');
-        }
-
-        this.state = _STATE.DOWNLOADING
+     async downloadSamples(uploadProgressUpdate?: (percent: number) => void): Promise<DeviceSamples | null> {
+        if (this.state !== _STATE.IDLE) return Promise.reject('Manager not idle');
+        this.state = _STATE.DOWNLOADING;
 
         let data_raw = new Uint8Array([]);
         let offset = 0;
         let total_length: number = 0;
 
-        // get first chunk with length
-        let payload: DownloadRequest = {off: offset};
-        let payloadEncoded = this._payloadDownloadEncode(payload);
-
         try {
-            const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.UPLOAD, payloadEncoded) as DownloadResponse | ResponseError;
-            if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) {
-                log.error(`Error response received, rc: ${(response as ResponseError).rc}`);
-                this.state = _STATE.IDLE;
-                return null;
-            }
-
-            const responseSuccess = response as DownloadResponse;
-            log.debug(`Received first chunk, offset: ${responseSuccess.off}, data length: ${responseSuccess.data.byteLength}`);
-            if (responseSuccess.len === undefined) {
-                log.error('Length not received in first chunk');
-                this.state = _STATE.IDLE;
-                return null;
-            }
-            if (responseSuccess.off !== offset) {
-                log.error('Invalid offset received in first chunk');
-                this.state = _STATE.IDLE;
-                return null;
-            }
-            data_raw = responseSuccess.data;
-            offset = responseSuccess.off + responseSuccess.data.byteLength;
-            total_length = responseSuccess.len as number;
-
-            // Call progress callback if defined
-            uploadProgressUpdate?.(Math.floor((offset / total_length) * 100));
-        } catch (error) {
-            log.error(`Error during download: ${error}`);
-            this.state = _STATE.IDLE;
-            return null;
-        }
-
-        while (offset < total_length) {
-            log.debug(`Current offset: ${offset}, Total length: ${total_length}`);
-
-            // Prepare the payload
-            payload = {off: offset};
-            payloadEncoded = this._payloadDownloadEncode(payload);
-
-            try {
+            while (this.state === _STATE.DOWNLOADING) {
+                let payloadEncoded = this._payloadDownloadEncode({ off: offset });
                 const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.UPLOAD, payloadEncoded) as DownloadResponse | ResponseError;
-                if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) {
-                    log.error(`Error response received, rc: ${(response as ResponseError).rc}`);
-                    this.state = _STATE.IDLE;
-                    return null;
+                
+                if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) throw new Error('Download RC error');
+
+                const success = response as DownloadResponse;
+                if (offset === 0) {
+                    if (success.len === undefined) throw new Error('No length');
+                    total_length = success.len;
                 }
 
-                const responseSuccess = response as DownloadResponse;
-                log.debug(`Received chunk, offset: ${responseSuccess.off}, data length: ${responseSuccess.data.byteLength}`);
-                data_raw = new Uint8Array([...data_raw, ...responseSuccess.data]);
-                offset = responseSuccess.off + responseSuccess.data.byteLength;
-
-                // Call progress callback if defined
+                data_raw = new Uint8Array([...data_raw, ...success.data]);
+                offset = success.off + success.data.byteLength;
                 uploadProgressUpdate?.(Math.floor((offset / total_length) * 100));
 
-                // Check if download is complete
-                if (offset >= total_length) {
-                    log.debug('Download complete');
-                    this.state = _STATE.IDLE;
-                    break;
-                }
+                if (offset >= total_length) break;
 
-            } catch (error) {
-                log.error(`Error during download: ${error}`);
-                this.state = _STATE.IDLE;
-                return null;
+                // Windows Fix: 10ms delay between reads to prevent stack congestion
+                await new Promise(r => setTimeout(r, 10));
             }
+            return samplesParser_decode(data_raw);
+        } catch (error) {
+            log.error(`Download failed: ${error}`);
+            return null;
+        } finally {
+            this.state = _STATE.IDLE;
         }
-
-        log.debug('Successfully downloaded samples');
-
-        return Promise.resolve(samplesParser_decode(data_raw));
     }
 
     private _payloadUploadEncode(payload: UploadRequest): Uint8Array {
