@@ -136,7 +136,12 @@ def maybe_commit(user_message: str, changed_files: list[str], repo_root: pathlib
 
     try:
         subprocess.run(["git", "add", "-A"], cwd=repo_root, check=False)
-        result = subprocess.run(["git", "commit", "-m", full_message], cwd=repo_root, capture_output=True, text=True)
+        result = subprocess.run(
+            ["git", "commit", "--allow-empty", "-m", full_message],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
         if result.returncode != 0:
             print(f"Commit skipped: {result.stderr.strip() or result.stdout.strip()}")
         else:
