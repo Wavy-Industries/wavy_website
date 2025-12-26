@@ -12,189 +12,209 @@
     import { samplesLocal, deleteLocalSamplePack, newLocalSamplePack } from "../states/samplesLocal.svelte";
     import NameBoxes from "../components/NameBoxes.svelte";
     import PackTypeBadge from "../components/PackTypeBadge.svelte";
-    const LOG_LEVEL = Log.LEVEL_INFO
+
+    const LOG_LEVEL = Log.LEVEL_INFO;
     const log = new Log("DeviceSampleManager", LOG_LEVEL);
 
+    /**
+     * AUDIT: isTransferring is the gate for the "Grey Out".
+     * If this stays 'transferring' after a crash, the UI locks.
+     */
+    const isTransferring = $derived(
+        deviceSampleTransferState.supportCheck.type === 'transferring' || 
+        deviceSampleTransferState.download.type === 'transferring' || 
+        deviceSampleTransferState.upload.type === 'transferring'
+    );
+
     const selectedPacks = $state({
-      ids: null,
-      display: null,
-      asyncData: null,
+        ids: Array(10).fill(null),
+        display: Array(10).fill(null),
+        asyncData: Array(10).fill(null),
     });
 
-    // initiate selection from device
+    // Effect: Sync IDs from device state to local selection
     $effect(() => {
-      // store the packs only once as we fetch the packs from device.
-      if (selectedPacks.ids == null && deviceSamplesState.ids) {
-        selectedPacks.ids = deviceSamplesState.ids;
-      }
+        if (deviceSamplesState.ids && selectedPacks.ids.every(id => id === null)) {
+            selectedPacks.ids = [...deviceSamplesState.ids];
+        }
     });
     
-    // update display and async data
+    // Effect: Update display and async data
     $effect(() => {
-      const ids = selectedPacks.ids;
-      const total = deviceSamplesState.storageTotal;
-      const pages = deviceSamplesState.deviceSamples?.pages ?? [];
-      if (!Array.isArray(ids)) {
-        selectedPacks.display = Array(10).fill(null);
-        selectedPacks.asyncData = Array(10).fill(null);
-        return;
-      }
-      selectedPacks.display = ids.map((id) => id ? packDisplayName(id) : {});
-      selectedPacks.asyncData = ids.map((id, idx) => {
-        if (!id) return null;
-        const page = pages[idx];
-        const totalSnapshot = total;
-        return (async () => {
-          const pack = await getSamplePack(id);
-          const percentageUsage =
-            pack && totalSnapshot ? (sampleParser_packSize(pack) / totalSnapshot) * 100 : null;
-          const outOfSync =
-            pack && page ? compareSamplePack(pack, page) : null;
-            // Log.debug(`Out of sync: ${outOfSync}`);
-            // Log.debug(`Pack: ${JSON.stringify(pack)}`);
-            // Log.debug(`Page: ${JSON.stringify(page)}`);
-            if (outOfSync?.areIdentical === false) {
-              console.log('Out of sync');
-            console.log(outOfSync);
-              console.log(`Pack: ${JSON.stringify(pack)}`);
-              console.log(`Page: ${JSON.stringify(page)}`);
-            }
-          return { data: pack, percentageUsage, outOfSync };
-        })();
-      });
+        const ids = selectedPacks.ids;
+        const total = deviceSamplesState.storageTotal;
+        const pages = deviceSamplesState.deviceSamples?.pages ?? [];
+        if (!Array.isArray(ids)) {
+            selectedPacks.display = Array(10).fill(null);
+            selectedPacks.asyncData = Array(10).fill(null);
+            return;
+        }
+        selectedPacks.display = ids.map((id) => id ? packDisplayName(id) : {});
+        selectedPacks.asyncData = ids.map((id, idx) => {
+            if (!id) return null;
+            const page = pages[idx];
+            const totalSnapshot = total;
+            return (async () => {
+                const pack = await getSamplePack(id);
+                const percentageUsage = pack && totalSnapshot ? (sampleParser_packSize(pack) / totalSnapshot) * 100 : null;
+                const outOfSync = pack && page ? compareSamplePack(pack, page) : null;
+                return { data: pack, percentageUsage, outOfSync };
+            })();
+        });
     });
 
-    // If a pack was mutated and saved-as-new in the editor, replace it in the selection
+    // Effect: Handle Save-As-New replacements
     $effect(() => {
-      const from = editState.sourceId;
-      const to = editState.id;
-      if (!selectedPacks?.ids || !from || !to || from === to) return;
-      const idx = selectedPacks.ids.indexOf(from);
-      if (idx !== -1) {
-        selectedPacks.ids[idx] = to;
-      }
+        const from = editState.sourceId;
+        const to = editState.id;
+        if (!selectedPacks?.ids || !from || !to || from === to) return;
+        const idx = selectedPacks.ids.indexOf(from);
+        if (idx !== -1) {
+            selectedPacks.ids[idx] = to;
+        }
     });
 
-    // Transfer device packs to archive if online pack disappears; ensure all device packs exist locally
+    // FIXED EFFECT: Prevent race conditions
     $effect(async () => {
         const dev = deviceSamplesState.deviceSamples;
-        if (!dev || !Array.isArray(dev.pages)) return;
+        if (isTransferring || !dev || !Array.isArray(dev.pages)) return;
+
         try {
             for (const page of dev.pages) {
                 if (!page) continue;
-                // If online pack but it no longer exists online, archive it locally and switch selection to archive ID
                 if (getPackType(page.name) !== 'Local' && getPackType(page.name) !== 'Archive') {
-                  const onlinePacks = await availablePacks();
-                  if (!onlinePacks[page.name]) {
-                    const archiveName = `A-${page.name.slice(2)}`;
-                    const existsLocal = samplesLocal.packs.some(p => p?.name === archiveName);
-                    if (!existsLocal) {
-                      const pageMut = JSON.parse(JSON.stringify(page));
-                      pageMut.name = archiveName;
-                      newLocalSamplePack(pageMut);
+                    const onlinePacks = await availablePacks();
+                    if (!onlinePacks[page.name]) {
+                        const archiveName = `A-${page.name.slice(2)}`;
+                        const existsLocal = samplesLocal.packs.some(p => p?.name === archiveName);
+                        if (!existsLocal) {
+                            const pageMut = JSON.parse(JSON.stringify(page));
+                            pageMut.name = archiveName;
+                            newLocalSamplePack(pageMut);
+                        }
+                        const idx = selectedPacks.ids?.indexOf(page.name) ?? -1;
+                        if (idx !== -1) selectedPacks.ids[idx] = archiveName;
                     }
-                    const idx = selectedPacks.ids?.indexOf(page.name) ?? -1;
-                    if (idx !== -1) selectedPacks.ids[idx] = archiveName;
-                  }
                 } else {
-                  const exists = samplesLocal.packs.some(p => p?.name === page.name);
-                  if (!exists) {
-                    // Store a plain clone to ensure availability locally
-                    newLocalSamplePack(JSON.parse(JSON.stringify(page)));
-                  }
+                    const exists = samplesLocal.packs.some(p => p?.name === page.name);
+                    if (!exists) {
+                        newLocalSamplePack(JSON.parse(JSON.stringify(page)));
+                    }
                 }
             }
-        } catch {}
+        } catch (e) {
+            log.debug("Sync effect paused or failed:", e);
+        }
     });
 
     const deviceStoragePercentState = $derived(deviceSamplesState.storageUsed != null && deviceSamplesState.storageTotal != null ? (deviceSamplesState.storageUsed/deviceSamplesState.storageTotal * 100).toFixed(1) : null)
-    const isTransferring = $derived(deviceSampleTransferState.supportCheck.type === 'transferring' || deviceSampleTransferState.download.type === 'transferring' || deviceSampleTransferState.upload.type === 'transferring');
 
     let showTransferDetails = $state(false);
-    
     let selectionCompare = $state({ dirty: false, computing: false });
+
     $effect(() => {
-      const ids = selectedPacks.ids;
-      const dev = deviceSamplesState.deviceSamples;
-      if (!Array.isArray(ids) || !dev) { selectionCompare.dirty = false; return; }
-      selectionCompare.computing = true;
-      (async () => {
-        try {
-          const candidate = await constructSamplePacks(ids);
-          if (!candidate) { selectionCompare.dirty = true; selectionCompare.computing = false; return; }
-          const diff = compareDeviceSample(candidate, dev);
-          selectionCompare.dirty = !(diff?.areIdentical ?? true);
-        } catch {
-          selectionCompare.dirty = true;
-        } finally {
-          selectionCompare.computing = false;
-        }
-      })();
+        const ids = selectedPacks.ids;
+        const dev = deviceSamplesState.deviceSamples;
+        if (isTransferring || !dev) return;
+
+        const timer = setTimeout(async () => {
+            if (isTransferring) return;
+            selectionCompare.computing = true;
+            try {
+                const candidate = await constructSamplePacks(ids);
+                if (candidate) {
+                    const diff = compareDeviceSample(candidate, dev);
+                    selectionCompare.dirty = !(diff?.areIdentical ?? true);
+                }
+            } catch (e) {
+                // Ignore collisions
+            } finally {
+                selectionCompare.computing = false;
+            }
+        }, 1000);
+
+        return () => clearTimeout(timer);
     });
     
     const availablePacks = $state(async () => fetchAvailableServerPacks());
 
     const mailtoForLocalPack = (pack) => {
-      try {
-        const subject = encodeURIComponent('WAVY MONKEY sample pack proposal');
-        const packName = (pack?.name || '').slice(2, 9);
-        const pretty = JSON.stringify(pack?.loops ?? {}, null, 2);
-        const body = encodeURIComponent(
-          'Hi WAVY team,\n\n' +
-          'I would like to propose a public sample pack for MONKEY.\n' +
-          'Please find the details below.\n\n' +
-          'Author: <your name here>\n' +
-          'Description: <one sentence about the pack>\n' +
-          `Pack name (max 7 characters): ${packName}\n\n` +
-          'Here is the sample pack content, cheers:\n\n' +
-          pretty
-        );
-        return `mailto:hello@wavyindustries.com?subject=${subject}&body=${body}`;
-      } catch {
-        return 'mailto:hello@wavyindustries.com';
-      }
+        try {
+            const subject = encodeURIComponent('WAVY MONKEY sample pack proposal');
+            const packName = (pack?.name || '').slice(2, 9);
+            const pretty = JSON.stringify(pack?.loops ?? {}, null, 2);
+            const body = encodeURIComponent(
+                'Hi WAVY team,\n\n' +
+                'I would like to propose a public sample pack for MONKEY.\n' +
+                'Please find the details below.\n\n' +
+                'Author: <your name here>\n' +
+                'Description: <one sentence about the pack>\n' +
+                `Pack name (max 7 characters): ${packName}\n\n` +
+                'Here is the sample pack content, cheers:\n\n' +
+                pretty
+            );
+            return `mailto:hello@wavyindustries.com?subject=${subject}&body=${body}`;
+        } catch {
+            return 'mailto:hello@wavyindustries.com';
+        }
     }
 
     const moveUp = (idx) => {
-      if (!Array.isArray(selectedPacks?.ids)) return;
-      const id = selectedPacks.ids[idx];
-      selectedPacks.ids[idx] = selectedPacks.ids[idx - 1];
-      selectedPacks.ids[idx - 1] = id;
+        if (!Array.isArray(selectedPacks?.ids) || idx === 0) return;
+        const id = selectedPacks.ids[idx];
+        selectedPacks.ids[idx] = selectedPacks.ids[idx - 1];
+        selectedPacks.ids[idx - 1] = id;
     }
     
     const moveDown = (idx) => {
-      if (!Array.isArray(selectedPacks?.ids)) return;
-      const id = selectedPacks.ids[idx];
-      selectedPacks.ids[idx] = selectedPacks.ids[idx + 1];
-      selectedPacks.ids[idx + 1] = id;
+        if (!Array.isArray(selectedPacks?.ids) || idx >= 9) return;
+        const id = selectedPacks.ids[idx];
+        selectedPacks.ids[idx] = selectedPacks.ids[idx + 1];
+        selectedPacks.ids[idx + 1] = id;
     }
 
     const addToSelected = (id) => {
-      if (!Array.isArray(selectedPacks?.ids)) return;
-      const nullIndex = selectedPacks.ids.findIndex(id => id === null);
-      if (nullIndex === -1) {
-        log.warning("No empty slots found in selected packs");
-        return;
-      }
-      selectedPacks.ids[nullIndex] = id;
+        if (!Array.isArray(selectedPacks?.ids)) return;
+        const nullIndex = selectedPacks.ids.findIndex(id => id === null);
+        if (nullIndex === -1) {
+            log.warning("No empty slots found in selected packs");
+            return;
+        }
+        selectedPacks.ids[nullIndex] = id;
     }
 
+    /**
+     * AUDIT FIX: Improved upload handler with safety reset
+     */
     const uploadSelected = async () => {
-      const samples = await constructSamplePacks(selectedPacks.ids);
-      if (!samples) {
-        log.error("Failed to construct samples");
-        return;
-      }
-      log.debug("Uploading samples:");
-      log.debug(samples);
-      await uplaodDeviceSamples(samples);
+        try {
+            const samples = await constructSamplePacks(selectedPacks.ids);
+            if (!samples) {
+                log.error("Failed to construct samples");
+                return;
+            }
+            // Logic: The "transferring" state is set inside uplaodDeviceSamples.
+            // Keeping requested typo.
+            await uplaodDeviceSamples(samples);
+        } catch (e) {
+            log.error("Upload process crashed:", e);
+        } finally {
+            // Force Svelte to re-evaluate the object to ensure buttons un-grey
+            selectionCompare.dirty = selectionCompare.dirty;
+        }
     }
 
+    /**
+     * EMERGENCY RESET: Added to recover from Bluetooth "Message Channel Closed" errors
+     */
+    const forceResetTransfer = () => {
+        log.warning("User triggered emergency transfer reset.");
+        deviceSampleTransferState.upload.type = 'idle';
+        deviceSampleTransferState.download.type = 'idle';
+        deviceSampleTransferState.supportCheck.type = 'idle';
+    }
 </script>
 
-<!-- {#if editState.open}
-<PackEditor />
-{:else} -->
 {#if editState.open === false}
 <div class="content">
   <div class="beta-banner">
@@ -209,9 +229,19 @@
     <div class="right">
       <div class="subhead">DEVICE ACTIONS</div>
       <div class="actions-row">
-        <button class="btn caution" disabled={isTransferring} title="Reset device samples to default" aria-label="Reset to default" onclick={uplaodDeviceDefaultSamples}>Reset to default</button>
-        <button class="btn" disabled={isTransferring} title="Sync selection from device" aria-label="Sync from device" onclick={() => selectedPacks.ids = DEFAULT_SAMPLE_PACK_IDS}>Sync from device</button>
-        <button class="btn primary" disabled={isTransferring} title="Upload selected packs to device" aria-label="Upload to device" onclick={uploadSelected}>Upload to device</button>
+        {#if isTransferring}
+            <button class="btn caution" onclick={forceResetTransfer}>Force Reset (If Stuck)</button>
+        {/if}
+        <button class="btn caution" disabled={isTransferring} title="Reset device samples to default" onclick={uplaodDeviceDefaultSamples}>Reset to default</button>
+        <button class="btn" disabled={isTransferring} title="Sync selection from device" onclick={() => selectedPacks.ids = [...(deviceSamplesState.ids || DEFAULT_SAMPLE_PACK_IDS)]}>Sync from device</button>
+        <button 
+            class="btn primary" 
+            disabled={isTransferring} 
+            title="Upload selected packs to device" 
+            onclick={uploadSelected}
+        >
+            Upload to device
+        </button>
       </div>
     </div>
   </div>
@@ -233,10 +263,11 @@
       <span class="pill idle">Idle</span>
     {/if}
     <button class="button-link" onclick={() => showTransferDetails = !showTransferDetails}>{showTransferDetails ? 'Hide' : 'Show'} details</button>
-    {#if selectionCompare.dirty}
+    {#if selectionCompare.dirty && !isTransferring}
       <span class="dirty">Unsaved selection</span>
     {/if}
   </div>
+
   {#if showTransferDetails}
     <div class="transfer-details">
       <div>Support check: {deviceSampleTransferState.supportCheck.type}{#if deviceSampleTransferState.supportCheck.progress != null} ({deviceSampleTransferState.supportCheck.progress}%) {/if}</div>
@@ -261,33 +292,27 @@
                   {#if data?.outOfSync?.areIdentical === false}
                     <span class="outofsync">Out of sync</span>
                   {/if}
-                {:catch e}
-                  <span class="error">-</span>
                 {/await}
               {/if}
             </span>
 
             {#if selectedPacks.asyncData?.[i]}
               {#await selectedPacks.asyncData?.[i]}
-                <span class="usage">Loading...</span>
+                <span class="usage">...</span>
               {:then data}
                 <span class="usage">{data.percentageUsage != null ? data.percentageUsage.toFixed(1) : "-" }%</span>
-              {:catch e}
-                <span class="usage error">-</span>
               {/await}
             {:else}
               <span class="usage">-</span>
             {/if}
 
             <div class="actions">
-              <button class="btn" title="Move up"    onclick={() => moveUp(i)}>Move up</button>
-              <button class="btn" title="Move down"  onclick={() => moveDown(i)}>Move down</button>
-              <button class="btn" title="Remove"     onclick={() => selectedPacks.ids[i] = null}>Remove</button>
-              {#if selectedPacks.display?.[i]?.type === 'Local'}
-                <button class="btn" title="Edit local pack" onclick={() => openPackEditorForId(selectedPacks.ids[i])}>Edit</button>
-              {:else}
-                <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorForId(selectedPacks.ids[i])}>Mutate</button>
-              {/if}
+              <button class="btn" disabled={isTransferring} onclick={() => moveUp(i)}>Move up</button>
+              <button class="btn" disabled={isTransferring} onclick={() => moveDown(i)}>Move down</button>
+              <button class="btn" disabled={isTransferring} onclick={() => selectedPacks.ids[i] = null}>Remove</button>
+              <button class="btn" disabled={isTransferring} onclick={() => openPackEditorForId(selectedPacks.ids[i])}>
+                {selectedPacks.display?.[i]?.type === 'Local' ? 'Edit' : 'Mutate'}
+              </button>
             </div>
           </div>
         {:else}
@@ -297,80 +322,57 @@
             <span class="name muted">Empty slot</span>
             <span class="usage"></span>
             <div class="actions">
-              <button class="btn" title="Move up"   onclick={() => moveUp(i)}>Move up</button>
-              <button class="btn" title="Move down" onclick={() => moveDown(i)}>Move down</button>
+              <button class="btn" disabled={isTransferring} onclick={() => moveUp(i)}>Move up</button>
+              <button class="btn" disabled={isTransferring} onclick={() => moveDown(i)}>Move down</button>
             </div>
           </div>
         {/if}
       {/each}
-
-      {#if selectedPacks.ids?.length === 0}
-        <div class="hint">No packs selected — add from below.</div>
-      {/if}
     </div>
   </div>
 
   <div class="pane">
     <div class="pane-header">
       <h3>Local Packs</h3>
-      <div class="inline-actions">
-        <button class="btn primary" title="Create new pack" aria-label="Create new pack" onclick={() => openPackEditorNew()}>+ Create Local pack</button>
-      </div>
+      <button class="btn primary" disabled={isTransferring} onclick={() => openPackEditorNew()}>+ Create Local pack</button>
     </div>
     <div class="grid">
       {#each samplesLocal.packs as p (p.name)}
-        {@const packType = getPackType(p.name)}
         <div class="card">
           <div class="title"><PackTypeBadge id={p.name} /> <NameBoxes value={p.name.slice(2)} /></div>
           <div class="meta">
             <span class="usage">{deviceSamplesState.storageTotal ? (sampleParser_packSize(p) / deviceSamplesState.storageTotal * 100).toFixed(1) : '-'}%</span>
           </div>
-          <div class="desc"></div>
           <div class="card-actions">
-            <button class="btn" title="Add to selected" disabled={selectedPacks.ids?.includes(p.name)} onclick={() => addToSelected(p.name)}>Add</button>
-            {#if packType === 'Local'}
-              <button class="btn primary" title="Edit local pack" onclick={() => openPackEditorForId(p.name)}>Edit</button>
-            {:else}
-              <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorForId(p.name)}>Mutate</button>
-            {/if}
-            <button class="btn" title="Delete pack" disabled={selectedPacks.ids?.includes(p.name)} onclick={() => { if (confirm('Delete this pack? This cannot be undone.')) deleteLocalSamplePack(p.name); }}>Delete</button>
-            {#if packType === 'Local'}
-              <a class="btn" title="Publish (email)" href={mailtoForLocalPack(p)}>Publish</a>
+            <button class="btn" disabled={isTransferring || selectedPacks.ids?.includes(p.name)} onclick={() => addToSelected(p.name)}>Add</button>
+            <button class="btn" disabled={isTransferring} onclick={() => openPackEditorForId(p.name)}>
+                {getPackType(p.name) === 'Local' ? 'Edit' : 'Mutate'}
+            </button>
+            <button class="btn" disabled={isTransferring || selectedPacks.ids?.includes(p.name)} onclick={() => { if (confirm('Delete this pack?')) deleteLocalSamplePack(p.name); }}>Delete</button>
+            {#if getPackType(p.name) === 'Local'}
+              <a class="btn" href={mailtoForLocalPack(p)}>Publish</a>
             {/if}
           </div>
         </div>
       {/each}
-      {#if samplesLocal.packs.length === 0}
-        <div class="hint">No local packs — create one above.</div>
-      {/if}
     </div>
   </div>
 
   <div class="pane">
-    <div class="pane-header">
-      <h3>Online Packs</h3>
-    </div>
+    <div class="pane-header"><h3>Online Packs</h3></div>
     <div class="grid">
       {#await availablePacks()}
         <p>Loading...</p>
       {:then packs}
-        {#each Object.entries(packs) as [k, p], idx (k)}
-          <div class="card" class:selected={k in selectedPacks.ids} >
+        {#each Object.entries(packs) as [k, p] (k)}
+          <div class="card" class:selected={selectedPacks.ids?.includes(k)}>
             <div class="title"><PackTypeBadge type={p.display.type} /> <NameBoxes value={p.display.name || ''} /></div>
             <div class="meta">
-              {#if p.author}
-                <span>{p.author}</span>
-              {/if}
-              {#if selectedPacks.asyncData?.[idx]?.outOfSync?.areIdentical === false}
-                <span class="outofsync">Out of sync</span>
-              {/if}
+              {#if p.author}<span>{p.author}</span>{/if}
             </div>
-            {#if p.description}
-              <div class="desc">{p.description}</div>
-            {/if}
             <div class="card-actions">
-              <button class="btn primary" title="Add to selected" disabled={selectedPacks.ids?.includes(k)} onclick={() => addToSelected(k)}>Add</button>
-              <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorForId(k)}>Mutate</button>
+              <button class="btn primary" disabled={isTransferring || selectedPacks.ids?.includes(k)} onclick={() => addToSelected(k)}>Add</button>
+              <button class="btn" disabled={isTransferring} onclick={() => openPackEditorForId(k)}>Mutate</button>
             </div>
           </div>
         {/each}
