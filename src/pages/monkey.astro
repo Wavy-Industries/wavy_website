@@ -13,8 +13,9 @@ import monkeyDarkImg from '~/assets/monkey/monkey_dark_crop.png';
 import monkeyRevealVideo from '~/assets/monkey/monkey_front_reveal_LED_compressed.mp4';
 import monkeyRevealPlaceholder from '~/assets/monkey/monkey_reveal_placeholder.png';
 import nyaMonkeyImg from '~/assets/monkey/Nya MONKEY.png';
-import monkeyGrainyImg from '~/assets/monkey/monkey_grainy.png';
 import monkeyTable from '~/assets/monkey/DSCF3535_comp.jpg'
+import monkeyPortabilityImg from '~/assets/monkey/DSCF3602_comp.jpg';
+import monkeyFunctionsImg from '~/assets/monkey/Monkey functions white.png';
 
 import steinbergProfile from '~/assets/monkey/profiles/floyd_steinberg.jpg';
 import haqProfile from '~/assets/monkey/profiles/jakob_haq.jpg';
@@ -47,21 +48,42 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 			</div>
 		</section>
 
-		<div class="hero-image">
+		<div class="hero-image hero-image--full">
 			<!-- <video id="monkey-reveal-video" width="100%" autoplay muted playsinline onended="this.pause()">
 				<source src={monkeyRevealVideo} type="video/mp4">
 			</video> -->
-			<img src={monkeyRevealPlaceholder.src} alt="Monkey reveal placeholder">
+			<img src={monkeyTable.src} alt="Monkey on table">
 		</div>
 
 		<section class="intro">
 			<div class="container">
 				<div class="intro-content">
 					<p>
-						MON<b>KEY</b> gives you the freedom to create music anywhere. At the kitchen table, in the park, or on long adventures. Through the <b>SHIFT</b> key, its full potential unfolds. Including MIDI effects with a range of creative presets, a drum engine, and a loop recorder capable of playing up to ten instruments at once. With its wireless connection, you can link MON<b>KEY</b> to a compact portable setup, your phone, laptop, or other external gear. All of this is made possible in practice by technological advancements which enables several months of battery life on a single coin cell battery!
+						MON<b>KEY</b> gives you the freedom to create music anywhere. At the kitchen table, in the park, or on long adventures. Through the <b>SHIFT</b> key, its full potential unfolds. Including MIDI effects with a range of creative presets, a drum engine, and a loop recorder capable of playing up to ten instruments at once. With its wireless connection, you can link MON<b>KEY</b> to a compact portable setup, your phone, laptop, or other external gear. All of this is made possible in practice by technological advancements which enables several months of battery life on a single coin cell battery and a reliable ultra-low-latency connection.
 					</p>
-					<p>It’s a platform built for creative exploration, playful experimentation, and to give you focus.</p>
+					<p><i>It’s a platform built for creative exploration, playful experimentation, and to give you focus.</i></p>
 				</div>
+		</section>
+
+		<section class="portability">
+			<div class="portability-image">
+				<img src={monkeyPortabilityImg.src} alt="Monkey on the go" />
+			</div>
+			<div class="container">
+				<div class="intro-content portability-content">
+					<p>
+						Portability used to mean what could fit in a backpack. Now it means what fits in your pocket. And without compromising on the quality of features.
+					</p>
+					<p>
+						Each of the 6 MIDI effects packs a variety of presets which makes it easy to explore compositions quickly. The built-in looper gives you the option to compose ideas without interacting with any screen; only the physical device and your own mind.
+					</p>
+					<img src={monkeyFunctionsImg.src} alt="Monkey functions overview" />
+					<p>
+						The device is plug-and-play, fun at any level of musical experience, and with customisation options with a musical playground straight in the browser. You can try it here:
+					</p>
+					<LinkButton class="portability-cta" href={routes.deviceUtility}>Visit device utility</LinkButton>
+				</div>
+			</div>
 		</section>
 
 		<section class="highlights">
@@ -129,7 +151,7 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 								<span class="testimonial-role">Youtuber</span>
 							</div>
 						</div>
-						<p class="testimonial-text">"I can full heartedly recommend this. It's the most fun I have had in a very long time with a new piece of gear." <sup><a href="#footnote-floyd-steinberg">[1]</a></sup></p>
+						<p class="testimonial-text">"I can wholeheartedly recommend this. It's the most fun I have had in a very long time with a new piece of gear." <sup><a href="#footnote-floyd-steinberg">[1]</a></sup></p>
 					</blockquote>
 					<blockquote class="testimonial-card">
 						<div class="testimonial-header">
@@ -156,10 +178,22 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 		</section>
 
 		 <section>
-		<div class="grainy">
-			<img src={monkeyTable.src} alt="Monkey grainy" />
+		<div class="grainy grainy--reveal">
+			<img src={monkeyRevealPlaceholder.src} alt="Monkey reveal placeholder" />
 		</div>
 		 </section>
+
+		<section class="bottom-cta">
+			<div class="container bottom-cta-inner">
+				<LinkButton href={routes.newsletter}>Join newsletter</LinkButton>
+				<LinkButton class="monkey-buy-button" href={routes.monkeyPurchase} type="highlight">
+					<span class="monkey-buy-label">
+						<span>Buy now</span>
+						<span class="monkey-price monkey-price--loading"></span>
+					</span>
+				</LinkButton>
+			</div>
+		</section>
 
 		<section class="footnotes">
 			<p id="footnote-floyd-steinberg">[1] Mentioned on his YouTube channel <i>Floyd Steinberg</i> in video titled <a target="_blank" href="https://youtu.be/V6iA643FbLM?si=EDgtCntUDnTKQBLL&t=657">"The Wavy Industries Monkey is the tiniest MIDI master keyboard"</a> at 10:57, published Apr 28, 2024</p>
@@ -278,6 +312,21 @@ h1 {
 	/* background-color: #101010; */
 }
 
+.hero-image--full {
+	padding: 0;
+	height: clamp(260px, 40vw, 520px);
+	display: flex;
+	align-items: center;
+	overflow: hidden;
+}
+
+.hero-image--full img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: center;
+}
+
 #monkey-reveal-video {
     width: 100%;
     padding: 50px 10%;
@@ -309,29 +358,58 @@ h1 {
 	margin-bottom: 0;
 }
 
+/* Portability Section */
+.portability {
+	width: 100%;
+	padding: 32px 0 56px;
+}
+
+.portability-image {
+	width: 100%;
+	padding: 0;
+}
+
+.portability-image img {
+	display: block;
+	width: 100%;
+	max-width: 1400px;
+	height: clamp(260px, 40vw, 520px);
+	margin: 0 auto;
+	object-fit: cover;
+	object-position: center;
+}
+
+.portability-content {
+	margin: 48px auto;
+}
+
+.portability-content img {
+	margin-top: 28px;
+}
+
 /* Highlights Section */
 .highlights {
 	width: 100%;
-	padding: 48px 0;
+	padding: 36px 0;
 	color: #f0f0f0;
 }
 
 .section-title {
-	font-size: 28px;
+	font-size: 24px;
 	font-weight: 300;
-	margin: 0 0 32px 0;
+	margin: 0 0 24px 0;
 	letter-spacing: -0.5px;
 	color: #fff;
 }
 
 .highlights-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-	gap: 24px;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 16px;
 }
 
 .highlight-item {
-	padding: 20px;
+	padding: 16px;
 	background-color: rgba(255, 255, 255, 0.02);
 	border: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -339,7 +417,7 @@ h1 {
 
 
 .highlight-label {
-	font-size: 12px;
+	font-size: 11px;
 	font-weight: 400;
 	color: #888;
 	text-transform: uppercase;
@@ -348,7 +426,7 @@ h1 {
 }
 
 .highlight-value {
-	font-size: 20px;
+	font-size: 18px;
 	font-weight: 300;
 	color: #fff;
 	margin-bottom: 6px;
@@ -356,7 +434,7 @@ h1 {
 }
 
 .highlight-desc {
-	font-size: 14px;
+	font-size: 13px;
 	color: #aaa;
 	line-height: 1.4;
 }
@@ -455,11 +533,33 @@ h1 {
 	/* background-color: #101010; */
 }
 
+.grainy--reveal {
+	padding: 80px 12%;
+}
+
 .grainy img {
 	max-width: 1600px;
 	margin: 0 auto;
 	display: block;
 	padding: 0 0;
+}
+
+.grainy--reveal img {
+	max-width: none;
+	margin: 0;
+}
+
+/* Bottom CTA */
+.bottom-cta {
+	width: 100%;
+	padding: 40px 0 56px;
+}
+
+.bottom-cta-inner {
+	display: flex;
+	justify-content: center;
+	gap: 12px;
+	flex-wrap: wrap;
 }
 
 /* Footnotes */
@@ -518,9 +618,10 @@ h1 {
 	}
 
 	.intro,
+	.portability,
 	.highlights,
 	.testimonials {
-		padding: 40px 0;
+		padding: 32px 0;
 	}
 
 	.highlights-grid,
@@ -535,6 +636,14 @@ h1 {
 
 	.packaging img {
 		padding: 0 20px;
+	}
+
+	.portability-content {
+		margin: 40px auto;
+	}
+
+	.bottom-cta {
+		padding: 32px 0 48px;
 	}
 
 	.footnotes {

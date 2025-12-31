@@ -142,11 +142,13 @@ export async function loadHeroPrice(priceEl) {
   priceEl.classList.remove('monkey-price--loading');
 }
 
-const priceEl = document.getElementById('monkey-price');
-loadHeroPrice(priceEl);
+const priceEls = document.querySelectorAll('.monkey-price');
+priceEls.forEach(function (priceEl) {
+  loadHeroPrice(priceEl);
+});
 
-const buyButton = document.getElementById('monkey-buy-button');
-if (buyButton) {
+const buyButtons = document.querySelectorAll('.monkey-buy-button');
+buyButtons.forEach(function (buyButton) {
   buyButton.addEventListener('click', function () {
     trackEvent('AddToCart', {
       content_ids: [productId],
@@ -154,4 +156,4 @@ if (buyButton) {
       content_type: 'product',
     });
   });
-}
+});
