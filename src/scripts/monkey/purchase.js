@@ -311,7 +311,7 @@ function updateTotal() {
   }
 
   if (taxLabelEl) {
-    var taxLabel = 'Taxes' + (taxNameForDisplay ? ' (' + taxNameForDisplay + ')' : '');
+    var taxLabel = 'Estimated taxes' + (taxNameForDisplay ? ' (' + taxNameForDisplay + ')' : '');
     var taxPercent = unitTaxAmount !== null && unitNetAmount
       ? Math.round((unitTaxAmount / unitNetAmount) * 100)
       : null;
