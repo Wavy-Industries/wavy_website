@@ -38,7 +38,7 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 						<Tag href={routes.monkeyGettingStarted}>Getting started</Tag>
 						<Tag href={routes.monkeyManual}>Manual</Tag>
 					</TagContainer>
-					<LinkButton id="monkey-buy-button" class="monkey-buy-button" href={routes.monkeyPurchase} type="highlight">
+					<LinkButton id="monkey-buy-button" class="monkey-buy-button" href={routes.monkeyPurchase} type="highlight" data-cta="hero">
 						<span class="monkey-buy-label">
 							<span>Buy now</span>
 							<span id="monkey-price" class="monkey-price monkey-price--loading"></span>
@@ -89,53 +89,44 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 		<section class="highlights">
 			<div class="container">
 				<h2 class="section-title">Highlights</h2>
-				<div class="highlights-grid">
-					<div class="highlight-item">
-						<div class="highlight-label">Battery Life</div>
-						<div class="highlight-value">Several months</div>
-						<div class="highlight-desc">Replaceable CR2032 battery</div>
-					</div>
-					<div class="highlight-item">
-						<div class="highlight-label">Keybed</div>
-						<div class="highlight-value">Two octave</div>
-						<div class="highlight-desc">Low operating force</div>
-					</div>
-					<div class="highlight-item">
-						<div class="highlight-label">MIDI Effects</div>
-						<div class="highlight-value">6 MIDI effects</div>
-						<div class="highlight-desc">Each with 10 unique presets</div>
-					</div>
-					<div class="highlight-item">
-						<div class="highlight-label">Loop Recorder</div>
-						<div class="highlight-value">Record up to 10 instruments</div>
-						<div class="highlight-desc">Simultaneous recording</div>
-					</div>
-					<div class="highlight-item">
-						<div class="highlight-label">Drum Loops</div>
-						<div class="highlight-value">Configurable</div>
-						<div class="highlight-desc">Up to 150 unique drum loops</div>
-					</div>
-					<div class="highlight-item">
-						<div class="highlight-label">Touch Surface</div>
-						<div class="highlight-value">Pressure sensitive</div>
-						<div class="highlight-desc">Real-time modulation</div>
-					</div>
-					<div class="highlight-item">
-						<div class="highlight-label">Bluetooth MIDI</div>
-						<div class="highlight-value">Low latency</div>
-						<div class="highlight-desc">Reliable connectivity</div>
-					</div>
-					<div class="highlight-item">
-						<div class="highlight-label">Form Factor</div>
-						<div class="highlight-value">150mm × 50mm</div>
-						<div class="highlight-desc">Ultra compact</div>
-					</div>
-					<div class="highlight-item">
-						<div class="highlight-label">Compatibility</div>
-						<div class="highlight-value">Universal</div>
-						<div class="highlight-desc">macOS, iOS, Android, Windows, CME WIDI, external gear</div>
-					</div>
-				</div>
+				<ul class="highlights-list">
+					<li class="highlight-item">
+						<span class="highlight-label">Battery Life</span>
+						<span class="highlight-line">Several months on a replaceable CR2032</span>
+					</li>
+					<li class="highlight-item">
+						<span class="highlight-label">Keybed</span>
+						<span class="highlight-line">Two octave, low operating force</span>
+					</li>
+					<li class="highlight-item">
+						<span class="highlight-label">MIDI Effects</span>
+						<span class="highlight-line">6 MIDI effects, 10 presets each</span>
+					</li>
+					<li class="highlight-item">
+						<span class="highlight-label">Loop Recorder</span>
+						<span class="highlight-line">Record up to 10 instruments at once</span>
+					</li>
+					<li class="highlight-item">
+						<span class="highlight-label">Drum Loops</span>
+						<span class="highlight-line">Up to 150 configurable loops</span>
+					</li>
+					<li class="highlight-item">
+						<span class="highlight-label">Touch Surface</span>
+						<span class="highlight-line">Pressure-sensitive real-time modulation</span>
+					</li>
+					<li class="highlight-item">
+						<span class="highlight-label">Bluetooth MIDI</span>
+						<span class="highlight-line">Low-latency, reliable connectivity</span>
+					</li>
+					<li class="highlight-item">
+						<span class="highlight-label">Form Factor</span>
+						<span class="highlight-line">150mm × 50mm ultra compact</span>
+					</li>
+					<li class="highlight-item">
+						<span class="highlight-label">Compatibility</span>
+						<span class="highlight-line">macOS, iOS, Android, Windows, CME WIDI, external gear</span>
+					</li>
+				</ul>
 			</div>
 		</section>
 
@@ -186,7 +177,7 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 		<section class="bottom-cta">
 			<div class="container bottom-cta-inner">
 				<LinkButton href={routes.newsletter}>Join newsletter</LinkButton>
-				<LinkButton class="monkey-buy-button" href={routes.monkeyPurchase} type="highlight">
+				<LinkButton class="monkey-buy-button" href={routes.monkeyPurchase} type="highlight" data-cta="bottom">
 					<span class="monkey-buy-label">
 						<span>Buy now</span>
 						<span class="monkey-price monkey-price--loading"></span>
@@ -402,16 +393,20 @@ h1 {
 	color: #fff;
 }
 
-.highlights-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-	gap: 16px;
+.highlights-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
 }
 
 .highlight-item {
-	padding: 16px;
-	background-color: rgba(255, 255, 255, 0.02);
-	border: 1px solid rgba(255, 255, 255, 0.05);
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 2px 0;
 }
 
 
@@ -422,21 +417,14 @@ h1 {
 	color: #888;
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
-	margin-bottom: 8px;
+	min-width: 150px;
 }
 
-.highlight-value {
-	font-size: 18px;
+.highlight-line {
+	font-size: 14px;
 	font-weight: 300;
-	color: #fff;
-	margin-bottom: 6px;
+	color: #ddd;
 	line-height: 1.3;
-}
-
-.highlight-desc {
-	font-size: 13px;
-	color: #aaa;
-	line-height: 1.4;
 }
 
 /* Testimonials Section */
@@ -624,10 +612,19 @@ h1 {
 		padding: 32px 0;
 	}
 
-	.highlights-grid,
+	.highlights-list,
 	.testimonials-grid {
-		grid-template-columns: 1fr;
-		gap: 20px;
+		gap: 14px;
+	}
+
+	.highlight-item {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 4px;
+	}
+
+	.highlight-label {
+		min-width: 0;
 	}
 
 	.packaging {

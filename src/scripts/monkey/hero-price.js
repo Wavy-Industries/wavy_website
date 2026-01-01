@@ -149,11 +149,13 @@ priceEls.forEach(function (priceEl) {
 
 const buyButtons = document.querySelectorAll('.monkey-buy-button');
 buyButtons.forEach(function (buyButton) {
+  const ctaPosition = buyButton.dataset ? buyButton.dataset.cta : null;
   buyButton.addEventListener('click', function () {
     trackEvent('AddToCart', {
       content_ids: [productId],
       content_name: 'MONKEY',
       content_type: 'product',
+      cta_position: ctaPosition || 'unknown',
     });
   });
 });
