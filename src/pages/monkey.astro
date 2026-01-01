@@ -430,33 +430,42 @@ h1 {
 /* Testimonials Section */
 .testimonials {
 	width: 100%;
-	padding: 48px 0;
+	padding: 36px 0;
 	color: #f0f0f0;
 }
 
 .testimonials-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-	gap: 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
 }
 
 .testimonial-card {
+	display: grid;
+	grid-template-columns: minmax(180px, 220px) 1fr;
+	grid-template-areas: "author text";
+	column-gap: 16px;
 	margin: 0;
-	padding: 24px;
-	background-color: rgba(255, 255, 255, 0.02);
-	border: 1px solid rgba(255, 255, 255, 0.05);
+	padding: 8px 0;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	background-color: transparent;
+}
+
+.testimonial-card:last-child {
+	border-bottom: 0;
 }
 
 .testimonial-header {
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	margin-bottom: 16px;
+	margin-bottom: 0;
+	grid-area: author;
 }
 
 .testimonial-header img {
-	width: 40px;
-	height: 40px;
+	width: 32px;
+	height: 32px;
 	object-fit: cover;
 	flex-shrink: 0;
 }
@@ -468,21 +477,22 @@ h1 {
 }
 
 .testimonial-author strong {
-	font-size: 15px;
+	font-size: 14px;
 	font-weight: 500;
 	color: #fff;
 }
 
 .testimonial-role {
-	font-size: 12px;
+	font-size: 11px;
 	color: #888;
 }
 
 .testimonial-text {
 	margin: 0;
-	font-size: 15px;
+	font-size: 14px;
 	line-height: 1.6;
 	color: #d0d0d0;
+	grid-area: text;
 }
 
 .testimonial-text sup {
@@ -614,7 +624,7 @@ h1 {
 
 	.highlights-list,
 	.testimonials-grid {
-		gap: 14px;
+		gap: 12px;
 	}
 
 	.highlight-item {
@@ -625,6 +635,14 @@ h1 {
 
 	.highlight-label {
 		min-width: 0;
+	}
+
+	.testimonial-card {
+		grid-template-columns: 1fr;
+		grid-template-areas:
+			"author"
+			"text";
+		row-gap: 6px;
 	}
 
 	.packaging {
