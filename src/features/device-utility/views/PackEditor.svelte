@@ -8,12 +8,13 @@
   import MidiPreview from '~/features/device-utility/components/MidiPreview.svelte';
   import { tempoState } from '~/features/device-utility/states/tempo.svelte';
   import { validatePage, getSamplePack } from '~/features/device-utility/utils/samples';
-    import { deviceSamplesState } from '~/lib/states/samples.svelte';
+  import { deviceSamplesState } from '~/lib/states/samples.svelte';
   import NameBoxes from '~/features/device-utility/components/NameBoxes.svelte';
   import PackTypeBadge from "~/features/device-utility/components/PackTypeBadge.svelte";
   import JSONEditor from "~/features/device-utility/components/JSONEditor.svelte";
 
   const slots = $derived(editState.loops);
+  const modeState = $derived(deviceSamplesState.modes[deviceSamplesState.activeMode]);
 
   onMount(() => {
     try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
@@ -52,13 +53,13 @@
     return sampleParser_packSize(page);
   }
   function percentTotal() {
-    const total = deviceSamplesState.storageTotal || 0;
+    const total = modeState.storageTotal || 0;
     if (!total) return '0.0';
     return ((totalBytes() / total) * 100).toFixed(1);
   }
 
   function percentFor(idx) {
-    const total = deviceSamplesState.storageTotal || 0;
+    const total = modeState.storageTotal || 0;
     if (!total) return 0;
     const b = bytesFor(idx);
     return ((b / total) * 100).toFixed(1);
@@ -123,7 +124,7 @@
       if (slots[0]) {
         importDialog.json = JSON.parse(JSON.stringify(slots[0]));
       } else if (editState.id) {
-        const page = await getSamplePack(editState.id);
+        const page = await getSamplePack(editState.id, deviceSamplesState.activeMode);
         importDialog.json = page ?? {};
       } else {
         importDialog.json = {};

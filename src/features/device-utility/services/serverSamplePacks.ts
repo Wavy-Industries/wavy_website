@@ -1,4 +1,5 @@
 import { SamplePack } from "~/lib/parsers/samples_parser";
+import { SampleMode, sampleModeLabel } from "~/lib/types/sampleMode";
 import { getPackType, packDisplayName, SamplePackInfo, normalizePackId } from "../utils/samples";
 
 import { Log } from "~/lib/utils/Log";
@@ -6,7 +7,7 @@ import { Log } from "~/lib/utils/Log";
 const LOG_LEVEL = Log.LEVEL_INFO
 const log = new Log("serverSamplePacks", LOG_LEVEL);
 
-export const fetchServerPack = async (id: string): Promise<SamplePack | null> => {
+export const fetchServerPack = async (id: string, mode: SampleMode = SampleMode.DRM): Promise<SamplePack | null> => {
     id = normalizePackId(id);
     const packType = getPackType(id);
     if (!packType || (packType !== 'Official' && packType !== 'User')) {
@@ -17,7 +18,7 @@ export const fetchServerPack = async (id: string): Promise<SamplePack | null> =>
     const DEVICE_NAME = "MONKEY"; // TODO: fetch from device info
 
     try {
-        const res = await fetch(`/samples/${DEVICE_NAME}/DRM/${encodeURIComponent(id)}.json`);
+        const res = await fetch(`/samples/${DEVICE_NAME}/${sampleModeLabel(mode)}/${encodeURIComponent(id)}.json`);
         if (res.ok) {
             const pack = await res.json() as SamplePack;
             pack.name = id;
@@ -30,9 +31,9 @@ export const fetchServerPack = async (id: string): Promise<SamplePack | null> =>
     return null;
 }
 
-export const fetchAvailableServerPacks = async (): Promise<{[key: string]: SamplePackInfo}> => {
+export const fetchAvailableServerPacks = async (mode: SampleMode = SampleMode.DRM): Promise<{[key: string]: SamplePackInfo}> => {
     log.debug("Fetching available server packs");
-    const res = await fetch(`/samples/MONKEY/DRM/record.json`);
+    const res = await fetch(`/samples/MONKEY/${sampleModeLabel(mode)}/record.json`);
     if (res.ok) {
         const record = await res.json() as {[key: string]: SamplePackInfo};
         // Add display key to each pack info

@@ -1,6 +1,7 @@
 import { getPackType, getSamplePack } from "../utils/samples";
 import type { SamplePack } from "~/lib/parsers/samples_parser";
 import { newLocalSamplePack, updateLocalSamplePack } from "./samplesLocal.svelte";
+import { deviceSamplesState } from "~/lib/states/samples.svelte";
 
 type EditorState = {
   open: boolean;
@@ -35,7 +36,7 @@ function ensurePageScaffold(name7: string): SamplePack {
 
 export async function openPackEditorForId(id: string) {
   const packType = getPackType(id);
-  const existing = await getSamplePack(id);
+  const existing = await getSamplePack(id, deviceSamplesState.activeMode);
 
   const baseName7 = id?.slice(2) || "";
   const localId = makeLocalId(baseName7);
@@ -119,7 +120,7 @@ export function saveEditor(): boolean {
   // ensure the working copy has the correct local name
   const newName = makeLocalId(editState.name7 || id.slice(2));
   page.name = newName;
-  updateLocalSamplePack(deepClone(page), id);
+  updateLocalSamplePack(deepClone(page), id, deviceSamplesState.activeMode);
   editState.unsaved = false;
   return true;
 }
@@ -131,10 +132,9 @@ export function saveEditorAsNew(): boolean {
 
   const newId = makeLocalId(editState.name7 || page.name.slice(2));
   page.name = newId;
-  newLocalSamplePack(deepClone(page));
+  newLocalSamplePack(deepClone(page), deviceSamplesState.activeMode);
   // After saving new, keep editor on this new id
   editState.id = newId;
   editState.unsaved = false;
   return true;
 }
-

@@ -1,5 +1,6 @@
 import { SamplePack } from "~/lib/parsers/samples_parser";
-import {Log} from "~/lib/utils/Log";
+import { Log } from "~/lib/utils/Log";
+import { SampleMode } from "~/lib/types/sampleMode";
 import { packDisplayName } from "../utils/samples";
 
 const LOG_LEVEL = Log.LEVEL_INFO
@@ -7,13 +8,23 @@ const log = new Log("samples-local", LOG_LEVEL);
 
 const STORAGE_SAMPLES_KEY = 'wavy_local_packs';
 
+const storageKeyForMode = (mode: SampleMode) =>
+    mode === SampleMode.PAT ? `${STORAGE_SAMPLES_KEY}_pat` : STORAGE_SAMPLES_KEY;
+
 export const samplesLocal = $state({
-    packs: [] as SamplePack[]
+    mode: SampleMode.DRM,
+    packs: [] as SamplePack[],
 });
 
-export const refreshLocalSamples = () => {
+export const setLocalSamplesMode = (mode: SampleMode) => {
+    samplesLocal.mode = mode;
+    refreshLocalSamples(mode);
+}
+
+export const refreshLocalSamples = (mode: SampleMode = samplesLocal.mode) => {
     try {
-        const raw = localStorage.getItem(STORAGE_SAMPLES_KEY);
+        const key = storageKeyForMode(mode);
+        const raw = localStorage.getItem(key);
         if (raw) {
             samplesLocal.packs = JSON.parse(raw) as SamplePack[];
         } else {
@@ -24,15 +35,24 @@ export const refreshLocalSamples = () => {
     }
 }
 
-export const getLocalSamplePack = (packName: string): SamplePack | null => {
+export const getLocalSamplePack = (packName: string, mode: SampleMode = samplesLocal.mode): SamplePack | null => {
     log.debug(`Getting local sample pack for name: ${packName}`);
-    const pack = samplesLocal.packs.find(p => p.name === packName);
+    let packs = samplesLocal.packs;
+    if (mode !== samplesLocal.mode) {
+        try {
+            const raw = localStorage.getItem(storageKeyForMode(mode));
+            packs = raw ? (JSON.parse(raw) as SamplePack[]) : [];
+        } catch {
+            packs = [];
+        }
+    }
+    const pack = packs.find(p => p.name === packName);
     log.debug(`Found local sample pack for name: ${packName}: ${pack ? pack.name : 'null'}`);
     // Return a deep clone to avoid reactive proxies in constructed packs
     return pack ? JSON.parse(JSON.stringify(pack)) as SamplePack : null;
 }
 
-export const newLocalSamplePack = (pack: SamplePack) => {
+export const newLocalSamplePack = (pack: SamplePack, mode: SampleMode = samplesLocal.mode) => {
     try {
         const display = packDisplayName(pack.name);
         if (display?.type !== 'Local' && display?.type !== 'Archive') {
@@ -40,7 +60,7 @@ export const newLocalSamplePack = (pack: SamplePack) => {
             return;
         }
 
-        const raw = localStorage.getItem(STORAGE_SAMPLES_KEY);
+        const raw = localStorage.getItem(storageKeyForMode(mode));
         let packs: SamplePack[] = [];
         if (raw) {
             packs = JSON.parse(raw) as SamplePack[];
@@ -53,15 +73,15 @@ export const newLocalSamplePack = (pack: SamplePack) => {
         // store a plain clone to avoid reactive proxies
         const clean: SamplePack = JSON.parse(JSON.stringify(pack));
         packs.push(clean);
-        localStorage.setItem(STORAGE_SAMPLES_KEY, JSON.stringify(packs));
+        localStorage.setItem(storageKeyForMode(mode), JSON.stringify(packs));
         // refresh from storage to ensure plain objects
-        refreshLocalSamples();
+        refreshLocalSamples(mode);
     } catch {
         log.error("Failed to save local sample pack");
     }
 }
 
-export const updateLocalSamplePack = (pack: SamplePack, prevName?: string | null) => {
+export const updateLocalSamplePack = (pack: SamplePack, prevName?: string | null, mode: SampleMode = samplesLocal.mode) => {
     try {
         const display = packDisplayName(pack.name);
         if (display?.type !== 'Local' && display?.type !== 'Archive') {
@@ -69,7 +89,7 @@ export const updateLocalSamplePack = (pack: SamplePack, prevName?: string | null
             return;
         }
 
-        const raw = localStorage.getItem(STORAGE_SAMPLES_KEY);
+        const raw = localStorage.getItem(storageKeyForMode(mode));
         let packs: SamplePack[] = [];
         if (raw) {
             packs = JSON.parse(raw) as SamplePack[];
@@ -89,23 +109,23 @@ export const updateLocalSamplePack = (pack: SamplePack, prevName?: string | null
         // store a plain clone to avoid reactive proxies
         const clean: SamplePack = JSON.parse(JSON.stringify(pack));
         packs[idx] = clean;
-        localStorage.setItem(STORAGE_SAMPLES_KEY, JSON.stringify(packs));
+        localStorage.setItem(storageKeyForMode(mode), JSON.stringify(packs));
         // refresh from storage to ensure plain objects
-        refreshLocalSamples();
+        refreshLocalSamples(mode);
     } catch {
         log.error("Failed to update local sample pack");
     }
 }
 
-export const deleteLocalSamplePack = (packName: string) => {
+export const deleteLocalSamplePack = (packName: string, mode: SampleMode = samplesLocal.mode) => {
     try {
-        const raw = localStorage.getItem(STORAGE_SAMPLES_KEY);
+        const raw = localStorage.getItem(storageKeyForMode(mode));
         let packs: SamplePack[] = [];
         if (raw) {
             packs = JSON.parse(raw) as SamplePack[];
         }
         packs = packs.filter(p => p.name !== packName);
-        localStorage.setItem(STORAGE_SAMPLES_KEY, JSON.stringify(packs));
+        localStorage.setItem(storageKeyForMode(mode), JSON.stringify(packs));
         samplesLocal.packs = packs;
     } catch {
         log.error("Failed to delete local sample pack");

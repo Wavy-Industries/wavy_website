@@ -3,6 +3,7 @@ import { Log } from "~/lib/utils/Log";
 import { getLocalSamplePack } from "../states/samplesLocal.svelte";
 import { canonicalize } from "~/lib/utils/canonicalize";
 import { fetchServerPack } from "../services/serverSamplePacks";
+import { SampleMode } from "~/lib/types/sampleMode";
 
 const LOG_LEVEL = Log.LEVEL_INFO
 const log = new Log("samples-util", LOG_LEVEL);
@@ -64,7 +65,7 @@ export const packDisplayName = (id: string): PackDisplay | null => {
     return {name: id.substring(2), type};
 }
 
-export const getSamplePack = async(id: string): Promise<SamplePack | null> => {
+export const getSamplePack = async(id: string, mode: SampleMode = SampleMode.DRM): Promise<SamplePack | null> => {
     id = normalizePackId(id);
     log.debug(`Getting sample pack for ID: ${id}`);
     const packType = getPackType(id);
@@ -76,17 +77,17 @@ export const getSamplePack = async(id: string): Promise<SamplePack | null> => {
     switch (packType) {
         case 'Local':
         case 'Archive':
-            return getLocalSamplePack(id);
+            return getLocalSamplePack(id, mode);
         case 'Official':
         case 'User':
-            return await fetchServerPack(id);
+            return await fetchServerPack(id, mode);
         default:
             log.error(`Invalid pack type for ID ${id}: ${packType}`);
             return null;
     }
 }
 
-export const constructSamplePacks = async (ids: string[]): Promise<DeviceSamples | null> => {
+export const constructSamplePacks = async (ids: string[], mode: SampleMode = SampleMode.DRM): Promise<DeviceSamples | null> => {
     log.debug(`Constructing sample packs from IDs: ${ids.join(", ")}`);
     if (ids.length < 1 || ids.length > 10) {
         log.error(`Number of Ids out of range (1-10): ${ids.length}`);
@@ -113,7 +114,7 @@ export const constructSamplePacks = async (ids: string[]): Promise<DeviceSamples
             continue;
         }
 
-        const pack = await getSamplePack(id_str);
+        const pack = await getSamplePack(id_str, mode);
         if (!pack) {
             log.error(`Failed to get pack for ID ${id_str}, pushing null.`);
             packs.push(null);

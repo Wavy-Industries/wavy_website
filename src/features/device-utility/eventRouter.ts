@@ -6,7 +6,8 @@ import { bluetoothManager, bluetoothStateSetConnected, bluetoothStateSetConnecti
 import { refreshChangelog, refreshDeviceFirmwareVersion } from '~/lib/states/firmware.svelte';
 import { midiTesterOnNoteOn, midiTesterOnNoteOff, midiTesterOnCC } from '~/features/device-utility/states/midiTester.svelte';
 import { soundBackend } from '~/lib/soundBackend';
-import { refreshLocalSamples } from './states/samplesLocal.svelte';
+import { setLocalSamplesMode } from './states/samplesLocal.svelte';
+import { SampleMode } from '~/lib/types/sampleMode';
 import { initialiseDeviceSamples, invalidateDeviceSamplesState } from '~/lib/states/samples.svelte';
 import { updaterNotifyConnectionReestablished, updaterNotifyIsSupported } from '~/lib/states/updater.svelte';
 import { midiControlOnCC, midiControlOnNoteOff, midiControlOnNoteOn } from './states/playground.svelte';
@@ -21,7 +22,7 @@ export const callbacksSet = () => {
         
         refreshDeviceFirmwareVersion();
         refreshChangelog();
-        refreshLocalSamples();
+        setLocalSamplesMode(SampleMode.DRM);
         (async () => {
             await initialiseDeviceSamples();
             updaterNotifyIsSupported();

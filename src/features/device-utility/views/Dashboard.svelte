@@ -10,6 +10,7 @@
     import { onMount } from 'svelte';
     import { fade } from 'svelte/transition';
     import { deviceSamplesState } from '~/lib/states/samples.svelte';
+    import { SampleMode } from '~/lib/types/sampleMode';
     import {  windowStateInit, windowState, DeviceUtilityView } from '~/features/device-utility/states/window.svelte';
 
     onMount(async () => {
@@ -25,13 +26,15 @@
 
     async function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+    const drmState = $derived(deviceSamplesState.modes[SampleMode.DRM]);
+
     async function waitForInitialData(timeoutMs = 1500) {
         const start = Date.now();
         // Ready when firmware known AND (samples unsupported OR basic sample info fetched)
         while (Date.now() - start < timeoutMs) {
             const fwReady = firmwareState?.firmwareVersion != null;
-            const samplesUnsupported = deviceSamplesState.isSupported === false && deviceSamplesState.isset === null && deviceSamplesState.names === null;
-            const samplesReady = deviceSamplesState.isSupported === true && deviceSamplesState.names != null && deviceSamplesState.storageUsed != null && deviceSamplesState.storageTotal != null;
+            const samplesUnsupported = deviceSamplesState.isSupported === false && drmState.isSet === null && drmState.ids === null;
+            const samplesReady = deviceSamplesState.isSupported === true && drmState.ids != null && drmState.storageUsed != null && drmState.storageTotal != null;
             if (fwReady && (samplesUnsupported || samplesReady)) return true;
             await wait(100);
         }
