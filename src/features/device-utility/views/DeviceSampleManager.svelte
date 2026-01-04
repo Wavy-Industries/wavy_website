@@ -295,6 +295,7 @@
 
   <div class="pane">
     <div class="pane-header"><h3>Selected Packs</h3></div>
+    <span>One pack for each page on MON<b>KEY</b>. Use SHIFT+number to switch between the pages on the active effect.</span>
     <div class="selected-list">
       {#each Array(10) as _, i (i + ':' + (activeIds?.[i] ?? 'empty'))}
         {#if activeIds?.[i]}
@@ -437,7 +438,7 @@
 .beta-badge { background:#ffb84d; color:#4a3b00; font-weight: 700; font-size: 0.72rem; padding:2px 6px; border-radius:4px; letter-spacing: .5px; }
 .toolbar { display: flex; gap: 12px; align-items: flex-end; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--du-border); }
 .toolbar .left { display: flex; flex-direction: column; }
-.toolbar .left .muted { color: var(--du-muted); font-size: 0.9em; }
+.muted { color: var(--du-muted); font-size: 0.9em; }
 .toolbar .right { display: flex; gap: 6px; align-items: flex-end; flex-direction: column; }
 .toolbar .right .actions-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .toolbar .right .subhead { position: relative; font-size: 12px; font-weight: 800; letter-spacing: .08em; color: #111827; text-transform: uppercase; padding-bottom: 6px; align-self: flex-end; }
