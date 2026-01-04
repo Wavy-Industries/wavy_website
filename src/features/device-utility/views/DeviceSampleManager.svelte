@@ -235,7 +235,7 @@
   </div>
   <div class="toolbar">
     <div class="left">
-      <h1>Sample Manager</h1>
+      <h1>Pack Editor</h1>
       <span class="muted">Selected packs on top; available below.</span>
     </div>
     <div class="right">
