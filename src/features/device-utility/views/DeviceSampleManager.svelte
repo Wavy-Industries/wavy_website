@@ -295,7 +295,7 @@
 
   <div class="pane">
     <div class="pane-header"><h3>Selected Packs</h3></div>
-    <span>One pack for each page on MON<b>KEY</b>. Use SHIFT+number to switch between the pages on the active effect.</span>
+    <span>One pack for each page on MON<b>KEY</b>. Use SHIFT+number to switch between the pages while <b>{sampleModeLabel(activeMode)}</b> is enabled.</span>
     <div class="selected-list">
       {#each Array(10) as _, i (i + ':' + (activeIds?.[i] ?? 'empty'))}
         {#if activeIds?.[i]}
