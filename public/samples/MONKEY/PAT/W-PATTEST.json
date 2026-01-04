@@ -1,0 +1,47 @@
+{
+  "loops": [
+    {
+      "length_beats": 4,
+      "events": [
+        {
+          "note": 60,
+          "time_ticks_press": 0,
+          "velocity": 100,
+          "time_ticks_release": 12
+        },
+        {
+          "note": 64,
+          "time_ticks_press": 24,
+          "velocity": 96,
+          "time_ticks_release": 36
+        },
+        {
+          "note": 67,
+          "time_ticks_press": 48,
+          "velocity": 96,
+          "time_ticks_release": 60
+        },
+        {
+          "note": 72,
+          "time_ticks_press": 72,
+          "velocity": 100,
+          "time_ticks_release": 84
+        }
+      ]
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ]
+}
