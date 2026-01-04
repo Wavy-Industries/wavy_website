@@ -1,5 +1,6 @@
 <script lang="ts">
   import { midiControlState, initPlaygroundSynthPersistence, resetAllSynthChannels, resetSynthChannel, playgroundUI } from '~/features/device-utility/states/playground.svelte';
+  import { drumKitState, selectDrumKit } from '~/features/device-utility/states/drumKits.svelte';
   import SynthChannelEditor from '~/features/device-utility/components/SynthChannelEditor.svelte';
   import { deviceState } from '~/features/device-utility/states/deviceState.svelte';
   import { soundBackend, type EffectInstance, type EffectType, type TrackId } from '~/lib/soundBackend';
@@ -251,6 +252,12 @@
   function resetAll() { resetAllSynthChannels(); }
 
   function resetChannel(ch: number) { resetSynthChannel(ch); }
+
+  function handleDrumKitChange(e: Event) {
+    const target = e.currentTarget as HTMLSelectElement;
+    if (!target?.value) return;
+    selectDrumKit(target.value);
+  }
 </script>
 
 <div class="content">
@@ -330,6 +337,26 @@
                 </div>
               </div>
             </div>
+            {#if isDrums}
+              <div class="drum-kit-row">
+                <span class="drum-kit-label">Kit</span>
+                <select
+                  class="drum-kit-select"
+                  value={drumKitState.selectedId ?? ''}
+                  disabled={drumKitState.status === 'loading' || drumKitState.kits.length === 0}
+                  onchange={handleDrumKitChange}
+                >
+                  {#each drumKitState.kits as kit}
+                    <option value={kit.id}>{kit.name}</option>
+                  {/each}
+                </select>
+                {#if drumKitState.status === 'loading'}
+                  <span class="drum-kit-status">Loading…</span>
+                {:else if drumKitState.status === 'error'}
+                  <span class="drum-kit-status error">Kit unavailable</span>
+                {/if}
+              </div>
+            {/if}
             {#if effectPanelState.trackKey === trackKey}
               {@const activeEffect = (effectsByTrack[trackKey] ?? []).find((effect) => effect.id === effectPanelState.effectId)}
               {#if activeEffect}
@@ -436,6 +463,11 @@
   @media (max-width: 860px) { .row { grid-template-columns: 1fr; } }
   .track-cell { display: flex; flex-direction: column; gap: 8px; }
   .track-controls { display: flex; align-items: center; gap: 8px; }
+  .drum-kit-row { display: flex; align-items: center; gap: 8px; }
+  .drum-kit-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #4b5563; }
+  .drum-kit-select { border: 1px solid #1f2329; border-radius: 4px; padding: 4px 6px; font-size: 12px; background: #fff; min-width: 140px; }
+  .drum-kit-status { font-size: 11px; color: #6b7280; }
+  .drum-kit-status.error { color: #b91c1c; }
   .label { font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--du-text); text-align:left; }
   .btn-chan { background:#fff; padding:6px 8px; cursor:pointer; border:1px solid black; display:flex; align-items:center; gap:6px; width: 100%; justify-content: flex-start; flex: 1; }
   .btn-chan:hover { background:#f9fafb; }

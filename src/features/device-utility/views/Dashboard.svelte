@@ -11,10 +11,12 @@
     import { fade } from 'svelte/transition';
     import { deviceSamplesState } from '~/lib/states/samples.svelte';
     import { SampleMode } from '~/lib/types/sampleMode';
+    import { initDrumKits } from '~/features/device-utility/states/drumKits.svelte';
     import {  windowStateInit, windowState, DeviceUtilityView } from '~/features/device-utility/states/window.svelte';
 
     onMount(async () => {
         windowStateInit();
+        initDrumKits();
 
         isLoading = true;
         await waitForInitialData();

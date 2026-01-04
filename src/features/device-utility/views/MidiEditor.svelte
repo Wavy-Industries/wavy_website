@@ -2,8 +2,10 @@
   import { onMount, onDestroy } from 'svelte';
   import { editState, setEditorLoopData } from '~/features/device-utility/states/edits.svelte';
   import { tempoState } from '~/features/device-utility/states/tempo.svelte';
-  import { TICKS_PER_BEAT, type LoopData, type SamplePack } from '~/lib/parsers/samples_parser';
+  import { TICKS_PER_BEAT, type LoopData, type SamplePack, type DrumEvent } from '~/lib/parsers/samples_parser';
   import { soundBackend } from '~/lib/soundBackend';
+  import { deviceSamplesState } from '~/lib/states/samples.svelte';
+  import { SampleMode } from '~/lib/types/sampleMode';
   import { calculateLoopLength, packDisplayName } from "../utils/samples";
   import { Log } from '~/lib/utils/Log';
   import PackTypeBadge from "~/features/device-utility/components/PackTypeBadge.svelte";
@@ -31,7 +33,7 @@
   });
   
   // UI state
-  let selectedNoteIndex = $state<number | null>(null);
+  let selectedNote = $state<DrumEvent | null>(null);
   let isDragging = $state(false);
   let dragMode = $state<'move' | 'velocity' | 'resize' | null>(null);
   let dragOriginalNote = $state<any>(null);
@@ -46,6 +48,26 @@
   
   // Default view settings - more reasonable for screen width
   const DEFAULT_NOTE_RANGE = { min: 0, max: 127 }; // Full MIDI range for vertical scroll
+
+  const isDrumMode = $derived(() => deviceSamplesState.activeMode === SampleMode.DRM);
+  const DRUM_LABELS: Record<number, string> = {
+    36: 'Kick',
+    37: 'Rim',
+    38: 'Snr 1',
+    39: 'Clap',
+    40: 'Snr 2',
+    42: 'HH Cl',
+    44: 'HH Pd',
+    45: 'Tom L',
+    46: 'HH Op',
+    48: 'Tom M',
+    49: 'Crash',
+    50: 'Tom H',
+    51: 'Ride',
+  };
+  function drumLabel(note: number): string {
+    return DRUM_LABELS[note] ?? '';
+  }
   
   // Playback state
   let isPlaying = $state(false);
@@ -122,10 +144,47 @@
     return Math.round(tick / step) * step;
   }
   
+  // Note helpers to keep manipulation logic centralized
+  const noteIds = new WeakMap<DrumEvent, number>();
+  let nextNoteId = 1;
+  function noteKey(note: DrumEvent) {
+    let id = noteIds.get(note);
+    if (!id) {
+      id = nextNoteId++;
+      noteIds.set(note, id);
+    }
+    return id;
+  }
+  function sortNotes(events: DrumEvent[]) {
+    events.sort((a, b) =>
+      a.time_ticks_press - b.time_ticks_press ||
+      a.note - b.note ||
+      a.time_ticks_release - b.time_ticks_release
+    );
+  }
+  function noteAtPosition(x: number, y: number) {
+    return localLoop.events.find((ev) => {
+      const noteY = noteToY(ev.note);
+      const noteStartX = tickToX(ev.time_ticks_press);
+      const noteEndX = tickToX(ev.time_ticks_release);
+      return y >= noteY && y <= noteY + laneHeight && x >= noteStartX && x <= noteEndX;
+    }) || null;
+  }
+  function createNote(note: number, press: number, release: number): DrumEvent {
+    return { note, velocity: 100, time_ticks_press: press, time_ticks_release: release };
+  }
+  function removeNote(note: DrumEvent | null) {
+    if (!note) return;
+    const idx = localLoop.events.indexOf(note);
+    if (idx === -1) return;
+    localLoop.events.splice(idx, 1);
+    if (selectedNote === note) selectedNote = null;
+  }
+
   // Sort events by press time to maintain proper order
   $effect(() => {
     log.debug(`Sorting events: ${JSON.stringify(localLoop.events)}`);
-    localLoop.events.sort((a, b) => a.time_ticks_press - b.time_ticks_press);
+    sortNotes(localLoop.events);
   });
   
   function tickToX(tick: number): number {
@@ -163,6 +222,7 @@
   });
   onDestroy(() => {
     window.removeEventListener('keydown', onWindowKeydown);
+    stopPlayback();
   });
 
   // Initialize data
@@ -211,21 +271,14 @@
     log.debug(`Calculated position: tick=${tick}, note=${note}`);
     
     // Check if clicking on existing note
-    const clickedNoteIndex = localLoop.events.findIndex(e => {
-      const noteY = noteToY(e.note);
-      const noteStartX = tickToX(e.time_ticks_press);
-      const noteEndX = tickToX(e.time_ticks_release);
-      
-      return y >= noteY && y <= noteY + laneHeight &&
-             x >= noteStartX && x <= noteEndX;
-    });
+    const clickedNote = noteAtPosition(x, y);
 
-    if (clickedNoteIndex >= 0) {
-      log.debug(`Clicked existing note: noteIndex=${clickedNoteIndex}`);
-      selectedNoteIndex = clickedNoteIndex;
+    if (clickedNote) {
+      log.debug(`Clicked existing note`);
+      selectedNote = clickedNote;
       isDragging = true;
       dragStartPos = { x, y };
-      dragOriginalNote = { ...localLoop.events[clickedNoteIndex] };
+      dragOriginalNote = { ...clickedNote };
       
       // Set pointer capture for smooth dragging
       (event.target as HTMLElement).setPointerCapture(event.pointerId);
@@ -239,22 +292,17 @@
       // clamp within valid tick bounds
       press = clamp(press, 0, MAX_TICKS - 1);
       const finalRelease = clamp(release, press + 1, MAX_TICKS);
-      const newNote = {
-        note,
-        velocity: 100,
-        time_ticks_press: press,
-        time_ticks_release: finalRelease
-      };
+      const newNote = createNote(note, press, finalRelease);
       
       log.debug(`Creating new note: ${JSON.stringify(newNote)}`);
       localLoop.events.push(newNote);
-      selectedNoteIndex = localLoop.events.length - 1;
+      selectedNote = newNote;
     }
   }
 
   function handleGridPointerMove(event: PointerEvent) {
-    if (!isDragging || selectedNoteIndex === null || !dragOriginalNote) {
-      log.debug(`Skipping pointer move: isDragging=${isDragging}, selectedNoteIndex=${selectedNoteIndex}`);
+    if (!isDragging || !selectedNote || !dragOriginalNote) {
+      log.debug(`Skipping pointer move: isDragging=${isDragging}, selectedNote=${Boolean(selectedNote)}`);
       return;
     }
 
@@ -263,9 +311,15 @@
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     
-    const currentNote = localLoop.events[selectedNoteIndex];
+    if (!localLoop.events.includes(selectedNote)) {
+      selectedNote = null;
+      isDragging = false;
+      return;
+    }
+
+    const currentNote = selectedNote;
     if (!currentNote) {
-      log.error(`No current note found for index: ${selectedNoteIndex}`);
+      log.error(`No current note found for selection`);
       return;
     }
 
@@ -332,16 +386,16 @@
   }
 
   function handleGridPointerUp(event: PointerEvent) {
-    if (isDragging && selectedNoteIndex !== null) {
+    if (isDragging && selectedNote) {
       // Audition the final note
-      const currentNote = localLoop.events[selectedNoteIndex];
+      const currentNote = selectedNote;
       if (currentNote) {
         soundBackend.noteOn(currentNote.note, currentNote.velocity, 9);
         setTimeout(() => soundBackend.noteOff(currentNote.note, 0, 9), 150);
       }
-    } else if (!isDragging && selectedNoteIndex !== null) {
+    } else if (!isDragging && selectedNote) {
       // Simple click - audition the note
-      const currentNote = localLoop.events[selectedNoteIndex];
+      const currentNote = selectedNote;
       if (currentNote) {
         soundBackend.noteOn(currentNote.note, currentNote.velocity, 9);
         setTimeout(() => soundBackend.noteOff(currentNote.note, 0, 9), 150);
@@ -366,37 +420,22 @@
     log.debug(`Context menu coordinates: x=${x}, y=${y}`);
     
     // Find note to delete
-    const noteIndex = localLoop.events.findIndex(e => {
-      const noteY = noteToY(e.note);
-      const noteStartX = tickToX(e.time_ticks_press);
-      const noteEndX = tickToX(e.time_ticks_release);
-      
-      const isInNote = y >= noteY && y <= noteY + laneHeight &&
-                      x >= noteStartX && x <= noteEndX;
-      
-      log.debug(`Checking note for deletion: noteIndex=${localLoop.events.indexOf(e)}, isInNote=${isInNote}`);
-      
-      return isInNote;
-    });
-
-    if (noteIndex >= 0) {
-      log.debug(`Deleting note: noteIndex=${noteIndex}`);
-      localLoop.events.splice(noteIndex, 1);
-      selectedNoteIndex = null;
+    const note = noteAtPosition(x, y);
+    if (note) {
+      log.debug(`Deleting note`);
+      removeNote(note);
     } else {
       log.debug(`No note found to delete at position: x=${x}, y=${y}`);
     }
   }
   
   // Handle right-click on notes directly
-  function handleNoteContextMenu(event: MouseEvent, noteIndex: number) {
+  function handleNoteContextMenu(event: MouseEvent, note: DrumEvent) {
     event.preventDefault();
     event.stopPropagation();
     
-    log.debug(`Right-click on note: noteIndex=${noteIndex}`);
-    
-    localLoop.events.splice(noteIndex, 1);
-    selectedNoteIndex = null;
+    log.debug(`Right-click on note`);
+    removeNote(note);
   }
 
   // Note-specific event handlers
@@ -404,19 +443,19 @@
   let dragOffsetTick: number | null = null;
   let dragOffsetNote: number | null = null;
 
-  function handleNotePointerDown(event: PointerEvent, noteIndex: number, mode: 'move' | 'velocity' | 'resize' = 'move') {
+  function handleNotePointerDown(event: PointerEvent, note: DrumEvent, mode: 'move' | 'velocity' | 'resize' = 'move') {
     event.stopPropagation();
     
-    log.debug(`Note pointer down: noteIndex=${noteIndex}, mode=${mode}`);
+    log.debug(`Note pointer down: mode=${mode}`);
     
-    selectedNoteIndex = noteIndex;
+    selectedNote = note;
     isDragging = true;
     dragMode = mode;
     
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     dragStartPos = { x: event.clientX - rect.left, y: event.clientY - rect.top };
     dragStartClient = { x: event.clientX, y: event.clientY };
-    dragOriginalNote = { ...localLoop.events[noteIndex] };
+    dragOriginalNote = { ...note };
 
     // Compute grab offsets relative to grid to keep cursor aligned with note
     try {
@@ -617,13 +656,14 @@
             class="piano-key" 
             class:is-c={isC}
             class:is-c3={isC3}
+            class:is-drum={isDrumMode()}
             style="height: {laneHeight}px; top: {i * laneHeight}px;"
             onclick={() => handlePianoClick(note)}
             onkeydown={(e) => e.key === 'Enter' && handlePianoClick(note)}
             role="button"
             tabindex="0"
           >
-            {isC ? `C${Math.floor(note / 12)}` : ''}
+            {isDrumMode() ? drumLabel(note) : (isC ? `C${Math.floor(note / 12)}` : '')}
           </div>
         {/each}
       </div>
@@ -693,12 +733,12 @@
         </svg>
 
         <!-- Notes -->
-        {#each localLoop.events as event, i}
+        {#each localLoop.events as event, i (noteKey(event))}
           {@const effectiveWidth = gridDimensions().effectiveTickWidth || tickWidth}
           {@const x = (event.time_ticks_press * effectiveWidth)}
           {@const width = ((event.time_ticks_release - event.time_ticks_press) * effectiveWidth)}
           {@const y = (noteRange().max - event.note) * laneHeight}
-          {@const isSelected = selectedNoteIndex === i}
+          {@const isSelected = selectedNote === event}
           {@const intensity = 0.3 + (event.velocity / 127) * 0.7} <!-- 30% to 100% intensity -->
           
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -706,8 +746,8 @@
             class="note-block"
             class:selected={isSelected}
             style="left: {x}px; top: {y}px; width: {width}px; height: {laneHeight - 2}px;"
-            onpointerdown={(e) => handleNotePointerDown(e, i, 'move')}
-            oncontextmenu={(e) => handleNoteContextMenu(e, i)}
+            onpointerdown={(e) => handleNotePointerDown(e, event, 'move')}
+            oncontextmenu={(e) => handleNoteContextMenu(e, event)}
             role="button"
             tabindex="0"
           >
@@ -720,7 +760,7 @@
               <div 
                 class="velocity-handle"
                 title="Velocity: {event.velocity} - drag vertically to adjust"
-                onpointerdown={(e) => handleNotePointerDown(e, i, 'velocity')}
+                onpointerdown={(e) => handleNotePointerDown(e, event, 'velocity')}
               ></div>
               <!-- Main note body -->
               <div class="note-body"></div>
@@ -728,7 +768,7 @@
               <div 
                 class="resize-handle"
                 title="Drag to resize note length"
-                onpointerdown={(e) => handleNotePointerDown(e, i, 'resize')}
+                onpointerdown={(e) => handleNotePointerDown(e, event, 'resize')}
               ></div>
             </div>
           </div>
@@ -926,6 +966,9 @@
     font-size: 11px;
     color: #6b7280;
     cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .piano-key:hover {
@@ -943,6 +986,13 @@
     color: #065f46;
     font-weight: 600;
     border-left: 3px solid #10b981;
+  }
+
+  .piano-key.is-drum {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #374151;
   }
 
   .timeline {

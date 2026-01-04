@@ -2,7 +2,7 @@
 // - Channels 0-8: simple instrument voices (different timbres per channel)
 // - Channel 9: drum kit with common GM-style note mappings
 // - Exposes a small interface used by UI (device tester, MIDI editor, MIDI input)
-import type { DrumSampleMap, EffectInstance, ISoundBackend, OscType, SynthChannelConfig, TrackId } from './types';
+import type { DrumKitManifest, DrumSampleMap, EffectInstance, ISoundBackend, OscType, SynthChannelConfig, TrackId } from './types';
 import { DEFAULT_CHANNEL_CONFIG } from './types';
 import { EffectChain } from './effectChain';
 import { createEffectModule } from './effects';
@@ -21,6 +21,32 @@ type LiveVoice = Voice & {
   oscs?: OscillatorNode[]; // for glide
 };
 
+type LoadedDrumLayer = {
+  buffer: AudioBuffer;
+  minVelocity: number;
+  maxVelocity: number;
+  gain: number;
+  tune: number;
+  samplePath: string;
+};
+
+type LoadedDrumSlot = {
+  label?: string;
+  layers: LoadedDrumLayer[];
+  gain: number;
+  tune: number;
+  pan?: number;
+  chokeGroup?: string;
+  roundRobin?: boolean;
+  cutOnRelease: boolean;
+};
+
+type LoadedDrumKit = {
+  id: string;
+  name: string;
+  notes: Map<number, LoadedDrumSlot>;
+};
+
 const CC_SLEW_SEC = 0.035; // faster 35ms smoothing for touch-driven CCs (more responsive)
 
 export class WebAudioBackend implements ISoundBackend {
@@ -30,6 +56,14 @@ export class WebAudioBackend implements ISoundBackend {
   private heldNotes: Map<number, Set<number>> = new Map(); // for monophonic retrigger/glide
   private activeNotes: Map<string, Voice> = new Map(); // key: `${channel}:${note}`
   private drumSamples: DrumSampleMap = new Map();
+  private drumKit: LoadedDrumKit | null = null;
+  private drumKitId: string | null = null;
+  private drumKitLoadToken = 0;
+  private drumSampleCache: Map<string, AudioBuffer> = new Map();
+  private drumChokeGroups: Map<string, Set<Voice>> = new Map();
+  private drumRoundRobin: Map<number, number> = new Map();
+  private drumActiveNotes: Map<string, { voice: Voice; cutOnRelease: boolean }> = new Map();
+  private drumVoiceKeys: Map<Voice, string> = new Map();
   private channelCfg: SynthChannelConfig[] = Array.from({ length: 16 }, () => ({ ...DEFAULT_CHANNEL_CONFIG }));
   private masterInputGainNode: GainNode | null = null;
   private masterCompressorNode: DynamicsCompressorNode | null = null;
@@ -361,6 +395,9 @@ export class WebAudioBackend implements ISoundBackend {
     for (const v of Array.from(this.playing)) try { v.stop(); } catch {}
     this.playing.clear();
     this.activeNotes.clear();
+    this.drumChokeGroups.clear();
+    this.drumActiveNotes.clear();
+    this.drumVoiceKeys.clear();
   }
 
   setDrumSample(note: number, buffer: AudioBuffer | null) {
@@ -373,6 +410,29 @@ export class WebAudioBackend implements ISoundBackend {
     const arr = await res.arrayBuffer();
     const buf = await ctx.decodeAudioData(arr);
     this.drumSamples.set(note, buf);
+  }
+
+  getDrumKitId(): string | null {
+    return this.drumKitId;
+  }
+
+  async loadDrumKitFromPath(path: string, kitId?: string): Promise<void> {
+    const ctx = this.ensureCtx();
+    const token = ++this.drumKitLoadToken;
+    const resolvedPath = path.startsWith('/') ? path : `/${path}`;
+    const manifestUrl = encodeURI(resolvedPath);
+    const res = await fetch(manifestUrl);
+    if (!res.ok) throw new Error(`Failed to load drum kit manifest: ${manifestUrl}`);
+    const manifest = (await res.json()) as DrumKitManifest;
+    const basePath = resolvedPath.slice(0, resolvedPath.lastIndexOf('/') + 1);
+    const loaded = await this.buildDrumKit(ctx, manifest, basePath, kitId);
+    if (token !== this.drumKitLoadToken) return;
+    this.drumKit = loaded;
+    this.drumKitId = loaded.id;
+    this.drumRoundRobin.clear();
+    this.drumChokeGroups.clear();
+    this.drumActiveNotes.clear();
+    this.drumVoiceKeys.clear();
   }
 
   private key(channel: number, note: number) { return `${channel|0}:${note|0}`; }
@@ -415,12 +475,15 @@ export class WebAudioBackend implements ISoundBackend {
     let voice: Voice;
     if ((channel|0) === 9) {
       // Drums on channel 9 (MONKEY device CH0 sends MIDI channel 9)
-      const prev = this.activeNotes.get(k);
+      const prev = this.drumActiveNotes.get(k);
       if (prev) {
-        try { prev.stop(); } catch {}
-        this.activeNotes.delete(k);
+        try { prev.voice.stop(); } catch {}
+        this.drumActiveNotes.delete(k);
+        this.drumVoiceKeys.delete(prev.voice);
       }
-      voice = this.playDrum(ctx, note|0, v, t);
+      const result = this.playDrum(ctx, note|0, v, t);
+      voice = result.voice;
+      this.registerDrumNote(k, voice, result.cutOnRelease);
     } else {
       const ch = (channel|0) & 0x0f;
       const cfg = this.channelCfg[ch];
@@ -468,10 +531,19 @@ export class WebAudioBackend implements ISoundBackend {
       }
     }
     this.playing.add(voice);
-    this.activeNotes.set(k, voice);
+    if ((channel|0) !== 9) this.activeNotes.set(k, voice);
   }
 
   noteOff(note: number, _velocity: number = 0, channel: number = 0) {
+    if ((channel|0) === 9) {
+      const k = this.key(channel, note);
+      const entry = this.drumActiveNotes.get(k);
+      if (!entry) return;
+      if (entry.cutOnRelease) {
+        try { entry.voice.stop(); } catch {}
+      }
+      return;
+    }
     const ch = (channel|0) & 0x0f;
     const cfg = this.channelCfg[ch];
     const k = this.key(channel, note);
@@ -812,55 +884,233 @@ export class WebAudioBackend implements ISoundBackend {
     return voice;
   }
 
-  // -------- Drums (channel 9) --------
-  private playDrum(ctx: AudioContext, note: number, v: number, t: number): Voice {
+  private async fetchDrumBuffer(ctx: AudioContext, url: string): Promise<AudioBuffer> {
+    const cached = this.drumSampleCache.get(url);
+    if (cached) return cached;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch drum sample: ${url}`);
+    const arr = await res.arrayBuffer();
+    const buf = await ctx.decodeAudioData(arr);
+    this.drumSampleCache.set(url, buf);
+    return buf;
+  }
+
+  private async buildDrumKit(
+    ctx: AudioContext,
+    manifest: DrumKitManifest,
+    basePath: string,
+    kitId?: string,
+  ): Promise<LoadedDrumKit> {
+    const notes = new Map<number, LoadedDrumSlot>();
+    const entries = Object.entries(manifest?.notes ?? {});
+    for (const [noteKey, slot] of entries) {
+      const note = Number(noteKey);
+      if (!Number.isFinite(note) || note < 0 || note > 127 || !slot) continue;
+      const layersIn = Array.isArray(slot.layers) ? slot.layers : [];
+      if (layersIn.length === 0) continue;
+      const layers: LoadedDrumLayer[] = [];
+      for (const layer of layersIn) {
+        if (!layer || typeof layer.sample !== 'string') continue;
+        const sampleUrl = encodeURI(`${basePath}${layer.sample}`);
+        const buffer = await this.fetchDrumBuffer(ctx, sampleUrl);
+        layers.push({
+          buffer,
+          minVelocity: Math.max(1, Math.min(127, layer.minVelocity ?? 1)),
+          maxVelocity: Math.max(1, Math.min(127, layer.maxVelocity ?? 127)),
+          gain: Math.max(0, Math.min(4, layer.gain ?? 1)),
+          tune: Math.max(-24, Math.min(24, layer.tune ?? 0)),
+          samplePath: sampleUrl,
+        });
+      }
+      if (layers.length === 0) continue;
+      notes.set(note, {
+        label: slot.label,
+        layers,
+        gain: Math.max(0, Math.min(4, slot.gain ?? 1)),
+        tune: Math.max(-24, Math.min(24, slot.tune ?? 0)),
+        pan: typeof slot.pan === 'number' ? Math.max(-1, Math.min(1, slot.pan)) : undefined,
+        chokeGroup: slot.chokeGroup,
+        roundRobin: slot.roundRobin,
+        cutOnRelease: slot.cutOnRelease ?? manifest?.cutOnRelease ?? false,
+      });
+    }
+    return {
+      id: kitId ?? manifest?.id ?? 'kit',
+      name: manifest?.name ?? kitId ?? 'Kit',
+      notes,
+    };
+  }
+
+  private addDrumChoke(group: string, voice: Voice) {
+    if (!this.drumChokeGroups.has(group)) this.drumChokeGroups.set(group, new Set());
+    this.drumChokeGroups.get(group)!.add(voice);
+  }
+
+  private removeDrumChoke(group: string, voice: Voice) {
+    const set = this.drumChokeGroups.get(group);
+    if (!set) return;
+    set.delete(voice);
+    if (set.size === 0) this.drumChokeGroups.delete(group);
+  }
+
+  private stopDrumChokeGroup(group: string) {
+    const set = this.drumChokeGroups.get(group);
+    if (!set || set.size === 0) return;
+    for (const voice of Array.from(set)) {
+      try { voice.stop(); } catch {}
+    }
+    this.drumChokeGroups.delete(group);
+  }
+
+  private trackDrumVoice(voice: Voice, onEnded: (cleanup: () => void) => void, chokeGroup?: string): Voice {
+    let done = false;
+    const cleanup = () => {
+      if (done) return;
+      done = true;
+      this.playing.delete(voice);
+      this.cleanupDrumVoice(voice);
+      if (chokeGroup) this.removeDrumChoke(chokeGroup, voice);
+    };
+    if (chokeGroup) this.addDrumChoke(chokeGroup, voice);
+    onEnded(cleanup);
+    const origStop = voice.stop;
+    voice.stop = () => {
+      if (done) return;
+      try { origStop(); } catch {}
+      cleanup();
+    };
+    return voice;
+  }
+
+  private cleanupDrumVoice(voice: Voice) {
+    const key = this.drumVoiceKeys.get(voice);
+    if (!key) return;
+    const entry = this.drumActiveNotes.get(key);
+    if (entry && entry.voice === voice) this.drumActiveNotes.delete(key);
+    this.drumVoiceKeys.delete(voice);
+  }
+
+  private registerDrumNote(key: string, voice: Voice, cutOnRelease: boolean) {
+    this.drumActiveNotes.set(key, { voice, cutOnRelease });
+    this.drumVoiceKeys.set(voice, key);
+  }
+
+  private playSampleBuffer(
+    ctx: AudioContext,
+    buffer: AudioBuffer,
+    v: number,
+    t: number,
+    opts: { gain?: number; tune?: number; pan?: number; chokeGroup?: string } = {},
+  ): Voice {
     const destinationNode = this.getTrackInputNode(9);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = Math.max(0, Math.min(4, opts.gain ?? 1));
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(gain * v, t);
+    src.connect(g);
+    if (typeof opts.pan === 'number' && typeof (ctx as any).createStereoPanner === 'function') {
+      const panner = (ctx as any).createStereoPanner() as StereoPannerNode;
+      panner.pan.setValueAtTime(Math.max(-1, Math.min(1, opts.pan)), t);
+      g.connect(panner).connect(destinationNode);
+    } else {
+      g.connect(destinationNode);
+    }
+    const tune = Math.max(-24, Math.min(24, opts.tune ?? 0));
+    if (tune !== 0) src.playbackRate.setValueAtTime(Math.pow(2, tune / 12), t);
+    src.start(t);
+    const voice: Voice = { stop: () => { try { src.stop(); } catch {} } };
+    return this.trackDrumVoice(voice, (cleanup) => { src.onended = cleanup; }, opts.chokeGroup);
+  }
+
+  private playDrumKitSlot(ctx: AudioContext, note: number, slot: LoadedDrumSlot, v: number, t: number): { voice: Voice; cutOnRelease: boolean } | null {
+    const velocity = Math.max(1, Math.min(127, Math.round(v * 127)));
+    const eligible = slot.layers.filter((layer) => velocity >= layer.minVelocity && velocity <= layer.maxVelocity);
+    const pool = eligible.length > 0 ? eligible : slot.layers;
+    if (pool.length === 0) return null;
+    let index = 0;
+    if (pool.length > 1 && slot.roundRobin) {
+      const prev = this.drumRoundRobin.get(note) ?? 0;
+      index = prev % pool.length;
+      this.drumRoundRobin.set(note, prev + 1);
+    } else if (pool.length > 1) {
+      index = Math.floor(Math.random() * pool.length);
+    }
+    const layer = pool[index];
+    const chokeGroup = slot.chokeGroup;
+    if (chokeGroup) this.stopDrumChokeGroup(chokeGroup);
+    const voice = this.playSampleBuffer(ctx, layer.buffer, v, t, {
+      gain: 0.9 * slot.gain * layer.gain,
+      tune: slot.tune + layer.tune,
+      pan: slot.pan,
+      chokeGroup,
+    });
+    return { voice, cutOnRelease: slot.cutOnRelease };
+  }
+
+  // -------- Drums (channel 9) --------
+  private playDrum(ctx: AudioContext, note: number, v: number, t: number): { voice: Voice; cutOnRelease: boolean } {
     // If a sample exists for the note, use it
     const sample = this.drumSamples.get(note);
     if (sample) {
-      const src = ctx.createBufferSource(); const g = ctx.createGain();
-      g.gain.setValueAtTime(0.7 * v, t);
-      src.buffer = sample; src.connect(g).connect(destinationNode);
-      src.start(t);
-      const voice: Voice = { stop: () => { try { src.stop(); } catch {} } };
-      src.onended = () => this.playing.delete(voice);
-      return voice;
+      return { voice: this.playSampleBuffer(ctx, sample, v, t, { gain: 0.7 }), cutOnRelease: false };
+    }
+
+    const kitSlot = this.drumKit?.notes.get(note);
+    if (kitSlot) {
+      const result = this.playDrumKitSlot(ctx, note, kitSlot, v, t);
+      if (result) return result;
     }
 
     // Synthesis fallbacks
     const drum = this.mapDrum(note);
     switch (drum) {
-      case 'kick': return this.drumKick(ctx, t, v);
-      case 'snare': return this.drumSnare(ctx, t, v);
-      case 'clap': return this.drumClap(ctx, t, v);
-      case 'ch': return this.drumHat(ctx, t, v, false);
-      case 'oh': return this.drumHat(ctx, t, v, true);
-      case 'toml': return this.drumTom(ctx, t, v, 90);
-      case 'tomm': return this.drumTom(ctx, t, v, 140);
-      case 'tomh': return this.drumTom(ctx, t, v, 200);
-      case 'crash': return this.drumCymbal(ctx, t, v, true);
-      case 'ride': return this.drumCymbal(ctx, t, v, false);
-      default: return this.drumHat(ctx, t, v, false);
+      case 'kick': return { voice: this.drumKick(ctx, t, v), cutOnRelease: false };
+      case 'snare': return { voice: this.drumSnare(ctx, t, v, 1200), cutOnRelease: false };
+      case 'snare2': return { voice: this.drumSnare(ctx, t, v, 800), cutOnRelease: false };
+      case 'rim': return { voice: this.drumRim(ctx, t, v), cutOnRelease: false };
+      case 'clap': return { voice: this.drumClap(ctx, t, v), cutOnRelease: false };
+      case 'ch': {
+        this.stopDrumChokeGroup('hihat');
+        return { voice: this.drumHat(ctx, t, v, 0.06, 'hihat'), cutOnRelease: false };
+      }
+      case 'pedal': {
+        this.stopDrumChokeGroup('hihat');
+        return { voice: this.drumHat(ctx, t, v * 0.7, 0.04, 'hihat'), cutOnRelease: false };
+      }
+      case 'oh': {
+        this.stopDrumChokeGroup('hihat');
+        return { voice: this.drumHat(ctx, t, v, 0.35, 'hihat'), cutOnRelease: false };
+      }
+      case 'toml': return { voice: this.drumTom(ctx, t, v, 90), cutOnRelease: false };
+      case 'tomm': return { voice: this.drumTom(ctx, t, v, 140), cutOnRelease: false };
+      case 'tomh': return { voice: this.drumTom(ctx, t, v, 200), cutOnRelease: false };
+      case 'crash': return { voice: this.drumCymbal(ctx, t, v, true), cutOnRelease: false };
+      case 'ride': return { voice: this.drumCymbal(ctx, t, v, false), cutOnRelease: false };
+      default: return { voice: this.drumHat(ctx, t, v, 0.06), cutOnRelease: false };
     }
   }
 
-  private mapDrum(note: number): 'kick'|'snare'|'clap'|'ch'|'oh'|'toml'|'tomm'|'tomh'|'crash'|'ride' {
-    // Common GM mapping
-    if (note === 35 || note === 36) return 'kick';
-    if (note === 38 || note === 40) return 'snare';
+  private mapDrum(note: number): 'kick'|'snare'|'snare2'|'rim'|'clap'|'ch'|'oh'|'pedal'|'toml'|'tomm'|'tomh'|'crash'|'ride' {
+    // Primary layout (Ableton-style + GM defaults)
+    if (note === 35 || note === 36) return 'kick'; // Kick
+    if (note === 37) return 'rim'; // Rimshot
+    if (note === 38) return 'snare';
+    if (note === 40) return 'snare2';
     if (note === 39) return 'clap';
-    if (note === 42 || note === 44) return 'ch';
+    if (note === 42) return 'ch';
+    if (note === 44) return 'pedal';
     if (note === 46) return 'oh';
-    if (note === 41 || note === 43) return 'toml';
-    if (note === 45 || note === 47) return 'tomm';
-    if (note === 48 || note === 50) return 'tomh';
-    if (note === 49 || note === 57) return 'crash';
-    if (note === 51 || note === 59) return 'ride';
+    if (note === 45 || note === 41 || note === 43) return 'toml';
+    if (note === 48 || note === 47) return 'tomm';
+    if (note === 50) return 'tomh';
+    if (note === 49 || note === 57 || note === 52) return 'crash';
+    if (note === 51 || note === 59 || note === 53) return 'ride';
     // Defaults
-    if (note <= 41) return 'kick';
-    if (note <= 45) return 'snare';
-    if (note <= 48) return 'ch';
-    if (note <= 50) return 'oh';
+    if (note <= 37) return 'kick';
+    if (note <= 40) return 'snare';
+    if (note <= 42) return 'ch';
+    if (note <= 46) return 'oh';
     return 'ch';
   }
 
@@ -871,24 +1121,37 @@ export class WebAudioBackend implements ISoundBackend {
     g.gain.setValueAtTime(0.9 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
     o.connect(g).connect(destinationNode); o.start(t); o.stop(t + 0.3);
     const voice: Voice = { stop: () => { try { o.stop(); } catch {} } };
-    o.onended = () => this.playing.delete(voice);
-    return voice;
+    return this.trackDrumVoice(voice, (cleanup) => { o.onended = cleanup; });
   }
 
-  private drumSnare(ctx: AudioContext, t: number, v: number): Voice {
+  private drumSnare(ctx: AudioContext, t: number, v: number, hpFreq: number): Voice {
     const destinationNode = this.getTrackInputNode(9);
     const bufferSize = Math.floor(0.2 * ctx.sampleRate);
     const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const output = noiseBuffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
     const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
-    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.setValueAtTime(1200, t);
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.setValueAtTime(hpFreq, t);
     const g = ctx.createGain(); g.gain.setValueAtTime(0.6 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
     noise.connect(hp).connect(g).connect(destinationNode);
     noise.start(t); noise.stop(t + 0.2);
     const voice: Voice = { stop: () => { try { noise.stop(); } catch {} } };
-    noise.onended = () => this.playing.delete(voice);
-    return voice;
+    return this.trackDrumVoice(voice, (cleanup) => { noise.onended = cleanup; });
+  }
+
+  private drumRim(ctx: AudioContext, t: number, v: number): Voice {
+    const destinationNode = this.getTrackInputNode(9);
+    const bufferSize = Math.floor(0.12 * ctx.sampleRate);
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(2000, t); bp.Q.value = 2.5;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.4 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    noise.connect(bp).connect(g).connect(destinationNode);
+    noise.start(t); noise.stop(t + 0.1);
+    const voice: Voice = { stop: () => { try { noise.stop(); } catch {} } };
+    return this.trackDrumVoice(voice, (cleanup) => { noise.onended = cleanup; });
   }
 
   private drumClap(ctx: AudioContext, t: number, v: number): Voice {
@@ -904,17 +1167,21 @@ export class WebAudioBackend implements ISoundBackend {
     const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.setValueAtTime(800, t);
     g.connect(destinationNode);
     const bursts = [0, 0.02, 0.04, 0.08];
+    const sources: AudioBufferSourceNode[] = [];
+    let last: AudioBufferSourceNode | null = null;
     bursts.forEach((d, i) => {
       const n = mkNoise();
       const gg = ctx.createGain(); gg.gain.setValueAtTime(0.7 * v / (i+1), t + d); gg.gain.exponentialRampToValueAtTime(0.001, t + d + 0.12);
       n.connect(hp).connect(gg).connect(g);
       n.start(t + d); n.stop(t + d + 0.15);
+      sources.push(n);
+      last = n;
     });
-    const voice: Voice = { stop: () => { /* bursts are short-lived; nothing to stop */ } };
-    return voice;
+    const voice: Voice = { stop: () => { for (const s of sources) { try { s.stop(); } catch {} } } };
+    return this.trackDrumVoice(voice, (cleanup) => { if (last) last.onended = cleanup; });
   }
 
-  private drumHat(ctx: AudioContext, t: number, v: number, open: boolean): Voice {
+  private drumHat(ctx: AudioContext, t: number, v: number, decaySec: number, chokeGroup?: string): Voice {
     const destinationNode = this.getTrackInputNode(9);
     const bufferSize = Math.floor(0.1 * ctx.sampleRate);
     const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -923,13 +1190,11 @@ export class WebAudioBackend implements ISoundBackend {
     const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
     const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.setValueAtTime(6000, t);
     const g = ctx.createGain(); g.gain.setValueAtTime(0.25 * v, t);
-    const dur = open ? 0.35 : 0.06;
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    g.gain.exponentialRampToValueAtTime(0.001, t + decaySec);
     noise.connect(hp).connect(g).connect(destinationNode);
-    noise.start(t); noise.stop(t + dur);
+    noise.start(t); noise.stop(t + decaySec);
     const voice: Voice = { stop: () => { try { noise.stop(); } catch {} } };
-    noise.onended = () => this.playing.delete(voice);
-    return voice;
+    return this.trackDrumVoice(voice, (cleanup) => { noise.onended = cleanup; }, chokeGroup);
   }
 
   private drumTom(ctx: AudioContext, t: number, v: number, f: number): Voice {
@@ -939,8 +1204,7 @@ export class WebAudioBackend implements ISoundBackend {
     g.gain.setValueAtTime(0.4 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
     o.connect(g).connect(destinationNode); o.start(t); o.stop(t + 0.25);
     const voice: Voice = { stop: () => { try { o.stop(); } catch {} } };
-    o.onended = () => this.playing.delete(voice);
-    return voice;
+    return this.trackDrumVoice(voice, (cleanup) => { o.onended = cleanup; });
   }
 
   private drumCymbal(ctx: AudioContext, t: number, v: number, crash: boolean): Voice {
@@ -955,7 +1219,6 @@ export class WebAudioBackend implements ISoundBackend {
     noise.connect(bp).connect(g).connect(destinationNode);
     noise.start(t); noise.stop(t + (crash ? 1.3 : 0.9));
     const voice: Voice = { stop: () => { try { noise.stop(); } catch {} } };
-    noise.onended = () => this.playing.delete(voice);
-    return voice;
+    return this.trackDrumVoice(voice, (cleanup) => { noise.onended = cleanup; });
   }
 }

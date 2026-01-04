@@ -1,0 +1,12 @@
+[
+  {
+    "id": "kit-1",
+    "name": "Kit 1",
+    "path": "Kit 1/kit.json"
+  },
+  {
+    "id": "kit-2",
+    "name": "Kit 2",
+    "path": "Kit 2/kit.json"
+  }
+]

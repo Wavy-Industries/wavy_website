@@ -1,5 +1,37 @@
 export type DrumSampleMap = Map<number, AudioBuffer>;
 
+export type DrumKitIndexEntry = {
+  id: string;
+  name: string;
+  path: string;
+};
+
+export type DrumKitLayer = {
+  sample: string;
+  minVelocity?: number;
+  maxVelocity?: number;
+  gain?: number;
+  tune?: number; // semitones
+};
+
+export type DrumKitSlot = {
+  label?: string;
+  layers: DrumKitLayer[];
+  gain?: number;
+  tune?: number;
+  pan?: number; // -1..1
+  chokeGroup?: string;
+  roundRobin?: boolean;
+  cutOnRelease?: boolean;
+};
+
+export type DrumKitManifest = {
+  id: string;
+  name: string;
+  cutOnRelease?: boolean;
+  notes: Record<string, DrumKitSlot>;
+};
+
 export type OscType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'supersaw' | 'fold' | 'pulse' | 'noise';
 export type ModRouting = 'off' | 'mix' | 'am' | 'fm';
 export type FilterType = 'none' | 'lowpass' | 'highpass' | 'bandpass';
@@ -134,6 +166,8 @@ export interface ISoundBackend {
   allNotesOff(): void;
   setDrumSample(note: number, buffer: AudioBuffer | null): void; // null to remove
   loadDrumSample(note: number, url: string): Promise<void>;
+  loadDrumKitFromPath(path: string, kitId?: string): Promise<void>;
+  getDrumKitId(): string | null;
   resume(): Promise<void>;
   // Synth configuration per channel (0-15)
   getChannelConfig(channel: number): SynthChannelConfig;

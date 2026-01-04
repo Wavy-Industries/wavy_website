@@ -1,12 +1,13 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { editState, closePackEditor, setEditorLoopData, saveEditor, saveEditorAsNew, setEditorName7 } from '~/features/device-utility/states/edits.svelte';
-  import { sampleParser_packSize } from '~/lib/parsers/samples_parser';
+  import { sampleParser_packSize, TICKS_PER_BEAT } from '~/lib/parsers/samples_parser';
   import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
   import { soundBackend } from '~/lib/soundBackend';
   import MidiEditor from '~/features/device-utility/views/MidiEditor.svelte';
   import MidiPreview from '~/features/device-utility/components/MidiPreview.svelte';
   import { tempoState } from '~/features/device-utility/states/tempo.svelte';
+  import { computeLoopEndTicks } from '~/lib/music/loop_utils';
   import { validatePage, getSamplePack } from '~/features/device-utility/utils/samples';
   import { deviceSamplesState } from '~/lib/states/samples.svelte';
   import NameBoxes from '~/features/device-utility/components/NameBoxes.svelte';
@@ -22,7 +23,24 @@
 
   // Local UI state for full-screen MIDI editor
   let midiEditor = $state({ open: false, index: -1 });
+
+  let previewPlaybackId = 0;
+  let previewTimeouts = [];
+  let previewRaf = 0;
+  const previewPlayhead = $state({ idx: null, progress: 0 });
+
+  function stopPreviewPlayback() {
+    previewPlaybackId++;
+    previewTimeouts.forEach((id) => clearTimeout(id));
+    previewTimeouts = [];
+    if (previewRaf) cancelAnimationFrame(previewRaf);
+    previewPlayhead.idx = null;
+    previewPlayhead.progress = 0;
+    soundBackend.allNotesOff();
+  }
+
   function openMidiEditorFor(index) {
+    stopPreviewPlayback();
     midiEditor.open = true; midiEditor.index = index;
   }
   function closeMidiEditor() { midiEditor.open = false; midiEditor.index = -1; }
@@ -76,24 +94,60 @@
     }
   }
   onMount(() => { window.addEventListener('keydown', onWindowKeydown); });
-  onDestroy(() => { window.removeEventListener('keydown', onWindowKeydown); });
+  onDestroy(() => {
+    window.removeEventListener('keydown', onWindowKeydown);
+    stopPreviewPlayback();
+  });
 
   // Playback
   const engine = soundBackend;
+  function loopSteps(loop) {
+    if (!loop) return 0;
+    const ticks = computeLoopEndTicks(loop);
+    const beats = Math.max(1, Math.round(ticks / TICKS_PER_BEAT));
+    return beats * 4;
+  }
+
+  function startPreviewPlayhead(idx, durationMs) {
+    if (!durationMs || durationMs <= 0) return;
+    const startedAt = performance.now();
+    previewPlayhead.idx = idx;
+    previewPlayhead.progress = 0;
+    const tick = () => {
+      if (previewPlayhead.idx !== idx) return;
+      const now = performance.now();
+      const progress = Math.min(1, Math.max(0, (now - startedAt) / durationMs));
+      previewPlayhead.progress = progress;
+      if (progress < 1) previewRaf = requestAnimationFrame(tick);
+      else { previewPlayhead.idx = null; previewPlayhead.progress = 0; }
+    };
+    previewRaf = requestAnimationFrame(tick);
+  }
+
   function playIdx(idx) {
     const page = slots[0]; if (!page) return;
     const loop = page.loops[idx]; if (!loop) return;
-    engine.allNotesOff();
+    stopPreviewPlayback();
+    const id = ++previewPlaybackId;
     const bpm = tempoState.bpm || 120;
     const msPerBeat = (60 / Math.max(1, Math.min(999, bpm))) * 1000;
     const startMs = performance.now() + 20;
+    const totalTicks = computeLoopEndTicks(loop);
+    const durationMs = (totalTicks / TICKS_PER_BEAT) * msPerBeat;
+    startPreviewPlayhead(idx, durationMs);
     for (const ev of loop.events) {
-      const onAt = startMs + (ev.time_ticks_press / 24) * msPerBeat;
+      const onAt = startMs + (ev.time_ticks_press / TICKS_PER_BEAT) * msPerBeat;
       const offTicks = (ev.time_ticks_release ?? (ev.time_ticks_press + 1));
-      const offAt = startMs + (offTicks / 24) * msPerBeat;
+      const offAt = startMs + (offTicks / TICKS_PER_BEAT) * msPerBeat;
       const vel = Math.max(0, Math.min(127, ev.velocity ?? 100));
-      setTimeout(() => engine.noteOn(ev.note, vel, 9), Math.max(0, onAt - performance.now()));
-      setTimeout(() => engine.noteOff(ev.note, 0, 9), Math.max(0, offAt - performance.now()));
+      previewTimeouts.push(window.setTimeout(() => {
+        if (previewPlaybackId !== id) return;
+        engine.noteOn(ev.note, vel, 9);
+      }, Math.max(0, onAt - performance.now())));
+      previewTimeouts.push(window.setTimeout(() => {
+        if (previewPlaybackId !== id) return;
+        engine.noteOff(ev.note, 0, 9);
+      }, Math.max(0, offAt - performance.now())));
     }
   }
 
@@ -165,7 +219,7 @@
 </script>
 
 {#if !midiEditor.open}
-<div class="page">
+  <div class="page">
   <div class="header">
     <div class="left">
       <button class="icon" title="Back" aria-label="Back" onclick={closePackEditor}>←</button>
@@ -203,7 +257,7 @@
     <!-- meta removed during migration -->
     <div class="bytes">Total: {totalBytes()} bytes ({percentTotal()}%)</div>
   </div>
-  <div class="tip">Tip: You can edit notes directly in the built-in Piano Roll — no MIDI file needed.</div>
+  <div class="tip">Drag and drop MIDI files into the slots or click to open the MIDI editor.</div>
   <div class="list">
     {#each Array(15) as _, idx}
       <div class="row">
@@ -215,7 +269,8 @@
           {#if slots[0]?.loops?.[idx]}
             {@const loop = slots[0].loops[idx]}
             <div class="preview-stack">
-              <MidiPreview class="clickable" {loop} onOpen={() => openMidiEditorFor(idx)} />
+              <MidiPreview class="clickable" {loop} playhead={previewPlayhead.idx === idx ? previewPlayhead.progress : null} onOpen={() => openMidiEditorFor(idx)} />
+              <div class="preview-meta">{loopSteps(loop)} steps</div>
             </div>
           {:else}
             <div class="drop">
@@ -229,9 +284,37 @@
         </div>
         <div class="bytes">{percentFor(idx)}%</div>
         <div class="reorder">
-          <button class="btn" onclick={() => move(idx, -1)}>Move up</button>
-          <button class="btn" onclick={() => move(idx, 1)}>Move down</button>
-          <button class="btn" onclick={() => deleteLoop(idx)} disabled={!slots[0]?.loops?.[idx]}>Delete</button>
+          <button class="btn icon-btn intent-move" title="Move up" aria-label="Move up" onclick={() => move(idx, -1)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 19V5"></path>
+              <path d="M5 12l7-7 7 7"></path>
+            </svg>
+            <span class="sr-only">Move up</span>
+          </button>
+          <button class="btn icon-btn intent-move" title="Move down" aria-label="Move down" onclick={() => move(idx, 1)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14"></path>
+              <path d="M5 12l7 7 7-7"></path>
+            </svg>
+            <span class="sr-only">Move down</span>
+          </button>
+          <button class="btn icon-btn intent-edit" title="Edit" aria-label="Edit" onclick={() => openMidiEditorFor(idx)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path>
+            </svg>
+            <span class="sr-only">Edit</span>
+          </button>
+          <button class="btn icon-btn intent-delete" title="Delete" aria-label="Delete" onclick={() => deleteLoop(idx)} disabled={!slots[0]?.loops?.[idx]}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 6h18"></path>
+              <path d="M8 6V4h8v2"></path>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+              <path d="M10 11v6"></path>
+              <path d="M14 11v6"></path>
+            </svg>
+            <span class="sr-only">Delete</span>
+          </button>
         </div>
       </div>
     {/each}
@@ -248,23 +331,52 @@
 {/if}
 
 <style>
-.page { display: flex; flex-direction: column; gap: 12px; padding: 16px; max-width: var(--du-maxw, 1100px); margin: 0 auto; }
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  max-width: var(--du-maxw, 1100px);
+  margin: 0 auto;
+  --pe-radius: 6px;
+  --pe-action-move-bg: #f3f4f6;
+  --pe-action-move-border: #d1d5db;
+  --pe-action-move-text: #374151;
+  --pe-action-edit-bg: #fff2cc;
+  --pe-action-edit-border: #e5c566;
+  --pe-action-edit-text: #7a5d00;
+  --pe-action-delete-bg: #ffecec;
+  --pe-action-delete-border: #ffc1c1;
+  --pe-action-delete-text: #a40000;
+}
 .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--du-border); padding-bottom: 8px; }
 .header .left { display: flex; align-items: center; gap: 10px; }
 .header .left h2 { position: relative; padding-bottom: 6px; }
 .header .left h2::after { content: ""; position: absolute; left: 0; bottom: 0; width: 120px; height: 3px; background: #2f313a; }
-.icon { width: 36px; height: 36px; border-radius: var(--du-radius); display: inline-flex; align-items: center; justify-content: center; }
+.icon { width: 36px; height: 36px; border-radius: var(--pe-radius); display: inline-flex; align-items: center; justify-content: center; }
 .actions { display: flex; gap: 8px; }
-.unsaved { margin-top: 8px; background: repeating-linear-gradient(45deg, #FFFEAC, #FFFEAC 6px, #f1ea7d 6px, #f1ea7d 12px); color: #3a3200; border: 1px solid #b3ac5a; padding: 6px 8px; border-radius: var(--du-radius); font-weight: 700; }
-.button-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border:1px solid #2f313a; border-radius:var(--du-radius); background:#f2f3f5; color:inherit; text-decoration:none; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.unsaved { margin-top: 8px; background: repeating-linear-gradient(45deg, #FFFEAC, #FFFEAC 6px, #f1ea7d 6px, #f1ea7d 12px); color: #3a3200; border: 1px solid #b3ac5a; padding: 6px 8px; border-radius: var(--pe-radius); font-weight: 700; }
+.button-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border:1px solid #2f313a; border-radius:var(--pe-radius); background:#f2f3f5; color:inherit; text-decoration:none; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
 .primary { background: #2b2f36; color: #fff; border: 1px solid #1f2329; }
 .toolbar { display:flex; gap: 16px; align-items: center; }
-.settings { background: #fafafa; border: 1px solid var(--du-border); border-radius: var(--du-radius); padding: 10px; }
+.settings { background: #fafafa; border: 1px solid var(--du-border); border-radius: var(--pe-radius); padding: 10px; }
 .namer { display: flex; gap: 6px; align-items: center; }
 .namer .hint { color:var(--du-muted); font-size: 0.85em; }
 .list { display: flex; flex-direction: column; gap: 8px; }
-.row { display: grid; grid-template-columns: 40px 80px 1fr 120px auto; align-items: center; gap: 8px; border: 1px solid #2f313a; border-radius: var(--du-radius); padding: 10px; background: #fcfcfd; box-shadow: none; }
-.drop { border: 1px dashed #2f313a; border-radius: var(--du-radius); padding: 12px; display: grid; place-items: center; background: #fcfcfc; }
+.row { display: grid; grid-template-columns: 40px 80px 1fr 120px auto; align-items: center; gap: 8px; border: 1px solid #2f313a; border-radius: var(--pe-radius); padding: 10px; background: #fcfcfd; box-shadow: none; }
+.idx {
+  text-align: center;
+  background: #111827;
+  color: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #000;
+  border-radius: var(--pe-radius);
+}
+.drop { border: 1px dashed #2f313a; border-radius: var(--pe-radius); padding: 12px; display: grid; place-items: center; background: #fcfcfc; }
 .hint { color: #777; font-size: 0.9em; }
 .content { min-height: 120px; display: flex; }
 input[type="file"] { width: 100%; }
@@ -282,16 +394,27 @@ input[type="file"] { width: 100%; }
 .preview-stack :global(svg.pianoroll:active) {
   transform: translateY(1px);
 }
+.preview-meta { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #4b5563; }
 .drop .actions { display:flex; gap: 8px; margin-top: 8px; }
 
 /* Small industrial buttons */
-.btn { border: 1px solid #2f313a; background: #f2f3f5; color: #111827; border-radius: var(--du-radius); padding: 6px 8px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.btn { border: 1px solid #2f313a; background: #f2f3f5; color: #111827; border-radius: var(--pe-radius); padding: 6px 8px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
 .btn:hover { background: #e9ebee; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; }
+.icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn.intent-move { background: var(--pe-action-move-bg); border-color: var(--pe-action-move-border); color: var(--pe-action-move-text); }
+.icon-btn.intent-edit { background: var(--pe-action-edit-bg); border-color: var(--pe-action-edit-border); color: var(--pe-action-edit-text); }
+.icon-btn.intent-delete { background: var(--pe-action-delete-bg); border-color: var(--pe-action-delete-border); color: var(--pe-action-delete-text); }
+.icon-btn.intent-move:hover { background: #e5e7eb; }
+.icon-btn.intent-edit:hover { background: #ffecb3; }
+.icon-btn.intent-delete:hover { background: #ffd7d7; }
+.icon-btn:disabled { background: #f3f4f6; color: #9ca3af; border-color: #e5e7eb; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .reorder { display: flex; gap: 6px; justify-content: flex-end; }
 .play { display: flex; }
 
 /* Modal reused styles */
-.error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius:6px; }
+.error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius: var(--pe-radius); }
 .errors { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 /* Embedded MIDI editor container */
 .embedded-editor { margin-top: 8px; display: flex; justify-content: center; width: 100%; overflow-x: hidden; }

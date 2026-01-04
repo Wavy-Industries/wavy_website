@@ -1,0 +1,21 @@
+{
+  "id": "kit-1",
+  "name": "Kit 1",
+  "cutOnRelease": false,
+  "notes": {
+    "35": { "label": "Kick 2", "layers": [{ "sample": "Kick 2.wav" }] },
+    "36": { "label": "Kick 1", "layers": [{ "sample": "Kick 1.wav" }] },
+    "37": { "label": "Rim", "layers": [{ "sample": "Perc 1.wav", "tune": 3, "gain": 0.8 }] },
+    "38": { "label": "Snare 1", "layers": [{ "sample": "Snare 1.wav" }] },
+    "39": { "label": "Clap", "layers": [{ "sample": "Clap.wav" }] },
+    "40": { "label": "Snare 2", "layers": [{ "sample": "Snare 2.wav" }] },
+    "42": { "label": "Hi-hat Closed", "chokeGroup": "hihat", "layers": [{ "sample": "Hi Hat 1.wav" }] },
+    "44": { "label": "Hi-hat Pedal", "chokeGroup": "hihat", "layers": [{ "sample": "Hi Hat 2.wav", "gain": 0.8 }] },
+    "45": { "label": "Tom Low", "layers": [{ "sample": "Perc 1.wav", "tune": -4 }] },
+    "46": { "label": "Hi-hat Open", "chokeGroup": "hihat", "layers": [{ "sample": "Open Hi Hat.wav" }] },
+    "48": { "label": "Tom Mid", "layers": [{ "sample": "Perc 2.wav", "tune": -2 }] },
+    "49": { "label": "Crash", "chokeGroup": "cymbal", "layers": [{ "sample": "Crash.wav" }] },
+    "50": { "label": "Tom High", "layers": [{ "sample": "Perc 2.wav", "tune": 2 }] },
+    "51": { "label": "Ride", "chokeGroup": "cymbal", "layers": [{ "sample": "Ride.wav" }] }
+  }
+}
