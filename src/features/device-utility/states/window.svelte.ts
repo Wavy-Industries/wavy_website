@@ -12,7 +12,7 @@ export function windowStateInit() {
 
 export const DeviceUtilityView = {
   DeviceUpdate: 'device-update',
-  SampleManager: 'sample-manager',
+  SampleManager: 'pack-editor',
   DeviceTester: 'device-tester',
   Playground: 'playground',
 };

@@ -446,8 +446,14 @@
 </div>
 
 {#if showPatchDialog}
-  <div class="modal-overlay" onclick={() => showPatchDialog = false}>
-    <div class="modal-dialog" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-layer">
+    <button
+      class="modal-overlay"
+      type="button"
+      aria-label="Close dialog"
+      onclick={() => showPatchDialog = false}
+    ></button>
+    <div class="modal-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
       <h4>Save Patch</h4>
       <input type="text" bind:value={patchName} placeholder="Patch name" class="patch-input" />
       <div class="modal-actions">
@@ -459,8 +465,14 @@
 {/if}
 
 {#if showLoadDialog}
-  <div class="modal-overlay" onclick={() => showLoadDialog = false}>
-    <div class="modal-dialog" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-layer">
+    <button
+      class="modal-overlay"
+      type="button"
+      aria-label="Close dialog"
+      onclick={() => showLoadDialog = false}
+    ></button>
+    <div class="modal-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
       <h4>Load Patch</h4>
       <div class="patch-list">
         {#if patchManagerState.patches.length === 0}
@@ -514,8 +526,9 @@
   .adsr-sliders { display:flex; gap:8px; margin-top:8px; }
   .field.small { flex-direction:column; align-items:flex-start; }
   
-  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000; }
-  .modal-dialog { background:#fff; border-radius:8px; padding:20px; min-width:320px; max-width:90vw; max-height:80vh; overflow:auto; box-shadow:0 8px 24px rgba(0,0,0,0.2); }
+  .modal-layer { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:10000; }
+  .modal-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.5); border:0; padding:0; margin:0; cursor:pointer; }
+  .modal-dialog { position:relative; background:#fff; border-radius:8px; padding:20px; min-width:320px; max-width:90vw; max-height:80vh; overflow:auto; box-shadow:0 8px 24px rgba(0,0,0,0.2); }
   .modal-dialog h4 { margin:0 0 16px; }
   .patch-input { width:100%; padding:8px; border:1px solid var(--du-border); border-radius:6px; font-size:14px; margin-bottom:16px; }
   .modal-actions { display:flex; gap:8px; justify-content:flex-end; }

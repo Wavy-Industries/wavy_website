@@ -176,7 +176,7 @@
   // Use shared UI state for refresh key (nudges editor to reload)
   const refreshKey = $derived(playgroundUI.refreshKey);
   // Focus management for modal dialog
-  let modalPanelEl: HTMLDivElement | null = null;
+  let modalPanelEl = $state<HTMLDivElement | null>(null);
   function modCanvas(node: HTMLCanvasElement, ch: number) {
     modCanvases[ch] = node;
     ctxs[ch] = node.getContext('2d');

@@ -384,18 +384,6 @@
         top: 0;
     }
 
-    .key.active {
-        background-color: #8f8;
-        transform: translateY(2px);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-    }
-
-    .key.black-key.active {
-        background-color: #4CAF50;
-        transform: translateY(2px);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-    }
-
     .key.tested {
         background-color: #8f8;
         transform: translateY(2px);

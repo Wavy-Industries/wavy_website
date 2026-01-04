@@ -82,7 +82,7 @@
         <div>
             <button onclick={() => {bluetoothManager.disconnect(); window.location.reload()}}>
                 <i class="bi-bluetooth-disconnect"></i>
-                disconnect
+                exit
             </button>
             <span>{bluetoothState.deviceName}</span>
             <ConnectionStatus />
@@ -107,7 +107,7 @@
               {/if}
             </span>
             <a 
-                href="#sample-manager" 
+                href="#pack-editor" 
                 class={`blink ${currentView === DeviceUtilityView.SampleManager ? 'active' : ''}`}
                 class:disabled={!deviceSamplesState.isSupported}
                 onclick={e => deviceSamplesState.isSupported == false && e.preventDefault()}

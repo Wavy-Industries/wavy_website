@@ -870,17 +870,6 @@
     font-size: 14px;
   }
 
-  .type-badge {
-    font-size: 12px;
-    padding: 2px 6px;
-    border: 1px solid #e5e7eb;
-    border-radius: 4px;
-    text-transform: uppercase;
-    color: #444;
-    background: #fff;
-    margin-left: 8px;
-  }
-
   .control-group {
     display: flex;
     align-items: center;

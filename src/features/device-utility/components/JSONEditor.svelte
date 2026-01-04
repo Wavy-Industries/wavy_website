@@ -52,7 +52,7 @@
       <button class="icon" onclick={close}>✕</button>
     </div>
     <div class="modal-body padded">
-      <textarea class="json-input" bind:value={jsonText} bind:this={jsonAreaEl} placeholder='Paste loops array or an object with a "loops" array' autofocus></textarea>
+      <textarea class="json-input" bind:value={jsonText} bind:this={jsonAreaEl} placeholder='Paste loops array or an object with a "loops" array'></textarea>
     </div>
     <div class="modal-actions">
         <button class="button-link" onclick={close}>Cancel</button>
