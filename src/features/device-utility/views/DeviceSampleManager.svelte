@@ -335,7 +335,7 @@
               {#if selectedPacks.display?.[i]?.type === 'Local'}
                 <button class="btn" title="Edit local pack" onclick={() => openPackEditorForId(activeIds[i])}>Edit</button>
               {:else}
-                <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorForId(activeIds[i])}>Mutate</button>
+                <button class="btn" title="Edit pack (edit or clone)" onclick={() => openPackEditorForId(activeIds[i])}>Edit</button>
               {/if}
             </div>
           </div>
@@ -419,7 +419,7 @@
             {/if}
             <div class="card-actions">
               <button class="btn primary" title="Add to selected" disabled={activeIds?.includes(k)} onclick={() => addToSelected(k)}>Add</button>
-              <button class="btn" title="Mutate pack (edit or clone)" onclick={() => openPackEditorForId(k)}>Mutate</button>
+              <button class="btn" title="Edit pack (edit or clone)" onclick={() => openPackEditorForId(k)}>Edit</button>
             </div>
           </div>
         {/each}
