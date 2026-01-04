@@ -22,63 +22,148 @@ import midiConnectImg from '~/assets/midi_connect/screenshot 2.png';
 
 <Layout title="Wavy Industries - MIDI Connect">
 	<main>
-		<Header />
-		<section>
-			<h1>MIDI Connect for macOS</h1>
-            <div class="sub-title-block" >
-				<span class="catch-phrase">🛑✋ STOP menu-diving each time you want to connect to a Bluetooth MIDI device on macOS</span>
-				<LinkButton href={routes.midiConnectAppStore} type="highlight" >Download on App Store</LinkButton>
+		<Header textColor="white" />
+		<section class="hero">
+			<div class="hero-inner">
+				<h1>MIDI Connect for macOS</h1>
+				<p class="tagline">🛑✋ STOP menu-diving each time you want to connect to a Bluetooth MIDI device on macOS</p>
+				<div class="hero-actions">
+					<LinkButton href={routes.midiConnectAppStore} type="highlight">Download on App Store</LinkButton>
+				</div>
 			</div>
-            <img src={midiConnectImg.src} alt="MIDI connect view" />
-            <p>We developed this simple macOS app to make it super easy for you to manage your Bluetooth MIDI devices. And it's not just for Wavy devices, it's for any Bluetooth MIDI device.</p>
+		</section>
 
-        </section>
+		<div class="hero-image hero-image--full">
+			<img src={midiConnectImg.src} alt="MIDI connect view" />
+		</div>
+
+		<section class="intro">
+			<div class="container">
+				<div class="intro-content">
+					<p>We developed this simple macOS app to make it super easy for you to manage your Bluetooth MIDI devices. And it's not just for Wavy devices, it's for any Bluetooth MIDI device.</p>
+				</div>
+			</div>
+		</section>
 	</main>
-    <Footer />
+    <Footer variant="dark" />
 </Layout>
 
 <style>
 main {
+	background-color: #000;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
 }
 
-section {
-    width: 100%;
-    padding: 0 20px;
+:global(html),
+:global(body) {
+	background-color: #000;
 }
 
-section img {
-    object-fit: contain;
-    width: calc(100% + 40px);
-    margin-left: -20px;
-    margin-top: 20px;
+img {
+	width: 100%;
+}
+
+.container {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 0 24px;
+}
+
+.hero {
+	width: 100%;
+	padding: 40px 24px 32px;
+	color: #f0f0f0;
+}
+
+.hero-inner {
+	max-width: 1200px;
+	margin: 0 auto;
 }
 
 h1 {
-    margin-block-start: 0em;
-    margin-block-end: 0em;
+	margin: 0 0 8px 0;
+	font-weight: 300;
+	font-size: 64px;
+	line-height: 1.1;
 }
 
-p {
-    max-width: 800px;
+.tagline {
+	font-size: 18px;
+	font-weight: 300;
+	color: #bbb;
+	margin: 0 0 16px 0;
+	line-height: 1.4;
 }
 
-.catch-phrase {
-    font-size: 20px;
-    font-weight: 300;
-    margin-block-start: 0em;
-    margin-block-end: 0em;
+.hero-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
 }
 
-.sub-title-block {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
+.hero-image {
+	width: 100%;
+	padding: 50px 10%;
+}
+
+.hero-image--full {
+	padding: 0;
+	display: block;
+}
+
+.hero-image--full img {
+	width: 100%;
+	height: auto;
+	object-fit: contain;
+	object-position: center;
+}
+
+.intro {
+	width: 100%;
+	padding: 48px 0;
+}
+
+.intro-content {
+	max-width: 680px;
+	margin: 0 auto;
+	text-align: center;
+	font-weight: 300;
+	color: #ddd;
+}
+
+.intro-content p {
+	font-size: 17px;
+	line-height: 1.6;
+	margin: 0 0 20px 0;
+	color: #d0d0d0;
+}
+
+.intro-content p:last-child {
+	margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+	h1 {
+		font-size: 48px;
+	}
+
+	.tagline {
+		font-size: 16px;
+	}
+
+	.container {
+		padding: 0 20px;
+	}
+
+	.hero {
+		padding: 32px 20px 24px;
+	}
+
+	.intro {
+		padding: 32px 0;
+	}
 }
 
 </style>
