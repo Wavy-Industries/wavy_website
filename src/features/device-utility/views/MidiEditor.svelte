@@ -189,20 +189,20 @@
   
   function tickToX(tick: number): number {
     const effectiveWidth = gridDimensions().effectiveTickWidth || tickWidth;
-    return PIANO_WIDTH + tick * effectiveWidth;
+    return tick * effectiveWidth;
   }
 
   function xToTick(x: number): number {
     const effectiveWidth = gridDimensions().effectiveTickWidth || tickWidth;
-    return Math.max(0, Math.min(MAX_TICKS, (x - PIANO_WIDTH) / effectiveWidth));
+    return Math.max(0, Math.min(MAX_TICKS, x / effectiveWidth));
   }
 
   function noteToY(note: number): number {
-    return HEADER_HEIGHT + (noteRange().max - note) * laneHeight;
+    return (noteRange().max - note) * laneHeight;
   }
 
   function yToNote(y: number): number {
-    const note = noteRange().max - Math.floor((y - HEADER_HEIGHT) / laneHeight);
+    const note = noteRange().max - Math.floor(y / laneHeight);
     return Math.max(0, Math.min(127, note));
   }
 
@@ -246,7 +246,7 @@
         if (!gridContainerEl) return;
         const c3 = 36;
         // noteToY returns position including header offset
-        const y = noteToY(c3);
+        const y = noteToY(c3) + HEADER_HEIGHT;
         const target = Math.max(0, y - (gridContainerEl.clientHeight / 2));
         gridContainerEl.scrollTop = target;
       } catch {}
@@ -283,11 +283,9 @@
       // Set pointer capture for smooth dragging
       (event.target as HTMLElement).setPointerCapture(event.pointerId);
     } else {
-      // Create new note centered to the nearest snap under the cursor
+      // Create new note starting at the nearest snap under the cursor
       const pointerTick = xToTick(x);
-      const center = snapNearestTick(pointerTick);
-      const half = DEFAULT_NOTE_LENGTH / 2;
-      let press = center - half;
+      let press = snapTick(pointerTick);
       const release = press + DEFAULT_NOTE_LENGTH;
       // clamp within valid tick bounds
       press = clamp(press, 0, MAX_TICKS - 1);
