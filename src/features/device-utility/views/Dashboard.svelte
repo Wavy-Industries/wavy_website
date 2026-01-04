@@ -111,7 +111,7 @@
                 onclick={e => deviceSamplesState.isSupported == false && e.preventDefault()}
                 title={!deviceSamplesState.isSupported ? "firmware version 1.2.0 or greater is required" : ""}
             >
-                Sample Manager
+                Pack Editor
             </a>
             {#if dev.enabled}
                 <a 
