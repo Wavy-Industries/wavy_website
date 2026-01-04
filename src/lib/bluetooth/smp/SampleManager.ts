@@ -2,7 +2,7 @@ import { SMPService, MGMT_OP, MGMT_ERR, ResponseError } from '~/lib/bluetooth/SM
 import { Log } from '~/lib/utils/Log';
 import { samplesParser_encode, DeviceSamples, samplesParser_decode, decodeAsciiString } from '~/lib/parsers/samples_parser';
 
-let log = new Log('smpl_mgr', Log.LEVEL_DEBUG);
+let log = new Log('smpl_mgr', Log.LEVEL_INFO);
 
 // Enums for better type safety
 enum _MGMT_ID {
