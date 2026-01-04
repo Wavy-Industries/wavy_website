@@ -1,7 +1,6 @@
 <script>
-    import { uplaodDeviceSamples, uplaodDeviceDefaultSamples } from "~/lib/states/samples.svelte";
     import { constructSamplePacks, packDisplayName, getSamplePack, compareDeviceSample } from "~/features/device-utility/utils/samples";
-    import { deviceSamplesState, deviceSampleTransferState, DEFAULT_SAMPLE_PACK_IDS } from "~/lib/states/samples.svelte";
+    import { DEFAULT_SAMPLE_PACK_IDS, deviceSamplesState, deviceSampleTransferState, sampleManager, uplaodDeviceDefaultSamples, uplaodDeviceSamples } from "~/lib/states/samples.svelte";
     import { fetchAvailableServerPacks } from "~/features/device-utility/services/serverSamplePacks";
     import { sampleParser_packSize } from "~/lib/parsers/samples_parser";
     import { compareSamplePack, getPackType } from "~/features/device-utility/utils/samples";
@@ -190,6 +189,30 @@
       await uplaodDeviceSamples(samples);
     }
 
+    const readMode = async () => {
+      try {
+        const mode = await sampleManager.getMode();
+        console.log('Sample mode:', mode);
+      } catch (error) {
+        console.error('Failed to read sample mode:', error);
+      }
+    }
+
+    const writeMode = async () => {
+      const input = prompt('Set sample mode (number):', '');
+      if (input == null) return;
+      const trimmed = input.trim();
+      if (!trimmed) return;
+      const nextMode = Number(trimmed);
+      if (!Number.isFinite(nextMode)) return;
+      try {
+        await sampleManager.setMode(nextMode);
+        console.log('Sample mode set to', nextMode);
+      } catch (error) {
+        console.error('Failed to set sample mode:', error);
+      }
+    }
+
 </script>
 
 <!-- {#if editState.open}
@@ -212,6 +235,11 @@
         <button class="btn caution" disabled={isTransferring} title="Reset device samples to default" aria-label="Reset to default" onclick={uplaodDeviceDefaultSamples}>Reset to default</button>
         <button class="btn" disabled={isTransferring} title="Sync selection from device" aria-label="Sync from device" onclick={() => selectedPacks.ids = DEFAULT_SAMPLE_PACK_IDS}>Sync from device</button>
         <button class="btn primary" disabled={isTransferring} title="Upload selected packs to device" aria-label="Upload to device" onclick={uploadSelected}>Upload to device</button>
+      </div>
+      <div class="subhead">MODE TEST</div>
+      <div class="actions-row">
+        <button class="btn" disabled={isTransferring} title="Read sample bank mode" aria-label="Get sample mode" onclick={readMode}>Get mode</button>
+        <button class="btn" disabled={isTransferring} title="Write sample bank mode" aria-label="Set sample mode" onclick={writeMode}>Set mode</button>
       </div>
     </div>
   </div>
@@ -335,7 +363,7 @@
             {/if}
             <button class="btn" title="Delete pack" disabled={selectedPacks.ids?.includes(p.name)} onclick={() => { if (confirm('Delete this pack? This cannot be undone.')) deleteLocalSamplePack(p.name); }}>Delete</button>
             {#if packType === 'Local'}
-              <a class="btn" title="Publish (email)" href={mailtoForLocalPack(p)}>Publish</a>
+              <a class="btn" style="background-color: green; color: white;" title="Publish (email)" href={mailtoForLocalPack(p)}>Make Online</a>
             {/if}
           </div>
         </div>
@@ -355,7 +383,7 @@
         <p>Loading...</p>
       {:then packs}
         {#each Object.entries(packs) as [k, p], idx (k)}
-          <div class="card" class:selected={k in selectedPacks.ids} >
+          <div class="card" class:selected={selectedPacks.ids != null ? k in selectedPacks.ids : false} >
             <div class="title"><PackTypeBadge type={p.display.type} /> <NameBoxes value={p.display.name || ''} /></div>
             <div class="meta">
               {#if p.author}

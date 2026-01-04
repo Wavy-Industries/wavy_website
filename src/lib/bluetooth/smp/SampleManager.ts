@@ -2,7 +2,7 @@ import { SMPService, MGMT_OP, MGMT_ERR, ResponseError } from '~/lib/bluetooth/SM
 import { Log } from '~/lib/utils/Log';
 import { samplesParser_encode, DeviceSamples, samplesParser_decode, decodeAsciiString } from '~/lib/parsers/samples_parser';
 
-let log = new Log('smpl_mgr', Log.LEVEL_INFO);
+let log = new Log('smpl_mgr', Log.LEVEL_DEBUG);
 
 // Enums for better type safety
 enum _MGMT_ID {
@@ -10,6 +10,7 @@ enum _MGMT_ID {
     UPLOAD = 1,
     ISSET = 2,
     SPACE_USED = 3,
+    MODE = 4,
 }
 
 enum _STATE {
@@ -88,6 +89,32 @@ export class SampleManager {
         }
         const responseSuccess = response as ISSETResponse;
         return responseSuccess.set;
+    }
+
+    async getMode(): Promise<number> {
+        log.debug('Reading sample bank mode');
+        const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.MODE) as { mode?: number } | ResponseError;
+        if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) {
+            log.error(`Error response received, rc: ${(response as ResponseError).rc}`);
+            return Promise.reject((response as ResponseError).rc);
+        }
+        const responseSuccess = response as { mode?: number };
+        if (typeof responseSuccess.mode !== 'number') {
+            log.error('Mode not found in response');
+            return Promise.reject(MGMT_ERR.EUNKNOWN);
+        }
+        return responseSuccess.mode;
+    }
+
+    async setMode(mode: number): Promise<void> {
+        log.debug(`Writing sample bank mode: ${mode}`);
+        const payload = new Uint8Array([mode & 0xff]);
+        const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.WRITE, this.GROUP_ID, _MGMT_ID.MODE, payload) as ResponseError | { rc?: number };
+        if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) {
+            log.error(`Error response received, rc: ${(response as ResponseError).rc}`);
+            return Promise.reject((response as ResponseError).rc);
+        }
+        return;
     }
 
     async getIDs(): Promise<string[]> {
@@ -257,7 +284,7 @@ export class SampleManager {
 
         this.state = _STATE.DOWNLOADING
 
-        let data_raw = new Uint8Array([]);
+        let data_raw = new Uint8Array([]) as Uint8Array<ArrayBufferLike>;
         let offset = 0;
         let total_length: number = 0;
 
