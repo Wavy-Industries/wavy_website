@@ -1,18 +1,18 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { editState, setEditorLoopData } from '~/features/device-utility/states/edits.svelte';
-  import { tempoState } from '~/features/device-utility/states/tempo.svelte';
-  import { TICKS_PER_BEAT, type LoopData, type SamplePack, type DrumEvent } from '~/lib/parsers/samples_parser';
+  import { TICKS_PER_BEAT, type LoopData, type DrumEvent } from '~/lib/parsers/samples_parser';
   import { soundBackend } from '~/lib/soundBackend';
   import { deviceSamplesState } from '~/lib/states/samples.svelte';
   import { SampleMode } from '~/lib/types/sampleMode';
-  import { calculateLoopLength, packDisplayName } from "../utils/samples";
-  import { Log } from '~/lib/utils/Log';
+  import { packDisplayName } from "../utils/samples";
+  import { computeLoopLengthBeatsFromEvents } from '~/lib/music/loop_utils';
+  import { parseMidiFile, indexLoopEvents, clampVelocity } from '~/features/device-utility/utils/midiUtils';
+  import { deviceState } from '~/features/device-utility/states/deviceState.svelte';
   import PackTypeBadge from "~/features/device-utility/components/PackTypeBadge.svelte";
   import JSONEditor from "~/features/device-utility/components/JSONEditor.svelte";
-  
-  const LOG_LEVEL = Log.LEVEL_DEBUG;
-  const log = new Log("midi-editor", LOG_LEVEL);
+  import PlayStopButton from "~/features/device-utility/components/PlayStopButton.svelte";
+  import { tickProviderSubscribe, tickProviderSetState, TickSubscriberState, type TickSubscriber } from '~/lib/tickProvider';
 
   // Constants
   const PIANO_WIDTH = 60;
@@ -20,15 +20,15 @@
   const MAX_TICKS = 511;
 
   // Props
-  let { index, close, page, pageIndex = 0, pageId = null, onSave = null } = $props<{ index: number, close?: () => void, page?: SamplePack | null, pageIndex?: number, pageId?: string | null, onSave?: (()=>void) | null }>();
+  let { index, close } = $props<{ index: number, close?: () => void }>();
 
   // Core state
   let localLoop = $state<LoopData>({ length_beats: 16, events: [] });
   let originalLoop = $state<LoopData>({ length_beats: 16, events: [] });
-  let pageName = $state('');
-  const workingPage = $derived(() => (page ?? (editState.loops?.[pageIndex] as SamplePack | null)));
+  const workingPage = $derived(() => editState.loops?.[0] ?? null);
+  const pageName = $derived.by(() => workingPage()?.name ?? '');
   const packInfo = $derived.by(() => {
-    const idOrName = workingPage()?.name || pageId || editState.id || '';
+    const idOrName = editState.id || workingPage()?.name || '';
     return idOrName ? packDisplayName(idOrName) : null;
   });
   
@@ -50,6 +50,7 @@
   const DEFAULT_NOTE_RANGE = { min: 0, max: 127 }; // Full MIDI range for vertical scroll
 
   const isDrumMode = $derived(() => deviceSamplesState.activeMode === SampleMode.DRM);
+  const midiChannel = $derived(() => (isDrumMode() ? 9 : 0));
   const DRUM_LABELS: Record<number, string> = {
     36: 'Kick',
     37: 'Rim',
@@ -68,25 +69,46 @@
   function drumLabel(note: number): string {
     return DRUM_LABELS[note] ?? '';
   }
-  
+  const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  function isBlackKey(note: number): boolean {
+    const mod = note % 12;
+    return mod === 1 || mod === 3 || mod === 6 || mod === 8 || mod === 10;
+  }
+  function noteLabel(note: number): string {
+    const name = NOTE_NAMES[note % 12] ?? '';
+    const octave = Math.floor(note / 12);
+    return `${name}${octave}`;
+  }
+
+  function playNote(note: number, velocity: number, durationMs: number) {
+    const channel = midiChannel();
+    soundBackend.noteOn(note, velocity, channel);
+    setTimeout(() => soundBackend.noteOff(note, 0, channel), durationMs);
+  }
+
   // Playback state
   let isPlaying = $state(false);
   let playbackPosition = $state(0);
   let playbackId = 0;
-  let animationFrame: number | null = null;
-  let playbackTimeout: number | null = null;
+  let playbackSubscriber: TickSubscriber | null = null;
+  let playbackTickHandler: (() => void) | null = null;
+  let playbackEventArmed = false;
+  let lastDevicePlayback: boolean | null = null;
   // Grid element ref for coordinate calculations
   let gridEl: HTMLElement | null = null;
   let gridContainerEl: HTMLElement | null = null;
 
   // Track pointer start in client space to compute deltas robustly
   let dragStartClient = $state({ x: 0, y: 0 });
-  let dragStartPos = $state({ x: 0, y: 0 });
 
   // Derive loop length early so other derived values can use it
   const loopLengthBeats = $derived(() => {
     // Use 4 beats (one bar) as minimum to avoid 4x oversizing
-    return calculateLoopLength(localLoop.events, TICKS_PER_BEAT, 4, 64);
+    return computeLoopLengthBeatsFromEvents(localLoop.events, {
+      ticksPerBeat: TICKS_PER_BEAT,
+      minBeats: 4,
+      maxBeats: 64,
+    });
   });
 
   // Derived metrics for overlay beyond loop end
@@ -122,11 +144,6 @@
       effectiveTickWidth: tickWidth
     };
 
-    log.debug(`Grid calculation details:`);
-    log.debug(`- Range: ${JSON.stringify(range)}, laneCount: ${laneCount}`);
-    log.debug(`- totalTicks: ${totalTicks}`);
-    log.debug(`- Total width: ${totalWidth}px, tick width: ${tickWidth}px`);
-
     return dimensions;
   });
 
@@ -138,10 +155,6 @@
   // Helper functions
   function snapTick(tick: number): number {
     return Math.floor(tick / snapStep()) * snapStep();
-  }
-  function snapNearestTick(tick: number): number {
-    const step = snapStep();
-    return Math.round(tick / step) * step;
   }
   
   // Note helpers to keep manipulation logic centralized
@@ -183,7 +196,6 @@
 
   // Sort events by press time to maintain proper order
   $effect(() => {
-    log.debug(`Sorting events: ${JSON.stringify(localLoop.events)}`);
     sortNotes(localLoop.events);
   });
   
@@ -210,19 +222,48 @@
     return Math.max(min, Math.min(max, value));
   }
 
+  function isEditableTarget(target: EventTarget | null) {
+    if (!target || !(target as HTMLElement).tagName) return false;
+    const el = target as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+    return el.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button';
+  }
+
   // Global ESC to close the editor (if a close handler is provided)
   function onWindowKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape' && typeof close === 'function') {
       e.preventDefault();
       try { close(); } catch {}
+      return;
+    }
+    if (e.code === 'Space' || e.key === ' ') {
+      if (isEditableTarget(e.target) || showJsonEditor) return;
+      e.preventDefault();
+      if (isPlaying) stopPlayback();
+      else startPlayback();
     }
   }
   onMount(() => {
     window.addEventListener('keydown', onWindowKeydown);
   });
+  onMount(() => {
+    playbackSubscriber = tickProviderSubscribe(() => { playbackTickHandler?.(); });
+    lastDevicePlayback = deviceState.playback ?? null;
+    playbackEventArmed = true;
+  });
   onDestroy(() => {
     window.removeEventListener('keydown', onWindowKeydown);
     stopPlayback();
+    if (playbackSubscriber) tickProviderSetState(playbackSubscriber, TickSubscriberState.Inactive);
+  });
+
+  $effect(() => {
+    if (!playbackEventArmed) return;
+    if (deviceState.playback == null) return;
+    if (deviceState.playback === lastDevicePlayback) return;
+    lastDevicePlayback = deviceState.playback;
+    if (deviceState.playback) startPlayback();
+    else stopPlayback();
   });
 
   // Initialize data
@@ -230,7 +271,6 @@
     const wp = workingPage();
     if (!wp) return;
     
-    pageName = wp.name || '';
     const storeLoop = wp.loops?.[index] as LoopData;
     
     const defaultLoop = { length_beats: 16, events: [] };
@@ -240,15 +280,18 @@
 
   onMount(() => {
     initializeLoop();
-    // After mount, scroll vertically to C3 (MIDI 36)
+    // After mount, scroll to the base note with padding below
     setTimeout(() => {
       try {
         if (!gridContainerEl) return;
-        const c3 = 36;
-        // noteToY returns position including header offset
-        const y = noteToY(c3) + HEADER_HEIGHT;
-        const target = Math.max(0, y - (gridContainerEl.clientHeight / 2));
-        gridContainerEl.scrollTop = target;
+        const notes = (localLoop.events || []).map((e) => e.note).filter((n) => typeof n === 'number');
+        const fallback = isDrumMode() ? 36 : 60;
+        const baseNote = notes.length ? Math.min(...notes) : fallback;
+        const y = noteToY(baseNote) + HEADER_HEIGHT;
+        const padding = laneHeight * 4;
+        const target = y - (gridContainerEl.clientHeight - padding);
+        const maxScroll = Math.max(0, gridDimensions().totalHeight - gridContainerEl.clientHeight);
+        gridContainerEl.scrollTop = Math.max(0, Math.min(target, maxScroll));
       } catch {}
     }, 0);
   });
@@ -257,27 +300,17 @@
 
   // Event handlers
   function handleGridPointerDown(event: PointerEvent) {
-    log.debug(`Grid pointer down: clientX=${event.clientX}, clientY=${event.clientY}`);
-    
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    
-    log.debug(`Grid coordinates: x=${x}, y=${y}`);
-    
     const tick = snapTick(xToTick(x));
     const note = yToNote(y);
-    
-    log.debug(`Calculated position: tick=${tick}, note=${note}`);
-    
     // Check if clicking on existing note
     const clickedNote = noteAtPosition(x, y);
 
     if (clickedNote) {
-      log.debug(`Clicked existing note`);
       selectedNote = clickedNote;
       isDragging = true;
-      dragStartPos = { x, y };
       dragOriginalNote = { ...clickedNote };
       
       // Set pointer capture for smooth dragging
@@ -292,17 +325,13 @@
       const finalRelease = clamp(release, press + 1, MAX_TICKS);
       const newNote = createNote(note, press, finalRelease);
       
-      log.debug(`Creating new note: ${JSON.stringify(newNote)}`);
       localLoop.events.push(newNote);
       selectedNote = newNote;
     }
   }
 
   function handleGridPointerMove(event: PointerEvent) {
-    if (!isDragging || !selectedNote || !dragOriginalNote) {
-      log.debug(`Skipping pointer move: isDragging=${isDragging}, selectedNote=${Boolean(selectedNote)}`);
-      return;
-    }
+    if (!isDragging || !selectedNote || !dragOriginalNote) return;
 
     // Compute coordinates relative to grid for consistent behavior
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -316,12 +345,7 @@
     }
 
     const currentNote = selectedNote;
-    if (!currentNote) {
-      log.error(`No current note found for selection`);
-      return;
-    }
-
-    log.debug(`Dragging note: mode=${dragMode}, x=${x}, y=${y}`);
+    if (!currentNote) return;
 
     if (dragMode === 'velocity') {
       // Use client-space delta with sigmoid response for smoother control
@@ -335,7 +359,6 @@
       const newVelocity = clamp(dragOriginalNote.velocity + velocityChange, 1, 127);
       currentNote.velocity = newVelocity;
 
-      log.debug(`Velocity change: dY=${deltaYClient}, d=${d.toFixed(3)}, velChange=${velocityChange}, newVel=${newVelocity}`);
     } else if (dragMode === 'resize') {
       // Resize using delta from original release, not snapping to min length
       const effectiveWidth = gridDimensions().effectiveTickWidth || tickWidth;
@@ -349,7 +372,6 @@
 
       currentNote.time_ticks_release = newRelease;
 
-      log.debug(`Resize: dX=${deltaXClient}, ticks=${deltaTicksFloat.toFixed(2)}, snappedRelease=${snappedRelease}, newRelease=${newRelease}`);
     } else {
       // Move the entire note - PRESERVE ORIGINAL LENGTH and keep cursor alignment
       const pointerTick = xToTick(x);
@@ -371,14 +393,10 @@
       currentNote.time_ticks_release = clampedTick + originalLength;
       currentNote.note = clampedNote;
 
-      log.debug(`Note moved: newTick=${newTick}, newNote=${newNote}, originalLength=${originalLength}`);
-
       // Audition only when the pitch actually changes (debounced by value)
       if (currentNote.note !== lastAuditionedNote) {
         lastAuditionedNote = currentNote.note;
-        log.debug(`Auditioning note change: ${currentNote.note}`);
-        soundBackend.noteOn(currentNote.note, currentNote.velocity, 9);
-        setTimeout(() => soundBackend.noteOff(currentNote.note, 0, 9), 100);
+        playNote(currentNote.note, currentNote.velocity, 100);
       }
     }
   }
@@ -388,15 +406,13 @@
       // Audition the final note
       const currentNote = selectedNote;
       if (currentNote) {
-        soundBackend.noteOn(currentNote.note, currentNote.velocity, 9);
-        setTimeout(() => soundBackend.noteOff(currentNote.note, 0, 9), 150);
+        playNote(currentNote.note, currentNote.velocity, 150);
       }
     } else if (!isDragging && selectedNote) {
       // Simple click - audition the note
       const currentNote = selectedNote;
       if (currentNote) {
-        soundBackend.noteOn(currentNote.note, currentNote.velocity, 9);
-        setTimeout(() => soundBackend.noteOff(currentNote.note, 0, 9), 150);
+        playNote(currentNote.note, currentNote.velocity, 150);
       }
     }
 
@@ -409,21 +425,13 @@
 
   function handleGridContextMenu(event: MouseEvent) {
     event.preventDefault();
-    log.debug(`Right-click context menu: clientX=${event.clientX}, clientY=${event.clientY}`);
-    
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    
-    log.debug(`Context menu coordinates: x=${x}, y=${y}`);
-    
     // Find note to delete
     const note = noteAtPosition(x, y);
     if (note) {
-      log.debug(`Deleting note`);
       removeNote(note);
-    } else {
-      log.debug(`No note found to delete at position: x=${x}, y=${y}`);
     }
   }
   
@@ -432,7 +440,6 @@
     event.preventDefault();
     event.stopPropagation();
     
-    log.debug(`Right-click on note`);
     removeNote(note);
   }
 
@@ -444,14 +451,11 @@
   function handleNotePointerDown(event: PointerEvent, note: DrumEvent, mode: 'move' | 'velocity' | 'resize' = 'move') {
     event.stopPropagation();
     
-    log.debug(`Note pointer down: mode=${mode}`);
-    
     selectedNote = note;
     isDragging = true;
     dragMode = mode;
     
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    dragStartPos = { x: event.clientX - rect.left, y: event.clientY - rect.top };
     dragStartClient = { x: event.clientX, y: event.clientY };
     dragOriginalNote = { ...note };
 
@@ -476,86 +480,65 @@
   }
 
   function handlePianoClick(note: number) {
-    soundBackend.noteOn(note, 100, 9);
-    setTimeout(() => soundBackend.noteOff(note, 0, 9), 150);
+    playNote(note, 100, 150);
+  }
+
+  function handleMidiDrop(e: DragEvent) {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    if (!/\.midi?$/i.test(file.name)) {
+      alert('Please drop a .mid file');
+      return;
+    }
+    parseMidiFile(file).then((loop) => {
+      localLoop = loop;
+      selectedNote = null;
+      isDragging = false;
+    }).catch(() => {
+      alert('Failed to parse MIDI');
+    });
   }
 
   // Playback functions
   function startPlayback() {
-    if (isPlaying) return;
-    
+    if (isPlaying || !playbackSubscriber) return;
+
+    const loopLengthTicks = Math.max(1, loopLengthBeats() * TICKS_PER_BEAT);
+    const eventIndex = indexLoopEvents(localLoop, loopLengthTicks, DEFAULT_NOTE_LENGTH);
+    let currentTick = 0;
+
     const id = ++playbackId;
     isPlaying = true;
     playbackPosition = 0;
-    
-    const bpm = tempoState.bpm || 120;
-    const msPerBeat = (60 / bpm) * 1000;
-    const msPerTick = msPerBeat / TICKS_PER_BEAT;
-    const loopLengthTicks = loopLengthBeats() * TICKS_PER_BEAT;
-    const loopLengthMs = loopLengthTicks * msPerTick;
-    
     soundBackend.allNotesOff();
-    
-    // Schedule notes
-    const startTime = performance.now();
-    const scheduleLoop = (cycleStart: number) => {
-      localLoop.events.forEach(event => {
-        const noteOnTime = cycleStart + (event.time_ticks_press * msPerTick);
-        const noteOffTime = cycleStart + (event.time_ticks_release * msPerTick);
-        
-        setTimeout(() => {
-          if (playbackId === id) {
-            soundBackend.noteOn(event.note, event.velocity, 9);
-          }
-        }, Math.max(0, noteOnTime - performance.now()));
-        
-        setTimeout(() => {
-          if (playbackId === id) {
-            soundBackend.noteOff(event.note, 0, 9);
-          }
-        }, Math.max(0, noteOffTime - performance.now()));
-      });
-    };
-    
-    scheduleLoop(startTime);
-    
-    // Animation loop
-    const animate = () => {
+
+    playbackTickHandler = () => {
       if (playbackId !== id) return;
-      
-      const elapsed = performance.now() - startTime;
-      const position = (elapsed % loopLengthMs) / msPerTick;
-      playbackPosition = Math.floor(position) % loopLengthTicks;
-      
-      animationFrame = requestAnimationFrame(animate);
+      const tick = currentTick % eventIndex.loopLengthTicks;
+      playbackPosition = tick;
+      const channel = midiChannel();
+      const ons = eventIndex.onByTick[tick] || [];
+      for (const ev of ons) {
+        soundBackend.noteOn(ev.note, clampVelocity(ev.velocity), channel);
+      }
+      const offs = eventIndex.offByTick[tick] || [];
+      for (const ev of offs) {
+        soundBackend.noteOff(ev.note, 0, channel);
+      }
+      currentTick = (currentTick + 1) % eventIndex.loopLengthTicks;
     };
-    
-    // Loop scheduling
-    const scheduleNextLoop = () => {
-      if (playbackId !== id) return;
-      scheduleLoop(performance.now());
-      playbackTimeout = window.setTimeout(scheduleNextLoop, loopLengthMs);
-    };
-    
-    playbackTimeout = window.setTimeout(scheduleNextLoop, loopLengthMs);
-    animationFrame = requestAnimationFrame(animate);
+
+    tickProviderSetState(playbackSubscriber, TickSubscriberState.Active);
   }
 
   function stopPlayback() {
     isPlaying = false;
     playbackId++;
     playbackPosition = 0;
+    playbackTickHandler = null;
+    if (playbackSubscriber) tickProviderSetState(playbackSubscriber, TickSubscriberState.Inactive);
     soundBackend.allNotesOff();
-    
-    if (animationFrame) {
-      cancelAnimationFrame(animationFrame);
-      animationFrame = null;
-    }
-    
-    if (playbackTimeout) {
-      clearTimeout(playbackTimeout);
-      playbackTimeout = null;
-    }
   }
 
   // Save functions
@@ -570,8 +553,7 @@
     toSave.length_beats = loopLengthBeats();
     updated.loops[index] = toSave;
     
-    setEditorLoopData(pageIndex, updated);
-    if (typeof onSave === 'function') onSave();
+    setEditorLoopData(0, updated);
     close?.();
   }
 
@@ -618,9 +600,14 @@
     </div>
     
     <div class="header-right">
-      <button class="play-button" onclick={isPlaying ? stopPlayback : startPlayback}>
-        {isPlaying ? 'Stop' : 'Play'}
-      </button>
+      <div class="bpm-display">
+        <span class="bpm-label">BPM</span>
+        <span class="bpm-value" class:placeholder={!deviceState.bpmFromDevice}>{deviceState.bpm}</span>
+      </div>
+      <PlayStopButton
+        playing={isPlaying}
+        onToggle={isPlaying ? stopPlayback : startPlayback}
+      />
       
       <label class="control-group">
         Snap:
@@ -655,13 +642,14 @@
             class:is-c={isC}
             class:is-c3={isC3}
             class:is-drum={isDrumMode()}
+            class:is-black={!isDrumMode() && isBlackKey(note)}
             style="height: {laneHeight}px; top: {i * laneHeight}px;"
             onclick={() => handlePianoClick(note)}
             onkeydown={(e) => e.key === 'Enter' && handlePianoClick(note)}
             role="button"
             tabindex="0"
           >
-            {isDrumMode() ? drumLabel(note) : (isC ? `C${Math.floor(note / 12)}` : '')}
+            {isDrumMode() ? drumLabel(note) : noteLabel(note)}
           </div>
         {/each}
       </div>
@@ -685,6 +673,8 @@
         class="grid-area"
         bind:this={gridEl}
         style="left: {PIANO_WIDTH}px; top: {HEADER_HEIGHT}px; width: {gridDimensions().gridWidth}px; height: {gridDimensions().gridHeight}px;"
+        ondragover={(e) => { e.preventDefault(); }}
+        ondrop={handleMidiDrop}
         onpointerdown={handleGridPointerDown}
         onpointermove={handleGridPointerMove}
         onpointerup={handleGridPointerUp}
@@ -694,6 +684,21 @@
       >
         <!-- Grid lines -->
         <svg class="grid-lines" width="100%" height="100%">
+          {#if !isDrumMode()}
+            {#each Array(gridDimensions().laneCount) as _, i}
+              {@const note = noteRange().max - i}
+              {@const isBlack = isBlackKey(note)}
+              {#if isBlack}
+                <rect
+                  x="0"
+                  y={i * laneHeight}
+                  width={gridDimensions().gridWidth}
+                  height={laneHeight}
+                  fill="rgba(15, 23, 42, 0.05)"
+                />
+              {/if}
+            {/each}
+          {/if}
           <!-- Horizontal lines (note lanes) -->
           {#each Array(gridDimensions().laneCount + 1) as _, i}
             {@const note = noteRange().max - i}
@@ -781,9 +786,10 @@
         <!-- Playback cursor -->
         {#if isPlaying}
           {@const effectiveWidth = gridDimensions().effectiveTickWidth || tickWidth}
+          {@const tickMs = deviceState.bpm > 0 ? 60000 / (TICKS_PER_BEAT * deviceState.bpm) : 0}
           <div 
             class="playback-cursor" 
-            style="left: {playbackPosition * effectiveWidth}px;"
+            style="left: {playbackPosition * effectiveWidth}px; --tick-ms: {tickMs}ms;"
           ></div>
         {/if}
 
@@ -839,6 +845,10 @@
     align-items: center;
     gap: 12px;
   }
+  .bpm-display { display: inline-flex; align-items: baseline; gap: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  .bpm-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #6b7280; }
+  .bpm-value { font-weight: 600; color: #111827; }
+  .bpm-value.placeholder { font-style: italic; }
 
   .back-button {
     width: 32px;
@@ -883,7 +893,6 @@
     border-radius: 3px;
   }
 
-  .play-button,
   .save-button,
   .text-button {
     padding: 6px 12px;
@@ -896,7 +905,6 @@
     letter-spacing: 0.05em;
   }
 
-  .play-button:hover,
   .text-button:hover {
     background: #f3f4f6;
   }
@@ -906,7 +914,6 @@
     color: white;
     border-color: #1d4ed8;
   }
-
   .save-button:hover:not(.disabled) {
     background: #1d4ed8;
   }
@@ -966,6 +973,11 @@
     background: #f9fafb;
     color: #111827;
     font-weight: 500;
+  }
+
+  .piano-key.is-black {
+    background: #f3f4f6;
+    color: #374151;
   }
 
   .piano-key.is-c3 {
@@ -1105,6 +1117,8 @@
     background: #ef4444;
     z-index: 20;
     pointer-events: none;
+    transition: left var(--tick-ms, 0ms) linear;
+    will-change: left;
   }
 
   .loop-end {

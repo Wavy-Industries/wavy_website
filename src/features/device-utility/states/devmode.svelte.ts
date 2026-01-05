@@ -7,30 +7,15 @@ export const loadDevMode = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     dev.enabled = stored === 'true';
     
-    /* listen for the commands */ 
-    const FLAG = '__wavyDevConsolePatched';
-    if (!(FLAG in window)) {
-        (window as any)[FLAG] = true;
-    
-        const orig = console.log;
-        console.log = function (...args: any[]) {
-            const msg = args.join(' ').toLowerCase();
-    
-            if (msg.includes('dev mode enable')) {
-                dev.enabled = true;
-                orig.call(console, '🔧 Dev mode enabled! Device Tester tab is now available.');
-                return;
-            }
-    
-            if (msg.includes('dev mode disable')) {
-                dev.enabled = false;
-                orig.call(console, '🔧 Dev mode disabled.');
-                return;
-            }
-    
-            orig.apply(console, args);
-        };
-    }
+    const FLAG = '__wavyDevModeRegistered';
+    if (FLAG in window) return;
+    (window as any)[FLAG] = true;
+
+    (window as any).__wavyDevMode = (value: boolean | 'enable' | 'disable') => {
+        const next = value === 'enable' ? true : value === 'disable' ? false : Boolean(value);
+        dev.enabled = next;
+        console.log(next ? '🔧 Dev mode enabled! Device Tester tab is now available.' : '🔧 Dev mode disabled.');
+    };
 }
 
 $effect.root(() => {

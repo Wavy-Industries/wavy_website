@@ -2,7 +2,7 @@
 connects modules together which relies on callbacks for event communication
 */
 
-import { bluetoothManager, bluetoothStateSetConnected, bluetoothStateSetConnecting, bluetoothStateSetDisconnected, bluetoothStateSetConnectionLoss, bluetoothStateSetConnectionReestablished, smpService, midiService } from '~/lib/states/bluetooth.svelte';
+import { batteryService, batteryState, bluetoothManager, bluetoothStateSetConnected, bluetoothStateSetConnecting, bluetoothStateSetDisconnected, bluetoothStateSetConnectionLoss, bluetoothStateSetConnectionReestablished, deviceStateService, smpService, midiService } from '~/lib/states/bluetooth.svelte';
 import { refreshChangelog, refreshDeviceFirmwareVersion } from '~/lib/states/firmware.svelte';
 import { midiTesterOnNoteOn, midiTesterOnNoteOff, midiTesterOnCC } from '~/features/device-utility/states/midiTester.svelte';
 import { soundBackend } from '~/lib/soundBackend';
@@ -10,16 +10,27 @@ import { setLocalSamplesMode } from './states/samplesLocal.svelte';
 import { SampleMode } from '~/lib/types/sampleMode';
 import { initialiseDeviceSamples, invalidateDeviceSamplesState } from '~/lib/states/samples.svelte';
 import { updaterNotifyConnectionReestablished, updaterNotifyIsSupported } from '~/lib/states/updater.svelte';
-import { midiControlOnCC, midiControlOnNoteOff, midiControlOnNoteOn } from './states/playground.svelte';
+import { initPlaygroundSynthPersistence, midiControlOnCC, midiControlOnNoteOff, midiControlOnNoteOn } from './states/playground.svelte';
 import { windowState, DeviceUtilityView } from './states/window.svelte';
-import { deviceState, setDeviceOctave, setDeviceBPM } from './states/deviceState.svelte';
+import { deviceState, setDeviceStateFromSnapshot } from './states/deviceState.svelte';
+import { setTempo } from './states/tempo.svelte';
 
 export const callbacksSet = () => {
+    deviceStateService.onStateUpdate = (state) => {
+        setDeviceStateFromSnapshot(state);
+        if (state.bpm !== null) setTempo(state.bpm);
+    };
 
     bluetoothManager.onConnect = () => {
         midiService.reset();
+        deviceStateService.reset();
         smpService.reset();
-        
+        deviceState.isAvailable = null;
+        batteryState.level = null;
+        batteryService.onBatteryLevel = (level) => { batteryState.level = level; };
+        batteryService.reset();
+
+        initPlaygroundSynthPersistence();
         refreshDeviceFirmwareVersion();
         refreshChangelog();
         setLocalSamplesMode(SampleMode.DRM);
@@ -27,19 +38,35 @@ export const callbacksSet = () => {
             await initialiseDeviceSamples();
             updaterNotifyIsSupported();
         })()
+        void batteryService.getBatteryLevel();
+        (async () => {
+            const available = await deviceStateService.initialize();
+            deviceState.isAvailable = available;
+        })()
 
         bluetoothStateSetConnected();
     }
 
     bluetoothManager.onConnectionReestablished = () => {
         midiService.reset();
+        deviceStateService.reset();
         smpService.reset();
-        
+        deviceState.isAvailable = null;
+        batteryState.level = null;
+        batteryService.onBatteryLevel = (level) => { batteryState.level = level; };
+        batteryService.reset();
+
+        initPlaygroundSynthPersistence();
         refreshDeviceFirmwareVersion();
 
         (async () => {
             await initialiseDeviceSamples();
             updaterNotifyIsSupported();
+        })()
+        void batteryService.getBatteryLevel();
+        (async () => {
+            const available = await deviceStateService.initialize();
+            deviceState.isAvailable = available;
         })()
         updaterNotifyConnectionReestablished();
         
@@ -52,11 +79,17 @@ export const callbacksSet = () => {
 
     bluetoothManager.onDisconnect = () => {
         invalidateDeviceSamplesState();
+        deviceState.isAvailable = null;
+        batteryState.level = null;
+        batteryService.onBatteryLevel = null;
         bluetoothStateSetDisconnected();
     }
 
     bluetoothManager.onConnectionLoss = () => {    
         invalidateDeviceSamplesState();
+        deviceState.isAvailable = null;
+        batteryState.level = null;
+        batteryService.onBatteryLevel = null;
         bluetoothStateSetConnectionLoss();
     }
 
@@ -67,15 +100,6 @@ export const callbacksSet = () => {
         soundBackend.noteOn(note, vel, channel);
 
         midiControlOnNoteOn(note, vel, channel);
-        
-        // Infer octave from note range (assuming middle C = 60)
-        // MONKEY default octave plays notes around C4 (60), so we can detect shifts
-        if (channel !== 9) { // Skip drums
-            const octave = Math.floor((note - 60) / 12);
-            if (octave !== deviceState.octave) {
-                setDeviceOctave(octave);
-            }
-        }
 
         if (windowState.hash === DeviceUtilityView.DeviceTester)
             midiTesterOnNoteOn(note, velocity, channel);

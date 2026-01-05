@@ -122,6 +122,7 @@ export function saveEditor(): boolean {
   page.name = newName;
   updateLocalSamplePack(deepClone(page), id, deviceSamplesState.activeMode);
   editState.unsaved = false;
+  closePackEditor();
   return true;
 }
 
@@ -133,8 +134,7 @@ export function saveEditorAsNew(): boolean {
   const newId = makeLocalId(editState.name7 || page.name.slice(2));
   page.name = newId;
   newLocalSamplePack(deepClone(page), deviceSamplesState.activeMode);
-  // After saving new, keep editor on this new id
-  editState.id = newId;
   editState.unsaved = false;
+  closePackEditor();
   return true;
 }

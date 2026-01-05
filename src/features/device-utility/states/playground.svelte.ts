@@ -49,14 +49,18 @@ export const PLAYGROUND_STORAGE_KEY = 'wavy_playground_synth_cfg_v1';
 
 // Baseline defaults captured on first init (synth channels 0-8)
 const baseline: (SynthChannelConfig | null)[] = Array.from({ length: 16 }, () => null);
+let _baselineCaptured = false;
 
 export const playgroundUI = $state({ refreshKey: 0 });
 
 export function initPlaygroundSynthPersistence() {
-  // Capture per-channel baseline before applying any saved overrides
-  for (let ch = 0; ch < 10; ch++) {
-    if (ch === 9) continue; // skip drums
-    try { baseline[ch] = soundBackend.getChannelConfig(ch); } catch {}
+  if (!_baselineCaptured) {
+    // Capture per-channel baseline before applying any saved overrides
+    for (let ch = 0; ch < 10; ch++) {
+      if (ch === 9) continue; // skip drums
+      try { baseline[ch] = soundBackend.getChannelConfig(ch); } catch {}
+    }
+    _baselineCaptured = true;
   }
   // Apply saved patches from localStorage
   if (typeof window !== 'undefined') {

@@ -8,13 +8,14 @@
 
     onMount(() => loadDevMode())
 
-    const CONNECTED_CLASS = 'device-utility-connected';
+    // hide the header when we enter device utility
+    const CONNECTED_CLASS = 'device-utility-open';
     $effect(() => {
         if (typeof document === 'undefined') return;
-        if (bluetoothState.connectionState === 'connected') {
-            document.body.classList.add(CONNECTED_CLASS);
-        } else {
+        if (bluetoothState.connectionState === 'disconnected') {
             document.body.classList.remove(CONNECTED_CLASS);
+        } else {
+            document.body.classList.add(CONNECTED_CLASS);
         }
     });
 

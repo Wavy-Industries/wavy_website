@@ -2,20 +2,25 @@
   import { onMount, onDestroy } from 'svelte';
   import { editState, closePackEditor, setEditorLoopData, saveEditor, saveEditorAsNew, setEditorName7 } from '~/features/device-utility/states/edits.svelte';
   import { sampleParser_packSize, TICKS_PER_BEAT } from '~/lib/parsers/samples_parser';
-  import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
   import { soundBackend } from '~/lib/soundBackend';
   import MidiEditor from '~/features/device-utility/views/MidiEditor.svelte';
   import MidiPreview from '~/features/device-utility/components/MidiPreview.svelte';
-  import { tempoState } from '~/features/device-utility/states/tempo.svelte';
   import { computeLoopEndTicks } from '~/lib/music/loop_utils';
+  import { parseMidiFile, indexLoopEvents, clampVelocity } from '~/features/device-utility/utils/midiUtils';
   import { validatePage, getSamplePack } from '~/features/device-utility/utils/samples';
   import { deviceSamplesState } from '~/lib/states/samples.svelte';
+  import { SampleMode } from '~/lib/types/sampleMode';
   import NameBoxes from '~/features/device-utility/components/NameBoxes.svelte';
   import PackTypeBadge from "~/features/device-utility/components/PackTypeBadge.svelte";
   import JSONEditor from "~/features/device-utility/components/JSONEditor.svelte";
+  import PlayStopButton from "~/features/device-utility/components/PlayStopButton.svelte";
+  import { tickProviderSubscribe, tickProviderSetState, TickSubscriberState } from '~/lib/tickProvider';
 
   const slots = $derived(editState.loops);
   const modeState = $derived(deviceSamplesState.modes[deviceSamplesState.activeMode]);
+  const previewChannel = $derived(() =>
+    deviceSamplesState.activeMode === SampleMode.DRM ? 9 : 0
+  );
 
   onMount(() => {
     try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
@@ -25,15 +30,14 @@
   let midiEditor = $state({ open: false, index: -1 });
 
   let previewPlaybackId = 0;
-  let previewTimeouts = [];
-  let previewRaf = 0;
+  let previewSubscriber = null;
+  let previewTickHandler = null;
   const previewPlayhead = $state({ idx: null, progress: 0 });
 
   function stopPreviewPlayback() {
     previewPlaybackId++;
-    previewTimeouts.forEach((id) => clearTimeout(id));
-    previewTimeouts = [];
-    if (previewRaf) cancelAnimationFrame(previewRaf);
+    previewTickHandler = null;
+    if (previewSubscriber) tickProviderSetState(previewSubscriber, TickSubscriberState.Inactive);
     previewPlayhead.idx = null;
     previewPlayhead.progress = 0;
     soundBackend.allNotesOff();
@@ -47,16 +51,13 @@
 
   function onFileChange(e, idx) {
     const file = e.target.files?.[0]; if (!file) return;
-    file.arrayBuffer().then((buf) => {
-      try {
-        const { loop } = parseMidiToLoop(buf);
-        // Build a Page container if missing at slot 0
-        let page = slots[0];
-        if (!page) page = { name: `U-${editState.name7}`, loops: Array(15).fill(null) };
-        page.loops[idx] = loop;
-        setEditorLoopData(0, page);
-      } catch (err) { alert('Failed to parse MIDI'); }
-    });
+    parseMidiFile(file).then((loop) => {
+      // Build a Page container if missing at slot 0
+      let page = slots[0];
+      if (!page) page = { name: `U-${editState.name7}`, loops: Array(15).fill(null) };
+      page.loops[idx] = loop;
+      setEditorLoopData(0, page);
+    }).catch(() => { alert('Failed to parse MIDI'); });
   }
 
   function bytesFor(idx) {
@@ -100,7 +101,6 @@
   });
 
   // Playback
-  const engine = soundBackend;
   function loopSteps(loop) {
     if (!loop) return 0;
     const ticks = computeLoopEndTicks(loop);
@@ -108,47 +108,37 @@
     return beats * 4;
   }
 
-  function startPreviewPlayhead(idx, durationMs) {
-    if (!durationMs || durationMs <= 0) return;
-    const startedAt = performance.now();
-    previewPlayhead.idx = idx;
-    previewPlayhead.progress = 0;
-    const tick = () => {
-      if (previewPlayhead.idx !== idx) return;
-      const now = performance.now();
-      const progress = Math.min(1, Math.max(0, (now - startedAt) / durationMs));
-      previewPlayhead.progress = progress;
-      if (progress < 1) previewRaf = requestAnimationFrame(tick);
-      else { previewPlayhead.idx = null; previewPlayhead.progress = 0; }
-    };
-    previewRaf = requestAnimationFrame(tick);
-  }
-
   function playIdx(idx) {
+    if (previewPlayhead.idx === idx) {
+      stopPreviewPlayback();
+      return;
+    }
     const page = slots[0]; if (!page) return;
     const loop = page.loops[idx]; if (!loop) return;
     stopPreviewPlayback();
+    if (!previewSubscriber) previewSubscriber = tickProviderSubscribe(() => { previewTickHandler?.(); });
     const id = ++previewPlaybackId;
-    const bpm = tempoState.bpm || 120;
-    const msPerBeat = (60 / Math.max(1, Math.min(999, bpm))) * 1000;
-    const startMs = performance.now() + 20;
-    const totalTicks = computeLoopEndTicks(loop);
-    const durationMs = (totalTicks / TICKS_PER_BEAT) * msPerBeat;
-    startPreviewPlayhead(idx, durationMs);
-    for (const ev of loop.events) {
-      const onAt = startMs + (ev.time_ticks_press / TICKS_PER_BEAT) * msPerBeat;
-      const offTicks = (ev.time_ticks_release ?? (ev.time_ticks_press + 1));
-      const offAt = startMs + (offTicks / TICKS_PER_BEAT) * msPerBeat;
-      const vel = Math.max(0, Math.min(127, ev.velocity ?? 100));
-      previewTimeouts.push(window.setTimeout(() => {
-        if (previewPlaybackId !== id) return;
-        engine.noteOn(ev.note, vel, 9);
-      }, Math.max(0, onAt - performance.now())));
-      previewTimeouts.push(window.setTimeout(() => {
-        if (previewPlaybackId !== id) return;
-        engine.noteOff(ev.note, 0, 9);
-      }, Math.max(0, offAt - performance.now())));
-    }
+    const channel = previewChannel();
+    const loopLengthTicks = computeLoopEndTicks(loop);
+    const eventIndex = indexLoopEvents(loop, loopLengthTicks, 1);
+    let currentTick = 0;
+    previewPlayhead.idx = idx;
+    previewPlayhead.progress = 0;
+    previewTickHandler = () => {
+      if (previewPlaybackId !== id) return;
+      const tick = currentTick % eventIndex.loopLengthTicks;
+      previewPlayhead.progress = eventIndex.loopLengthTicks ? tick / eventIndex.loopLengthTicks : 0;
+      const ons = eventIndex.onByTick[tick] || [];
+      for (const ev of ons) {
+        soundBackend.noteOn(ev.note, clampVelocity(ev.velocity), channel);
+      }
+      const offs = eventIndex.offByTick[tick] || [];
+      for (const ev of offs) {
+        soundBackend.noteOff(ev.note, 0, channel);
+      }
+      currentTick = (currentTick + 1) % eventIndex.loopLengthTicks;
+    };
+    tickProviderSetState(previewSubscriber, TickSubscriberState.Active);
   }
 
   function move(idx, dir) {
@@ -231,9 +221,9 @@
     <div class="actions">
       <button class="button-link" onclick={openImportDialog}>View raw</button>
       {#if editState.id && editState.id.startsWith('L-')}
-        <button onclick={saveEditor} class="primary">Save</button>
+        <button onclick={saveEditor} class:primary={editState.unsaved} class:attention={editState.unsaved}>Save</button>
       {:else}
-        <button onclick={saveEditorAsNew} class="primary">Save As New Pack</button>
+        <button onclick={saveEditorAsNew} class:primary={editState.unsaved || !editState.id} class:attention={editState.unsaved || !editState.id}>Save As New Pack</button>
       {/if}
     </div>
   </div>
@@ -260,17 +250,19 @@
   <div class="tip">Drag and drop MIDI files into the slots or click to open the MIDI editor.</div>
   <div class="list">
     {#each Array(15) as _, idx}
+      {@const loop = slots[0]?.loops?.[idx]}
       <div class="row">
         <div class="idx">{idx+1}</div>
         <div class="play">
-          <button class="btn" title="Play" onclick={() => playIdx(idx)}>Play</button>
+          <PlayStopButton
+            playing={previewPlayhead.idx === idx}
+            onToggle={() => playIdx(idx)}
+          />
         </div>
         <div class="content">
-          {#if slots[0]?.loops?.[idx]}
-            {@const loop = slots[0].loops[idx]}
+          {#if loop}
             <div class="preview-stack">
               <MidiPreview class="clickable" {loop} playhead={previewPlayhead.idx === idx ? previewPlayhead.progress : null} onOpen={() => openMidiEditorFor(idx)} />
-              <div class="preview-meta">{loopSteps(loop)} steps</div>
             </div>
           {:else}
             <div class="drop">
@@ -282,7 +274,12 @@
             </div>
           {/if}
         </div>
-        <div class="bytes">{percentFor(idx)}%</div>
+        <div class="metrics">
+          <span class="bytes">{percentFor(idx)}%</span>
+          {#if loop}
+            <span class="steps">{loopSteps(loop)} steps</span>
+          {/if}
+        </div>
         <div class="reorder">
           <button class="btn icon-btn intent-move" title="Move up" aria-label="Move up" onclick={() => move(idx, -1)}>
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -322,7 +319,7 @@
 </div>
 {:else}
   <div class="embedded-editor">
-    <MidiEditor index={midiEditor.index} page={slots[0]} pageIndex={0} pageId={editState.id} close={closeMidiEditor} onback={closeMidiEditor} />
+    <MidiEditor index={midiEditor.index} close={closeMidiEditor} />
   </div>
 {/if}
 
@@ -358,6 +355,11 @@
 .unsaved { margin-top: 8px; background: repeating-linear-gradient(45deg, #FFFEAC, #FFFEAC 6px, #f1ea7d 6px, #f1ea7d 12px); color: #3a3200; border: 1px solid #b3ac5a; padding: 6px 8px; border-radius: var(--pe-radius); font-weight: 700; }
 .button-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border:1px solid #2f313a; border-radius:var(--pe-radius); background:#f2f3f5; color:inherit; text-decoration:none; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
 .primary { background: #2b2f36; color: #fff; border: 1px solid #1f2329; }
+.attention { animation: upload-bounce 1.1s ease-in-out infinite; }
+@keyframes upload-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
 .toolbar { display:flex; gap: 16px; align-items: center; }
 .settings { background: #fafafa; border: 1px solid var(--du-border); border-radius: var(--pe-radius); padding: 10px; }
 .namer { display: flex; gap: 6px; align-items: center; }
@@ -376,12 +378,16 @@
   border: 1px solid #000;
   border-radius: var(--pe-radius);
 }
-.drop { border: 1px dashed #2f313a; border-radius: var(--pe-radius); padding: 12px; display: grid; place-items: center; background: #fcfcfc; }
+.drop { border: 1px dashed #2f313a; border-radius: var(--pe-radius); padding: 6px 8px; display: flex; align-items: center; gap: 8px; background: #fcfcfc; height: 50px; }
+.drop input[type="file"] { flex: 1; }
+.drop .actions { margin-top: 0; }
+.drop .hint { display: none; }
 .hint { color: #777; font-size: 0.9em; }
-.content { min-height: 120px; display: flex; }
+.content { min-height: 50px; display: flex; }
 input[type="file"] { width: 100%; }
 .tip { margin-top: 4px; color: var(--du-muted); font-size: 0.92em; }
 .preview-stack { display:flex; flex-direction: column; gap: 6px; width: 100%; }
+.preview-stack :global(svg.pianoroll) { height: 50px; }
 .preview-stack :global(svg.pianoroll) {
   border: 2px solid #111; /* black border to indicate interactivity */
   cursor: pointer;
@@ -394,7 +400,8 @@ input[type="file"] { width: 100%; }
 .preview-stack :global(svg.pianoroll:active) {
   transform: translateY(1px);
 }
-.preview-meta { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #4b5563; }
+.metrics { display: flex; gap: 8px; justify-content: flex-end; align-items: center; text-align: right; }
+.steps { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #4b5563; }
 .drop .actions { display:flex; gap: 8px; margin-top: 8px; }
 
 /* Small industrial buttons */

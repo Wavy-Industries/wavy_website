@@ -23,9 +23,9 @@ assert len(sys.argv) > 1, "Please provide a pack name"
 TICKS_PER_BEAT = 24
 MAX_BEATS = 16
 
-def main(pack_name):
+def main(pack_type, pack_name):
     print_important(f'processing {pack_name}...')
-    pack_root_dir = "scripts/midi/"
+    pack_root_dir = "scripts/midi/" + pack_type + '/'
     pack_dir = pack_root_dir + pack_name
 
     # import loops
@@ -113,7 +113,7 @@ def main(pack_name):
         "loops": loops
     }
 
-    out_dir = Path("public/samples/MONKEY/DRM")
+    out_dir = Path(f"public/samples/MONKEY/{pack_type}")
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"W-{pack_name}.json"
 
@@ -123,6 +123,7 @@ def main(pack_name):
     print_important(f"[SUCCESS] Wrote {len(loops)} loops to {out_path}\n")
 
 if __name__ == "__main__":
-    pack_names = sys.argv[1:]
+    pack_type = sys.argv[1]
+    pack_names = sys.argv[2:]
     for pack_name in pack_names:
-        main(pack_name)
+        main(pack_type, pack_name)

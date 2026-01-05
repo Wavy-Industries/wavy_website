@@ -1,5 +1,7 @@
-# 1.2.99[4. Jan 2026] -dev
+# 1.2.90[5. Jan 2026] -dev
 - Dynamic PAT
+- device state Bluetooth service
+- improved MIDI transmission capabilities
 
 # 1.2.0[29. Aug 2025] The drum update
 - User selectable drum loops (through device utility sample manager tab)

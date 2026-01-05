@@ -225,25 +225,3 @@ export function validatePage(id: string, page: SamplePack | null): string[] {
     }
     return errs;
 }
-
-export function calculateLoopLength(
-    events: { time_ticks_release: number }[] | null | undefined,
-    ticksPerBeat: number,
-    minBeats: number = 1,
-    maxBeats: number = 64,
-): number {
-    try {
-        const tpb = Math.max(1, Math.floor(ticksPerBeat || 24));
-        const minB = Math.max(1, Math.floor(minBeats || 1));
-        const maxB = Math.max(minB, Math.floor(maxBeats || 64));
-        const maxTicks = Math.max(0, ...((events || []).map(e => Math.max(0, e.time_ticks_release || 0))));
-        const neededBeats = Math.max(minB, Math.ceil(maxTicks / tpb));
-        // Round up to next power of two: 1,2,4,8,...
-        let pow = 1;
-        while (pow < neededBeats && pow < maxB) pow <<= 1;
-        return Math.min(pow, maxB);
-    } catch (e) {
-        log.error(`calculate loop length failed: ${String(e)}`);
-        return Math.max(1, Math.floor(minBeats || 1));
-    }
-}

@@ -59,18 +59,92 @@ export class MIDIService {
 
     private _handleMIDIMessage(event: Event): void {
         const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
-        const value = new Uint8Array(characteristic.value!.buffer);
-        this.onMIDIMessage?.(value);
-        this._parseMIDIMessage(value);
+        const value = characteristic.value;
+        if (!value) return;
+        const data = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        this.onMIDIMessage?.(data);
+        this._parseMIDIMessage(data);
     }
 
     private _parseMIDIMessage(data: Uint8Array): void {
-        if (data.length < 5) return;
-        const status = data[2]; const type = status & 0xF0; const channel = status & 0x0F; const noteOrController = data[3]; const value = data[4];
-        switch (type) {
-            case 0x90:  this.onNoteOn?.(noteOrController, value, channel); break;
-            case 0x80: this.onNoteOff?.(noteOrController, value, channel); break;
-            case 0xB0: this.onControlChange?.(noteOrController, value, channel); break;
+        if (data.length === 0) return;
+        const hasBleHeader = (data[0] & 0x80) !== 0;
+        let i = hasBleHeader ? 1 : 0;
+        let runningStatus: number | null = null;
+
+        const isRealtime = (status: number) => status >= 0xF8;
+        const dataLenForStatus = (status: number) => {
+            const type = status & 0xF0;
+            if (type === 0xC0 || type === 0xD0) return 1;
+            if (type === 0xF0) {
+                if (status === 0xF1 || status === 0xF3) return 1;
+                if (status === 0xF2) return 2;
+                return 0;
+            }
+            return 2;
+        };
+        const hasDataBytes = (idx: number, len: number) => {
+            if (len === 0) return true;
+            if (idx + len > data.length) return false;
+            for (let j = 0; j < len; j++) {
+                if ((data[idx + j] & 0x80) !== 0) return false;
+            }
+            return true;
+        };
+
+        while (i < data.length) {
+            let status = data[i];
+            if ((status & 0x80) !== 0) {
+                if (isRealtime(status)) { i++; continue; }
+
+                const dataLen = dataLenForStatus(status);
+                if (!hasDataBytes(i + 1, dataLen)) {
+                    // Timestamp low byte or incomplete status, skip it.
+                    i++;
+                    continue;
+                }
+
+                i++;
+                runningStatus = status;
+            } else if (runningStatus !== null) {
+                status = runningStatus;
+            } else {
+                i++;
+                continue;
+            }
+
+            const type = status & 0xF0;
+            const channel = status & 0x0F;
+            if (type === 0xF0) {
+                if (status === 0xF0) {
+                    while (i < data.length && data[i] !== 0xF7) i++;
+                    if (i < data.length) i++;
+                } else {
+                    const sysLen = dataLenForStatus(status);
+                    if (!hasDataBytes(i, sysLen)) break;
+                    i += sysLen;
+                }
+                runningStatus = null;
+                continue;
+            }
+
+            const dataLen = dataLenForStatus(status);
+            if (!hasDataBytes(i, dataLen)) break;
+            const data1 = data[i++];
+            const data2 = dataLen === 2 ? data[i++] : 0;
+
+            switch (type) {
+                case 0x90:
+                    if (data2 === 0) this.onNoteOff?.(data1, data2, channel);
+                    else this.onNoteOn?.(data1, data2, channel);
+                    break;
+                case 0x80:
+                    this.onNoteOff?.(data1, data2, channel);
+                    break;
+                case 0xB0:
+                    this.onControlChange?.(data1, data2, channel);
+                    break;
+            }
         }
     }
 
@@ -78,4 +152,3 @@ export class MIDIService {
     private _buildNoteOffMessage(note: number, velocity: number, channel: number): Uint8Array { const ts = new Uint8Array([0,0]); const status = 0x80 | (channel & 0x0F); return new Uint8Array([...ts, status, note, velocity]); }
     private _buildControlChangeMessage(controller: number, value: number, channel: number): Uint8Array { const ts = new Uint8Array([0,0]); const status = 0xB0 | (channel & 0x0F); return new Uint8Array([...ts, status, controller, value]); }
 }
-

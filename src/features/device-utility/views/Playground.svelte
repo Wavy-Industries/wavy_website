@@ -3,6 +3,7 @@
   import { drumKitState, selectDrumKit } from '~/features/device-utility/states/drumKits.svelte';
   import SynthChannelEditor from '~/features/device-utility/components/SynthChannelEditor.svelte';
   import { deviceState } from '~/features/device-utility/states/deviceState.svelte';
+  import PlayStopButton from '~/features/device-utility/components/PlayStopButton.svelte';
   import { soundBackend, type EffectInstance, type EffectType, type TrackId } from '~/lib/soundBackend';
   import { onMount } from 'svelte';
 
@@ -173,6 +174,35 @@
   const sizes = Array.from({ length: 10 }, () => ({ w: 0, h: 0, dpr: 1 }));
   let raf = 0;
   const selected = $state<{ ch: number | null }>({ ch: null });
+  const octaveValues = [-1, 0, 1, 2, 3, 4, 5, 6, 7];
+  const effectLabels: Record<number, string> = {
+    0: 'NONE',
+    1: 'ARP',
+    2: 'DOUBLE',
+    3: 'DRM',
+    4: 'STUTTER',
+    5: 'ECHO',
+    6: 'PAT',
+  };
+  const deviceChannelOrder = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const effectOrder = [
+    { id: 1, label: 'ARP' },
+    { id: 2, label: 'DOUBLE' },
+    { id: 4, label: 'STUTTER' },
+    { id: 5, label: 'ECHO' },
+    { id: 6, label: 'PAT' },
+    { id: 3, label: 'DRM' },
+  ];
+  const effectPresets = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+  const selectedChannel = $derived(deviceState.channel == null ? null : (deviceState.channel === 9 ? 10 : deviceState.channel + 1));
+  const muteBits = $derived(deviceState.muteMask == null
+    ? null
+    : deviceChannelOrder.map((ch) => ((deviceState.muteMask >> (ch === 10 ? 9 : ch - 1)) & 1) === 1));
+  const selectedEffectId = $derived(deviceState.effectId == null ? null : deviceState.effectId);
+  const isKnownEffect = $derived(selectedEffectId == null || selectedEffectId === 0 ? true : effectOrder.some((opt) => opt.id === selectedEffectId));
+  const hasEffect = $derived(selectedEffectId != null && selectedEffectId !== 0);
+  const selectedPreset = $derived(deviceState.effectPreset == null || !hasEffect ? null : deviceState.effectPreset);
   // Use shared UI state for refresh key (nudges editor to reload)
   const refreshKey = $derived(playgroundUI.refreshKey);
   // Focus management for modal dialog
@@ -272,12 +302,161 @@
       <span class="muted">Go ahead, play on your MONKEY.</span>
     </div>
     <div class="right">
+      {#if deviceState.isAvailable}
       <div class="status-item">
         <span class="status-label">Octave:</span>
         <span class="status-value">{deviceState.octave >= 0 ? '+' : ''}{deviceState.octave}</span>
       </div>
+      {/if}
+      <div class="status-item">
+        <span class="status-label">BPM:</span>
+        <span class="status-value" class:placeholder={!deviceState.bpmFromDevice}>{deviceState.bpm}</span>
+      </div>
     </div>
   </div>
+
+  {#if deviceState.isAvailable}
+  <div class="state-details">
+    <div class="detail-stack">
+      <div class="detail-block">
+        <span class="detail-label">Oct</span>
+        <table class="mini-table" aria-label="Octave selection">
+          <thead>
+            <tr>
+              {#each octaveValues as oct}
+                <th>{oct}</th>
+              {/each}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {#each octaveValues as oct}
+                <td class:marked={deviceState.octave === oct}>{deviceState.octave === oct ? 'X' : ''}</td>
+              {/each}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="detail-block">
+        <span class="detail-label">Channel</span>
+        <table class="mini-table" aria-label="Selected channel">
+          <thead>
+            <tr>
+              {#each deviceChannelOrder as ch}
+                <th>{ch}</th>
+              {/each}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {#each deviceChannelOrder as ch}
+                <td class:marked={selectedChannel === ch}>{selectedChannel === ch ? 'X' : ''}</td>
+              {/each}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="detail-block">
+        <span class="detail-label">Channel mute</span>
+        {#if muteBits == null}
+          <span class="detail-value">unset</span>
+        {:else}
+          <table class="mini-table" aria-label="Mute mask by channel">
+            <thead>
+              <tr>
+                {#each deviceChannelOrder as ch}
+                  <th>{ch}</th>
+                {/each}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {#each muteBits as muted}
+                  <td class:muted={muted}>{muted ? 'X' : ''}</td>
+                {/each}
+              </tr>
+            </tbody>
+          </table>
+        {/if}
+      </div>
+    </div>
+    <div class="detail-stack">
+      <div class="detail-block">
+        <span class="detail-label">BPM</span>
+        <span class="detail-value" class:placeholder={!deviceState.bpmFromDevice}>{deviceState.bpmFromDevice ? deviceState.bpm : `${deviceState.bpm} (default)`}</span>
+      </div>
+      <div class="detail-block">
+        <span class="detail-label">Hold</span>
+        {#if deviceState.hold == null}
+          <span class="detail-value">unset</span>
+        {:else}
+          <span class="lever" class:on={deviceState.hold} aria-label={deviceState.hold ? 'Hold on' : 'Hold off'}></span>
+        {/if}
+      </div>
+    </div>
+    <div class="detail-block detail-wide">
+      <span class="detail-label">Effect</span>
+      <table class="mini-table" aria-label="Effect selection">
+        <thead>
+          <tr>
+            {#each effectOrder as effect}
+              <th>{effect.label}</th>
+            {/each}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {#each effectOrder as effect}
+              <td class:marked={selectedEffectId === effect.id}>{selectedEffectId === effect.id ? 'X' : ''}</td>
+            {/each}
+          </tr>
+        </tbody>
+      </table>
+      {#if !hasEffect}
+      {:else if !isKnownEffect}
+        <span class="detail-note">unknown({selectedEffectId})</span>
+      {/if}
+      <table class="mini-table" aria-label="Effect preset selection">
+        <thead>
+          <tr>
+            {#each effectPresets as preset}
+              <th>{preset}</th>
+            {/each}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {#each effectPresets as preset}
+              <td class:marked={selectedPreset === preset}>{selectedPreset === preset ? 'X' : ''}</td>
+            {/each}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="detail-stack">
+      <div class="detail-block">
+        <span class="detail-label">Playback</span>
+        {#if deviceState.playback == null}
+          <span class="detail-value">unset</span>
+        {:else}
+          <PlayStopButton playing={!deviceState.playback} disabled={true} class="playback-indicator" />
+        {/if}
+      </div>
+      <div class="detail-block">
+        <span class="detail-label">Recording</span>
+        {#if deviceState.recording == null}
+          <span class="detail-value">unset</span>
+        {:else}
+          <span class="record-dot" class:active={deviceState.recording}></span>
+        {/if}
+      </div>
+      <div class="detail-block">
+        <span class="detail-label">Undo</span>
+        <span class="detail-value">{deviceState.undoSession ?? 'unset'}</span>
+      </div>
+    </div>
+  </div>
+  {/if}
 
   <div class="pane">
     <div class="pane-header">
@@ -292,11 +471,13 @@
         {@const isDrums = track.isDrums ?? false}
         {@const canOpenSettings = track.canOpenSettings ?? false}
         {@const isActive = isMaster ? true : (channel !== null ? midiControlState.activeChannels[channel] : false)}
-        <div class="row">
+        {@const isDeviceSelected = channel !== null && deviceState.channel === channel}
+        <div class="row" class:device-selected={isDeviceSelected}>
           <div class="track-cell">
             <div class="track-controls">
               <button
                 class={`label btn-chan ${canOpenSettings ? '' : 'disabled'}`}
+                class:device-selected={isDeviceSelected}
                 title={isMaster ? 'Master track' : (isDrums ? 'Drums channel' : 'Edit synth')}
                 onclick={() => { if (canOpenSettings && channel !== null) selected.ch = channel; }}
               >
@@ -455,11 +636,72 @@
   .status-item { display: flex; gap: 6px; align-items: baseline; }
   .status-label { color: var(--du-muted); font-weight: 500; }
   .status-value { color: var(--du-text); font-weight: 600; font-family: monospace; font-size: 1.05em; }
+  .status-value.placeholder { font-style: italic; }
+  .state-details {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 11px;
+    border: 1px solid var(--du-border);
+    background: #f8fafc;
+    padding: 8px 10px;
+    border-radius: var(--du-radius);
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    align-items: flex-start;
+  }
+  .detail-stack { display: flex; flex-direction: column; gap: 8px; }
+  .detail-block { display: flex; flex-direction: column; gap: 4px; }
+  .detail-block.detail-wide { min-width: 280px; }
+  .detail-label { color: #4b5563; text-transform: uppercase; letter-spacing: .08em; font-size: 10px; }
+  .detail-value { font-variant-numeric: tabular-nums; }
+  .detail-value.placeholder { font-style: italic; color: #6b7280; }
+  .detail-note { color: #6b7280; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+  :global(.play-stop-button.playback-indicator) {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: default;
+    box-shadow: none;
+  }
+  :global(.play-stop-button.playback-indicator:hover) { background: transparent; }
+  .record-dot { width: 10px; height: 10px; border-radius: 999px; background: #9ca3af; box-shadow: inset 0 0 0 1px #6b7280; display: inline-block; }
+  .record-dot.active { background: #dc2626; box-shadow: 0 0 6px rgba(220, 38, 38, 0.6); }
+  .mini-table { border-collapse: collapse; border: 1px solid var(--du-border); }
+  .mini-table th, .mini-table td { border: 1px solid var(--du-border); padding: 2px 5px; text-align: center; font-size: 10px; min-width: 18px; height: 18px; line-height: 14px; }
+  .mini-table th { background: #eef2f7; font-weight: 700; }
+  .mini-table td.marked { background: #111827; color: #fff; font-weight: 700; }
+  .mini-table td.muted { background: #fff3a6; color: #6b5600; font-weight: 700; }
+  .lever {
+    min-width: 36px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid #9ca3af;
+    background: #f3f4f6;
+    color: #4b5563;
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .lever::before { content: "OFF"; }
+  .lever.on {
+    background: #ffedd5;
+    border-color: #f59e0b;
+    color: #b45309;
+  }
+  .lever.on::before { content: "ON"; }
 
   .pane { display: flex; flex-direction: column; gap: 8px; }
   .pane-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .list { display: flex; flex-direction: column; gap: 6px; }
   .row { display: grid; grid-template-columns: 360px 1fr; align-items: start; gap: 8px; padding: 10px; border: 1px solid #2f313a; border-radius: var(--du-radius); background: #fcfcfd; box-shadow: none; }
+  .row.device-selected { border-color: #f59e0b; background: #fff8e1; }
   @media (max-width: 860px) { .row { grid-template-columns: 1fr; } }
   .track-cell { display: flex; flex-direction: column; gap: 8px; }
   .track-controls { display: flex; align-items: center; gap: 8px; }
@@ -470,6 +712,7 @@
   .drum-kit-status.error { color: #b91c1c; }
   .label { font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--du-text); text-align:left; }
   .btn-chan { background:#fff; padding:6px 8px; cursor:pointer; border:1px solid black; display:flex; align-items:center; gap:6px; width: 100%; justify-content: flex-start; flex: 1; }
+  .btn-chan.device-selected { box-shadow: inset 0 0 0 2px #f59e0b; border-color: #b45309; }
   .btn-chan:hover { background:#f9fafb; }
   .btn-chan.disabled { opacity: 0.6; cursor: default; }
   .btn-chan .gear { margin-left: auto; font-size: 18px; color: #000; line-height: 1; }

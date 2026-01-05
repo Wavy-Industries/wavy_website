@@ -20,7 +20,7 @@ main {
     display: flex;
     flex-direction: column;
 }
-body.device-utility-connected header {
+body.device-utility-open header {
     display: none;
 }
 section { width: 100%; padding: 0 20px; }

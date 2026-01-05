@@ -1,8 +1,12 @@
+import { tickProviderGetBpm, tickProviderSetBpm } from '~/lib/tickProvider';
+
 export const tempoState = $state({
-  bpm: 120,
+  bpm: tickProviderGetBpm(),
 });
 
 export function setTempo(bpm: number) {
-  const clamped = Math.max(1, Math.min(999, Math.round(bpm || 120)));
-  tempoState.bpm = clamped;
+  const value = Number(bpm);
+  const next = Number.isFinite(value) ? value : 120;
+  tempoState.bpm = next;
+  tickProviderSetBpm(next);
 }

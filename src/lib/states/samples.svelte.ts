@@ -203,13 +203,14 @@ export const uplaodDeviceSamples = async (newSamples: DeviceSamples, mode: Sampl
 
 export const DEFAULT_SAMPLE_PACK_IDS_BY_MODE: Record<SampleMode, string[]> = {
   [SampleMode.DRM]: ['W-MIXED', 'W-UNDRGND', 'W-OLLI', 'W-OG'],
-  [SampleMode.PAT]: ['W-PATTEST'],
+  [SampleMode.PAT]: ['W-OG', 'W-PATTEST'],
 };
 
 export const uplaodDeviceDefaultSamples = async (mode: SampleMode = deviceSamplesState.activeMode) => {
   log.debug('Uploading default samples to device...');
   if (_isTransfering) { log.error('Transfer already in progress, aborting new upload request.'); deviceSampleTransferState.upload = { type: 'error', message: 'Transfer already in progress' }; return false; }
-  const effectiveMode = deviceSamplesState.modeSupported ? mode : SampleMode.DRM;
+  const resolvedMode = typeof mode === 'number' ? mode : deviceSamplesState.activeMode;
+  const effectiveMode = deviceSamplesState.modeSupported ? resolvedMode : SampleMode.DRM;
   const deviceSamples = await buildDeviceSamplesFromIds(DEFAULT_SAMPLE_PACK_IDS_BY_MODE[effectiveMode], effectiveMode);
   if (!deviceSamples) { log.error('Failed to construct default sample packs'); deviceSampleTransferState.upload = { type: 'error', message: 'Failed to construct default sample packs' }; return false; }
   return await uplaodDeviceSamples(deviceSamples, effectiveMode);
