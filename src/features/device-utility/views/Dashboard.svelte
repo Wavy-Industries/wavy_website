@@ -16,8 +16,15 @@
     import { initDrumKits } from '~/features/device-utility/states/drumKits.svelte';
     import {  windowStateInit, windowState, DeviceUtilityView } from '~/features/device-utility/states/window.svelte';
     import { deviceState } from '~/features/device-utility/states/deviceState.svelte';
+    import { getOperatingSystem } from '~/lib/utils/operating_system';
+
+    const _showIosAudioNote = () => {
+        if (getOperatingSystem() !== 'iOS') return;
+        window.alert('Note for iOS: if you hear no sound, check that the hardware silent switch is off. Web audio can be muted by silent mode.');
+    };
 
     onMount(async () => {
+        _showIosAudioNote();
         windowStateInit();
         initDrumKits();
 

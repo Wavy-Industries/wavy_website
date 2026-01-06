@@ -37,7 +37,7 @@
     });
   
     async function handleConnectClick() {
-      try { await soundBackend.resume?.(); } catch {}
+      try { await soundBackend.resume?.(); } catch {} // used for enabling Audio on IOS devices
       await bluetoothManager.connect(filters);
     }
   </script>
