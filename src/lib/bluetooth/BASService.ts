@@ -5,7 +5,7 @@ export class BatteryService {
     private readonly BATTERY_LEVEL_UUID = '00002a19-0000-1000-8000-00805f9b34fb';
 
     private bluetoothManager: BluetoothManager;
-    private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
+    private characteristicKey: string | null = null;
     private initPromise: Promise<void> | null = null;
     private _boundCharHandler: ((event: Event) => void) | null = null;
     private cachedLevel: number | null = null;
@@ -17,10 +17,10 @@ export class BatteryService {
     }
 
     public reset(): void {
-        if (this.characteristic && this._boundCharHandler) {
-            try { this.characteristic.removeEventListener('characteristicvaluechanged', this._boundCharHandler); } catch {}
+        if (this.characteristicKey && this._boundCharHandler) {
+            try { void this.bluetoothManager.removeCharacteristicListener(this.characteristicKey, 'characteristicvaluechanged', this._boundCharHandler); } catch {}
         }
-        this.characteristic = null;
+        this.characteristicKey = null;
         this.cachedLevel = null;
         this.initPromise = null;
     }
@@ -29,25 +29,25 @@ export class BatteryService {
         if (this.initPromise) { await this.initPromise; return this.characteristic !== null; }
         this.initPromise = new Promise<void>(async (resolve, reject) => {
             try {
-                if (this.characteristic && this._boundCharHandler) {
-                    try { this.characteristic.removeEventListener('characteristicvaluechanged', this._boundCharHandler); } catch {}
+                if (this.characteristicKey && this._boundCharHandler) {
+                    try { await this.bluetoothManager.removeCharacteristicListener(this.characteristicKey, 'characteristicvaluechanged', this._boundCharHandler); } catch {}
                 }
-                this.characteristic = await this.bluetoothManager.getCharacteristic(this.BAS_SERVICE_UUID, this.BATTERY_LEVEL_UUID);
-                if (!this.characteristic) { reject(new Error('Failed to get battery level characteristic')); return; }
-                try { await this.bluetoothManager.startNotifications(this.characteristic); } catch {}
+                this.characteristicKey = await this.bluetoothManager.getCharacteristicKey(this.BAS_SERVICE_UUID, this.BATTERY_LEVEL_UUID);
+                if (!this.characteristicKey) { reject(new Error('Failed to get battery level characteristic')); return; }
+                try { await this.bluetoothManager.startNotifications(this.characteristicKey); } catch {}
                 if (!this._boundCharHandler) this._boundCharHandler = this._handleBatteryLevel.bind(this);
-                this.characteristic.addEventListener('characteristicvaluechanged', this._boundCharHandler);
+                await this.bluetoothManager.addCharacteristicListener(this.characteristicKey, 'characteristicvaluechanged', this._boundCharHandler);
                 resolve();
             } catch (error) { reject(error); } finally { this.initPromise = null; }
         });
         try { await this.initPromise; return true; } catch { return false; }
     }
 
-    public isInitialized(): boolean { return this.characteristic !== null; }
+    public isInitialized(): boolean { return this.characteristicKey !== null; }
 
     public async getBatteryLevel(): Promise<number | null> {
-        if (!this.characteristic) { const ok = await this.initialize(); if (!ok || !this.characteristic) return null; }
-        const view = await this.bluetoothManager.readCharacteristicValue(this.characteristic);
+        if (!this.characteristicKey) { const ok = await this.initialize(); if (!ok || !this.characteristicKey) return null; }
+        const view = await this.bluetoothManager.readCharacteristicValue(this.characteristicKey);
         if (!view || view.byteLength < 1) return null;
         const level = view.getUint8(0);
         this.cachedLevel = level;

@@ -15,6 +15,7 @@ export class BluetoothManager {
     private mtu: number = 250;
     private state: ConnectionState = { type: 'disconnected' };
     private gattQueue: Promise<void> = Promise.resolve();
+    private characteristicCache: Map<string, BluetoothRemoteGATTCharacteristic> = new Map();
 
     public onConnect: (() => void) | null = null;
     public onDisconnect: (() => void) | null = null;
@@ -30,33 +31,47 @@ export class BluetoothManager {
     public get connectedDevice(): BluetoothDevice | null { return this.device; }
     public get gattServer(): BluetoothRemoteGATTServer | null { return this.device?.gatt || null; }
 
-    public async getCharacteristic(serviceUUID: string, characteristicUUID: string): Promise<BluetoothRemoteGATTCharacteristic | null> {
-        if (!this.device || !this.device.gatt) { console.error('No device connected'); return null; }
-        try {
-            return await this._queueGattOperation(async () => {
-                const service = await this.device!.gatt!.getPrimaryService(serviceUUID);
-                return service.getCharacteristic(characteristicUUID);
-            });
-        } catch (error) {
-            console.error(`Failed to get characteristic ${characteristicUUID} from service ${serviceUUID}:`, error);
-            return null;
-        }
+    public async getCharacteristicKey(serviceUUID: string, characteristicUUID: string): Promise<string | null> {
+        const key = this._buildCharacteristicKey(serviceUUID, characteristicUUID);
+        if (this.characteristicCache.has(key)) return key;
+        const characteristic = await this._getCharacteristicForKey(key);
+        return characteristic ? key : null;
     }
 
-    public async startNotifications(characteristic: BluetoothRemoteGATTCharacteristic): Promise<void> {
+    public async startNotifications(characteristicKey: string): Promise<void> {
+        const characteristic = await this._getCharacteristicForKey(characteristicKey);
+        if (!characteristic) throw new Error('Characteristic not available');
         await this._queueGattOperation(() => characteristic.startNotifications());
     }
 
-    public async stopNotifications(characteristic: BluetoothRemoteGATTCharacteristic): Promise<void> {
+    public async stopNotifications(characteristicKey: string): Promise<void> {
+        const characteristic = await this._getCharacteristicForKey(characteristicKey);
+        if (!characteristic) throw new Error('Characteristic not available');
         await this._queueGattOperation(() => characteristic.stopNotifications());
     }
 
-    public async readCharacteristicValue(characteristic: BluetoothRemoteGATTCharacteristic): Promise<DataView> {
+    public async readCharacteristicValue(characteristicKey: string): Promise<DataView> {
+        const characteristic = await this._getCharacteristicForKey(characteristicKey);
+        if (!characteristic) throw new Error('Characteristic not available');
         return this._queueGattOperation(() => characteristic.readValue());
     }
 
-    public async writeCharacteristicValueWithoutResponse(characteristic: BluetoothRemoteGATTCharacteristic, value: BufferSource): Promise<void> {
+    public async writeCharacteristicValueWithoutResponse(characteristicKey: string, value: BufferSource): Promise<void> {
+        const characteristic = await this._getCharacteristicForKey(characteristicKey);
+        if (!characteristic) throw new Error('Characteristic not available');
         await this._queueGattOperation(() => characteristic.writeValueWithoutResponse(value));
+    }
+
+    public async addCharacteristicListener(characteristicKey: string, eventName: string, handler: EventListener): Promise<void> {
+        const characteristic = await this._getCharacteristicForKey(characteristicKey);
+        if (!characteristic) throw new Error('Characteristic not available');
+        characteristic.addEventListener(eventName, handler);
+    }
+
+    public async removeCharacteristicListener(characteristicKey: string, eventName: string, handler: EventListener): Promise<void> {
+        const characteristic = this.characteristicCache.get(characteristicKey);
+        if (!characteristic) return;
+        characteristic.removeEventListener(eventName, handler);
     }
 
     private async _requestDevice(filters?: BluetoothLEScanFilter[]): Promise<BluetoothDevice> {
@@ -120,12 +135,18 @@ export class BluetoothManager {
     }
 
     private async _handleDisconnection(): Promise<void> {
+        this._resetCharacteristicCache();
         if (this.state.type === 'connected') { this.state = { type: 'connectionLoss' }; this.onConnectionLoss?.(); await this._reconnect(); }
         else if (this.state.type === 'disconnecting') { await this._handleDisconnected?.(); }
     }
 
     private async _reconnect(): Promise<void> { try { await this._connectDevice(); } catch (e) { console.error('Reconnection error:', e); } }
-    private async _handleDisconnected(): Promise<void> { this.state = { type: 'disconnected' }; this.onDisconnect?.(); this.device = null; }
+    private async _handleDisconnected(): Promise<void> {
+        this._resetCharacteristicCache();
+        this.state = { type: 'disconnected' };
+        this.onDisconnect?.();
+        this.device = null;
+    }
     public get name(): string | undefined { return this.device?.name; }
     public get maxPayloadSize(): number { const MTU_OVERHEAD = 3; return this.mtu - MTU_OVERHEAD - 8; }
 
@@ -135,5 +156,32 @@ export class BluetoothManager {
         const result = this.gattQueue.then(run, run);
         this.gattQueue = result.then(() => undefined, () => undefined);
         return result;
+    }
+
+    private _buildCharacteristicKey(serviceUUID: string, characteristicUUID: string): string {
+        return `${serviceUUID.toLowerCase()}:${characteristicUUID.toLowerCase()}`;
+    }
+
+    private async _getCharacteristicForKey(characteristicKey: string): Promise<BluetoothRemoteGATTCharacteristic | null> {
+        const cached = this.characteristicCache.get(characteristicKey);
+        if (cached) return cached;
+        if (!this.device || !this.device.gatt) { console.error('No device connected'); return null; }
+        const [serviceUUID, characteristicUUID] = characteristicKey.split(':');
+        if (!serviceUUID || !characteristicUUID) { console.error(`Invalid characteristic key ${characteristicKey}`); return null; }
+        try {
+            const characteristic = await this._queueGattOperation(async () => {
+                const service = await this.device!.gatt!.getPrimaryService(serviceUUID);
+                return service.getCharacteristic(characteristicUUID);
+            });
+            this.characteristicCache.set(characteristicKey, characteristic);
+            return characteristic;
+        } catch (error) {
+            console.error(`Failed to get characteristic ${characteristicUUID} from service ${serviceUUID}:`, error);
+            return null;
+        }
+    }
+
+    private _resetCharacteristicCache(): void {
+        this.characteristicCache.clear();
     }
 }

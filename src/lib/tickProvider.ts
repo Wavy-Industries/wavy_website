@@ -71,10 +71,6 @@ export function tickProviderGetBpm(): number {
   return _bpm;
 }
 
-export function tickProviderIncrementBpm(inc: number): void {
-  tickProviderSetBpm(_bpm + inc);
-}
-
 function _restartTicker(): void {
   _clearTickTimeout();
   _scheduleTick(0);

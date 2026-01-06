@@ -30,7 +30,7 @@ export class DeviceInformationService {
     if (this.initPromise) { await this.initPromise; return true; }
     // Touch one char to ensure the service is reachable
     this.initPromise = (async () => {
-      await this.bluetoothManager.getCharacteristic(this.DIS_SERVICE_UUID, this.CH.modelNumber);
+      await this.bluetoothManager.getCharacteristicKey(this.DIS_SERVICE_UUID, this.CH.modelNumber);
     })().finally(() => { this.initPromise = null; });
 
     try { await this.initPromise; return true; } catch { return false; }
@@ -79,10 +79,10 @@ export class DeviceInformationService {
       if (!(await this.initialize())) return null;
 
       const charUuid = this.CH[key];
-      const ch = await this.bluetoothManager.getCharacteristic(this.DIS_SERVICE_UUID, charUuid);
-      if (!ch) return null;
+      const key = await this.bluetoothManager.getCharacteristicKey(this.DIS_SERVICE_UUID, charUuid);
+      if (!key) return null;
 
-      const view = await this.bluetoothManager.readCharacteristicValue(ch);
+      const view = await this.bluetoothManager.readCharacteristicValue(key);
       if (!view) return null;
 
       const u8 = new Uint8Array(view.buffer);

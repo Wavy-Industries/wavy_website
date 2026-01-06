@@ -50,7 +50,7 @@ export class DeviceStateService {
     };
 
     private bluetoothManager: BluetoothManager;
-    private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
+    private characteristicKey: string | null = null;
     private stateInitPromise: Promise<void> | null = null;
     private _boundCharHandler: ((event: Event) => void) | null = null;
     private deviceState: DeviceStateSnapshot = {
@@ -77,10 +77,10 @@ export class DeviceStateService {
     }
 
     public reset(): void {
-        if (this.characteristic && this._boundCharHandler) {
-            try { this.characteristic.removeEventListener('characteristicvaluechanged', this._boundCharHandler); } catch {}
+        if (this.characteristicKey && this._boundCharHandler) {
+            try { void this.bluetoothManager.removeCharacteristicListener(this.characteristicKey, 'characteristicvaluechanged', this._boundCharHandler); } catch {}
         }
-        this.characteristic = null;
+        this.characteristicKey = null;
         this.stateInitPromise = null;
     }
 
@@ -88,21 +88,21 @@ export class DeviceStateService {
         if (this.stateInitPromise) { await this.stateInitPromise; return this.characteristic !== null; }
         this.stateInitPromise = new Promise<void>(async (resolve, reject) => {
             try {
-                if (this.characteristic && this._boundCharHandler) {
-                    try { this.characteristic.removeEventListener('characteristicvaluechanged', this._boundCharHandler); } catch {}
+                if (this.characteristicKey && this._boundCharHandler) {
+                    try { await this.bluetoothManager.removeCharacteristicListener(this.characteristicKey, 'characteristicvaluechanged', this._boundCharHandler); } catch {}
                 }
-                this.characteristic = await this.bluetoothManager.getCharacteristic(this.STATE_SERVICE_UUID, this.STATE_CHARACTERISTIC_UUID);
-                if (!this.characteristic) { reject(new Error('Failed to get device state characteristic')); return; }
-                await this.bluetoothManager.startNotifications(this.characteristic);
+                this.characteristicKey = await this.bluetoothManager.getCharacteristicKey(this.STATE_SERVICE_UUID, this.STATE_CHARACTERISTIC_UUID);
+                if (!this.characteristicKey) { reject(new Error('Failed to get device state characteristic')); return; }
+                await this.bluetoothManager.startNotifications(this.characteristicKey);
                 if (!this._boundCharHandler) this._boundCharHandler = this._handleStateMessage.bind(this);
-                this.characteristic.addEventListener('characteristicvaluechanged', this._boundCharHandler);
+                await this.bluetoothManager.addCharacteristicListener(this.characteristicKey, 'characteristicvaluechanged', this._boundCharHandler);
                 resolve();
             } catch (error) { reject(error); } finally { this.stateInitPromise = null; }
         });
         try { await this.stateInitPromise; return true; } catch { return false; }
     }
 
-    public isInitialized(): boolean { return this.characteristic !== null; }
+    public isInitialized(): boolean { return this.characteristicKey !== null; }
 
     // A single snapshot log helps verify the full device state after any update.
     public logStateSnapshot(): void {

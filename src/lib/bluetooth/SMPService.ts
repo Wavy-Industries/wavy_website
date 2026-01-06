@@ -58,7 +58,7 @@ export class SMPService {
 
     private readonly SMP_SERVICE_UUID = '8d53dc1d-1db7-4cd3-868b-8a527460aa84';
     private readonly SMP_CHARACTERISTIC_UUID = 'da2e7828-fbce-4e01-ae9e-261174997c48';
-    private smpCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
+    private smpCharacteristicKey: string | null = null;
     private _boundCharHandler: ((event: Event) => void) | null = null;
     private smpInitialized: boolean = false;
     private smpBuffer: Uint8Array = new Uint8Array([]);
@@ -72,22 +72,23 @@ export class SMPService {
     }
 
     public reset(): void {
-        if (this.smpCharacteristic && this._boundCharHandler) {
-            try { this.smpCharacteristic.removeEventListener('characteristicvaluechanged', this._boundCharHandler); } catch {}
+        if (this.smpCharacteristicKey && this._boundCharHandler) {
+            try { void this.bluetoothManager.removeCharacteristicListener(this.smpCharacteristicKey, 'characteristicvaluechanged', this._boundCharHandler); } catch {}
         }
         this.smpInitPromise = null;
         this.smpInitialized = false;
+        this.smpCharacteristicKey = null;
     }
 
     private async _initializeSMP(): Promise<void> {
         if (this.smpInitPromise) return this.smpInitPromise;
         this.smpInitPromise = new Promise<void>(async (resolve, reject) => {
             try {
-                this.smpCharacteristic = await this.bluetoothManager.getCharacteristic(this.SMP_SERVICE_UUID, this.SMP_CHARACTERISTIC_UUID);
-                if (!this.smpCharacteristic) { reject(new Error('Failed to get SMP characteristic')); return; }
-                await this.bluetoothManager.startNotifications(this.smpCharacteristic);
+                this.smpCharacteristicKey = await this.bluetoothManager.getCharacteristicKey(this.SMP_SERVICE_UUID, this.SMP_CHARACTERISTIC_UUID);
+                if (!this.smpCharacteristicKey) { reject(new Error('Failed to get SMP characteristic')); return; }
+                await this.bluetoothManager.startNotifications(this.smpCharacteristicKey);
                 if (!this._boundCharHandler) this._boundCharHandler = this._handleSMPMessage.bind(this);
-                this.smpCharacteristic.addEventListener('characteristicvaluechanged', this._boundCharHandler);
+                await this.bluetoothManager.addCharacteristicListener(this.smpCharacteristicKey, 'characteristicvaluechanged', this._boundCharHandler);
                 this.smpInitialized = true;
                 resolve();
             } catch (error) { reject(error); } finally { this.smpInitPromise = null; }
@@ -109,15 +110,15 @@ export class SMPService {
             this.responseResolvers[sequenceNumber] = { resolve, reject };
             try {
                 if (this.smpWritePromise) await this.smpWritePromise;
-                if (!this.smpCharacteristic) throw new Error('SMP characteristic not available');
-                this.smpWritePromise = this.bluetoothManager.writeCharacteristicValueWithoutResponse(this.smpCharacteristic, message);
+                if (!this.smpCharacteristicKey) throw new Error('SMP characteristic not available');
+                this.smpWritePromise = this.bluetoothManager.writeCharacteristicValueWithoutResponse(this.smpCharacteristicKey, message);
                 await this.smpWritePromise; this.smpWritePromise = null;
             } catch (error: any) {
                 log.debug(`Failed to send SMP message: ${error}`);
                 delete this.responseResolvers[sequenceNumber]; this.smpWritePromise = null;
                 if (error.message?.includes('no longer valid') || error.message?.includes('Characteristic')) {
                     this.smpInitialized = false;
-                    try { await this._initializeSMP(); if (this.smpCharacteristic) { await this.bluetoothManager.writeCharacteristicValueWithoutResponse(this.smpCharacteristic, message); return; } } catch {}
+                    try { await this._initializeSMP(); if (this.smpCharacteristicKey) { await this.bluetoothManager.writeCharacteristicValueWithoutResponse(this.smpCharacteristicKey, message); return; } } catch {}
                 }
                 reject(error);
             }
