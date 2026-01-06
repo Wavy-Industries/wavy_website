@@ -634,6 +634,7 @@
 .row.empty { opacity: 0.75; background: #f9fafb; }
 .index { text-align: center; background:#111827; color:#fff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid #000; border-radius: var(--pe-radius); }
 .badge { padding: 2px 8px; border-radius: var(--pe-radius); font-size: 0.75em; text-transform: capitalize; border: 1px solid var(--du-border); background: #f9fafb; }
+.name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
 .usage { text-align: right; font-variant-numeric: tabular-nums; color: #555; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .actions .btn { border: 1px solid #2f313a; background: #f2f3f5; color: #111827; border-radius: var(--pe-radius); padding: 6px 8px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
@@ -678,5 +679,26 @@
 .desc { color:#444; font-size: 0.9em; }
 .outofsync { margin-left: 8px; color: #a40000; display: inline-flex; align-items: center; }
 .outofsync svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+@media (max-width: 900px) {
+  .content { padding: 12px; max-width: 100%; }
+  .toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .toolbar .right { align-items: flex-start; }
+  .toolbar .right .subhead { align-self: flex-start; }
+  .toolbar .right .subhead::after { width: 100px; }
+  .toolbar .right .actions-row { gap: 6px; }
+  .mode-tabs { flex-wrap: wrap; }
+  .status { gap: 8px; }
+  .progress { width: 120px; }
+  .row { grid-template-columns: 28px 54px minmax(0, 1fr) 52px auto; align-items: center; gap: 6px; padding: 8px; }
+  .index { width: 24px; height: 24px; font-size: 11px; }
+  .badge { font-size: 0.7em; padding: 2px 6px; }
+  .name { gap: 4px; }
+  .usage { text-align: right; font-size: 12px; }
+  .actions { justify-content: flex-start; flex-wrap: nowrap; gap: 4px; }
+  .row .icon-btn { width: 28px; height: 28px; }
+  .row .actions .btn { padding: 4px; font-size: 11px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
 
 </style>

@@ -756,4 +756,19 @@
   
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index: 1000; padding: 20px; }
 .modal-panel { max-width: 98vw; max-height: 92vh; overflow: auto; padding: 4px; background:#fff; border-radius:10px; }
+
+  @media (max-width: 900px) {
+    .content { padding: 12px; max-width: 100%; }
+    .toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+    .toolbar .right { flex-wrap: wrap; justify-content: flex-start; }
+    .status { gap: 8px; }
+    .detail-block.detail-wide { min-width: 0; }
+    .state-details { gap: 8px 10px; }
+    .row { grid-template-columns: 1fr; }
+    .fx-control { grid-template-columns: 1fr 120px 40px; }
+  }
+
+  @media (max-width: 600px) {
+    .mini-table th, .mini-table td { font-size: 9px; min-width: 16px; }
+  }
 </style>

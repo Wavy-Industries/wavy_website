@@ -102,3 +102,22 @@ a[active] { color: var(--du-accent); }
 
 /* Page background for device utility */
 main[style*="background-color"] { background-color: var(--du-bg) !important; }
+
+body.device-utility-page {
+    min-width: 0;
+}
+
+@media (max-width: 900px) {
+    :root { --du-maxw: 100%; }
+    section { padding: 0 12px; }
+    h1 { font-size: 34px; }
+    .main-content { margin: 60px auto; gap: 12px; }
+    .tagline { font-size: 14px; }
+}
+
+@media (max-width: 600px) {
+    h1 { font-size: 28px; }
+    .main-content { margin: 40px auto; }
+    button, input[type="submit"] { padding: 6px 10px; font-size: 12px; }
+    #device-tools-header { gap: 20px; flex-wrap: wrap; }
+}

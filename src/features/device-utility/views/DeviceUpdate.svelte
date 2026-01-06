@@ -151,4 +151,18 @@
     .toolbar .right .actions-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .toolbar .right .subhead { position: relative; font-size: 12px; font-weight: 800; letter-spacing: .08em; color: #111827; text-transform: uppercase; padding-bottom: 6px; align-self: flex-end; }
     .toolbar .right .subhead::after { content: ""; position: absolute; right: 0; bottom: 0; width: 140px; height: 3px; background: #2f313a; }
+
+    @media (max-width: 900px) {
+        .content { padding: 12px; max-width: 100%; }
+        .toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+        .toolbar .right { align-items: flex-start; }
+        .toolbar .right .subhead { align-self: flex-start; }
+        .toolbar .right .subhead::after { width: 100px; }
+        .select-wrap select { min-width: 0; width: 100%; }
+    }
+
+    @media (max-width: 600px) {
+        .toolbar .right .actions-row { width: 100%; }
+        .update-buttons { width: 100%; }
+    }
 </style>

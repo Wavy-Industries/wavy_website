@@ -1,4 +1,7 @@
+import { Log } from '../utils/Log';
 import { BluetoothManager } from './bluetoothManager';
+
+let log = new Log('midi', Log.LEVEL_DEBUG);
 
 export class MIDIService {
     private characteristicKey: string | null = null;
@@ -28,7 +31,7 @@ export class MIDIService {
     }
 
     public async initialize(): Promise<boolean> {
-        if (this.midiInitPromise) { await this.midiInitPromise; return this.characteristic !== null; }
+        if (this.midiInitPromise) { await this.midiInitPromise; return this.characteristicKey !== null; }
         this.midiInitPromise = new Promise<void>(async (resolve, reject) => {
             try {
                 // Remove old listener if any
@@ -65,14 +68,15 @@ export class MIDIService {
         const value = characteristic.value;
         if (!value) return;
         const data = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        const hex = Array.from(data).map((b) => b.toString(16).padStart(2, '0')).join(' ');
+        log.debug(['packet', hex]);
         this.onMIDIMessage?.(data);
         this._parseMIDIMessage(data);
     }
 
     private _parseMIDIMessage(data: Uint8Array): void {
         if (data.length === 0) return;
-        const hasBleHeader = (data[0] & 0x80) !== 0;
-        let i = hasBleHeader ? 1 : 0;
+        const isBlePacket = (data[0] & 0x80) !== 0;
         let runningStatus: number | null = null;
 
         const isRealtime = (status: number) => status >= 0xF8;
@@ -86,29 +90,57 @@ export class MIDIService {
             }
             return 2;
         };
+        const isDataByte = (value: number) => (value & 0x80) === 0;
         const hasDataBytes = (idx: number, len: number) => {
             if (len === 0) return true;
             if (idx + len > data.length) return false;
             for (let j = 0; j < len; j++) {
-                if ((data[idx + j] & 0x80) !== 0) return false;
+                if (!isDataByte(data[idx + j])) return false;
             }
             return true;
         };
+        const shouldTreatAsStatus = (status: number, idx: number) => {
+            if (isRealtime(status)) return true;
+            const dataLen = dataLenForStatus(status);
+            return hasDataBytes(idx + 1, dataLen);
+        };
+        const handleChannelMessage = (status: number, data1: number, data2: number) => {
+            const type = status & 0xF0;
+            const channel = status & 0x0F;
+            switch (type) {
+                case 0x90:
+                    if (data2 === 0) {
+                        log.debug(['note-off', { note: data1, velocity: data2, channel }]);
+                        this.onNoteOff?.(data1, data2, channel);
+                    } else {
+                        log.debug(['note-on', { note: data1, velocity: data2, channel }]);
+                        this.onNoteOn?.(data1, data2, channel);
+                    }
+                    break;
+                case 0x80:
+                    log.debug(['note-off', { note: data1, velocity: data2, channel }]);
+                    this.onNoteOff?.(data1, data2, channel);
+                    break;
+                case 0xB0:
+                    log.debug(['cc', { controller: data1, value: data2, channel }]);
+                    this.onControlChange?.(data1, data2, channel);
+                    break;
+            }
+        };
 
+        let i = isBlePacket ? 1 : 0;
         while (i < data.length) {
             let status = data[i];
             if ((status & 0x80) !== 0) {
-                if (isRealtime(status)) { i++; continue; }
-
-                const dataLen = dataLenForStatus(status);
-                if (!hasDataBytes(i + 1, dataLen)) {
-                    // Timestamp low byte or incomplete status, skip it.
+                if (isBlePacket && !shouldTreatAsStatus(status, i)) {
+                    // Likely BLE-MIDI timestamp byte; skip it.
                     i++;
                     continue;
                 }
-
+                if (isRealtime(status)) { i++; continue; }
                 i++;
-                runningStatus = status;
+                if ((status & 0xF0) !== 0xF0) runningStatus = status;
+                else if (status < 0xF8) runningStatus = null;
             } else if (runningStatus !== null) {
                 status = runningStatus;
             } else {
@@ -117,17 +149,15 @@ export class MIDIService {
             }
 
             const type = status & 0xF0;
-            const channel = status & 0x0F;
             if (type === 0xF0) {
                 if (status === 0xF0) {
                     while (i < data.length && data[i] !== 0xF7) i++;
                     if (i < data.length) i++;
                 } else {
                     const sysLen = dataLenForStatus(status);
-                    if (!hasDataBytes(i, sysLen)) break;
+                    if (i + sysLen > data.length) break;
                     i += sysLen;
                 }
-                runningStatus = null;
                 continue;
             }
 
@@ -135,19 +165,8 @@ export class MIDIService {
             if (!hasDataBytes(i, dataLen)) break;
             const data1 = data[i++];
             const data2 = dataLen === 2 ? data[i++] : 0;
-
-            switch (type) {
-                case 0x90:
-                    if (data2 === 0) this.onNoteOff?.(data1, data2, channel);
-                    else this.onNoteOn?.(data1, data2, channel);
-                    break;
-                case 0x80:
-                    this.onNoteOff?.(data1, data2, channel);
-                    break;
-                case 0xB0:
-                    this.onControlChange?.(data1, data2, channel);
-                    break;
-            }
+            if (!isDataByte(data1) || (dataLen === 2 && !isDataByte(data2))) continue;
+            handleChannelMessage(status, data1, data2);
         }
     }
 

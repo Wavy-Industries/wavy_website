@@ -116,7 +116,7 @@
     {#if !isLoading}
     <nav>
       <div class="nav-inner">
-        <div>
+        <div class="nav-status">
             <button onclick={() => {bluetoothManager.disconnect(); window.location.reload()}}>
                 <i class="bi-bluetooth-disconnect"></i>
                 exit
@@ -173,7 +173,7 @@
                 <span class="dev-indicator" title="Dev mode active - type 'disable dev mode' in console to disable">🔧</span>
             {/if}
         </div>
-        <div>
+        <div class="nav-tabs">
             <a 
                 href="#playground" 
                 class={currentView === DeviceUtilityView.Playground ? 'active' : ''}
@@ -245,7 +245,8 @@
         align-items: center;
         padding: 16px 20px;
         justify-content: space-between;
-        width: 100vw;
+        width: 100%;
+        box-sizing: border-box;
         flex-wrap: wrap;
         border-top: 1px solid var(--du-border);
         border-bottom: 1px solid var(--du-border);
@@ -262,7 +263,8 @@
         gap: 12px;
     }
 
-    .nav-inner > div {
+    .nav-status,
+    .nav-tabs {
         display: flex;
         flex-direction: row;
         align-items: center;
@@ -433,4 +435,13 @@
         animation: spin 1s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 860px) {
+        nav { padding: 12px 14px; }
+        .nav-inner { flex-direction: column; align-items: stretch; gap: 10px; }
+        .nav-status,
+        .nav-tabs { flex-wrap: wrap; justify-content: flex-start; gap: 10px; }
+        nav a { font-size: 11px; padding: 6px 8px; }
+        .info-tooltip { left: 0; right: auto; }
+    }
 </style>

@@ -383,7 +383,7 @@
 .drop .actions { margin-top: 0; }
 .drop .hint { display: none; }
 .hint { color: #777; font-size: 0.9em; }
-.content { min-height: 50px; display: flex; }
+.content { min-height: 50px; display: flex; min-width: 0; }
 input[type="file"] { width: 100%; }
 .tip { margin-top: 4px; color: var(--du-muted); font-size: 0.92em; }
 .preview-stack { display:flex; flex-direction: column; gap: 6px; width: 100%; }
@@ -425,4 +425,26 @@ input[type="file"] { width: 100%; }
 .errors { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 /* Embedded MIDI editor container */
 .embedded-editor { margin-top: 8px; display: flex; justify-content: center; width: 100%; overflow-x: hidden; }
+
+@media (max-width: 900px) {
+  .page { padding: 12px; max-width: 100%; }
+  .header { flex-wrap: wrap; align-items: flex-start; gap: 10px; }
+  .actions { flex-wrap: wrap; }
+  .toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .namer { flex-wrap: wrap; }
+  .row { grid-template-columns: 28px 32px minmax(0, 1fr) 64px auto; align-items: center; gap: 6px; padding: 8px; }
+  .metrics { justify-content: flex-start; text-align: left; white-space: nowrap; font-size: 11px; }
+  .reorder { justify-content: flex-start; flex-wrap: nowrap; gap: 4px; }
+  .drop { flex-direction: row; align-items: center; height: 44px; gap: 6px; padding: 4px 6px; flex-wrap: nowrap; }
+  .drop input[type="file"] { min-width: 0; font-size: 11px; }
+  .drop .actions { margin-top: 0; }
+  .drop .actions .btn { padding: 4px 6px; font-size: 11px; }
+  .drop .hint { display: none; }
+  .row .icon-btn { width: 28px; height: 28px; }
+  .embedded-editor { justify-content: stretch; }
+}
+
+@media (max-width: 600px) {
+  .button-link, .btn { padding: 6px 8px; font-size: 11px; }
+}
 </style>

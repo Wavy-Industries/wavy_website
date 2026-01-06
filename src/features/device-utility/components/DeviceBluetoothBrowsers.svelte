@@ -49,6 +49,7 @@
         justify-content: center;
         font-size: 2rem;
         margin-bottom: 0.5rem;
+        flex-wrap: wrap;
     }
     p {
         text-align: center;

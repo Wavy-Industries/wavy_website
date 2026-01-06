@@ -480,4 +480,14 @@
         transform: translateY(4px);
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
     }
+
+    @media (max-width: 900px) {
+        .device-tester { padding: 12px; max-width: 100%; }
+        .controls { flex-wrap: wrap; gap: 10px; }
+        .keyboard { overflow-x: auto; }
+    }
+
+    @media (max-width: 600px) {
+        .controls button { width: 100%; }
+    }
 </style> 

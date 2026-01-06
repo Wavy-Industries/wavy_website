@@ -6,10 +6,16 @@
 
     import { loadDevMode } from '~/features/device-utility/states/devmode.svelte';
 
-    onMount(() => loadDevMode())
+    const PAGE_CLASS = 'device-utility-page';
+    const CONNECTED_CLASS = 'device-utility-open';
+
+    onMount(() => {
+        loadDevMode();
+        if (typeof document === 'undefined') return;
+        document.body.classList.add(PAGE_CLASS);
+    })
 
     // hide the header when we enter device utility
-    const CONNECTED_CLASS = 'device-utility-open';
     $effect(() => {
         if (typeof document === 'undefined') return;
         if (bluetoothState.connectionState === 'disconnected') {
@@ -22,6 +28,7 @@
     onDestroy(() => {
         if (typeof document === 'undefined') return;
         document.body.classList.remove(CONNECTED_CLASS);
+        document.body.classList.remove(PAGE_CLASS);
     });
 
     import { callbacksSet } from '~/features/device-utility/eventRouter';

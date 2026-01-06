@@ -1130,4 +1130,33 @@
     z-index: 15;
     pointer-events: none;
   }
+
+  @media (max-width: 900px) {
+    .editor-screen {
+      max-width: 100%;
+      margin: 0;
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+      max-height: 100vh;
+    }
+    .editor-header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      padding: 10px 12px;
+    }
+    .header-left,
+    .header-right { flex-wrap: wrap; }
+    .subtitle { width: 100%; }
+    .grid-container { max-height: calc(100vh - 180px); }
+  }
+
+  @media (max-width: 600px) {
+    h2 { font-size: 16px; }
+    .subtitle { font-size: 12px; }
+    .control-group { width: 100%; }
+    .save-button,
+    .text-button { padding: 6px 10px; }
+  }
 </style>
