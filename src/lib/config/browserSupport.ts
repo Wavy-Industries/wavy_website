@@ -19,24 +19,24 @@ export function getBrowserRecommendations(os: OperatingSystem): BrowserSupport {
       return {
         message: 'Use Chrome or Edge on Windows.',
         recs: [
-          { id: 'chrome', name: 'Google Chrome' },
-          { id: 'edge', name: 'Microsoft Edge' },
+          { id: 'chrome', name: 'Google Chrome', url: 'https://www.google.com/chrome/' },
+          { id: 'edge', name: 'Microsoft Edge', url: 'https://www.microsoft.com/edge' },
         ],
       };
     case 'MacOS':
       return {
         message: 'Use a Chrome browser on macOS.',
-        recs: [{ id: 'chrome', name: 'Google Chrome' }],
+        recs: [{ id: 'chrome', name: 'Google Chrome', url: 'https://www.google.com/chrome/' }],
       };
     case 'Linux':
       return {
         message: 'Use a Chrome browser on Linux.',
-        recs: [{ id: 'chrome', name: 'Google Chrome' }],
+        recs: [{ id: 'chrome', name: 'Google Chrome', url: 'https://www.google.com/chrome/' }],
       };
     case 'Android':
       return {
         message: 'Use a Chrome browser on Android.',
-        recs: [{ id: 'chrome', name: 'Google Chrome' }],
+        recs: [{ id: 'chrome', name: 'Google Chrome', url: 'https://play.google.com/store/apps/details?id=com.android.chrome' }],
       };
     case 'iOS':
       return {
@@ -47,4 +47,3 @@ export function getBrowserRecommendations(os: OperatingSystem): BrowserSupport {
       return { message: 'Browser support may be limited on your operating system.', recs: [] };
   }
 }
-

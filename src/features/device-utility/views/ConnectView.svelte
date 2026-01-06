@@ -6,6 +6,7 @@
     import { onMount } from 'svelte';
     import { bluetoothManager, bluetoothState } from '~/lib/states/bluetooth.svelte';
     import DeviceBluetoothBrowsers from '~/features/device-utility/components/DeviceBluetoothBrowsers.svelte';
+    import { soundBackend } from '~/lib/soundBackend';
     
     // The device advertises the MIDI service, so we use that for discovery
     // Both SMP and MIDI services are treated equally once connected
@@ -36,6 +37,7 @@
     });
   
     async function handleConnectClick() {
+      try { await soundBackend.resume?.(); } catch {}
       await bluetoothManager.connect(filters);
     }
   </script>

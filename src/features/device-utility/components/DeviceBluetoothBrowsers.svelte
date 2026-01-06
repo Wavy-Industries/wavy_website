@@ -21,6 +21,7 @@
         It looks like your browser does not support Bluetooth :/<br />
         <p>{support.message}</p>
         {#if support.recs?.length}
+            <div class="download-note">Press the button below to download.</div>
             <div class="browser-icons">
                 {#each support.recs as rec}
                     {#if rec.url}
@@ -50,6 +51,10 @@
         font-size: 2rem;
         margin-bottom: 0.5rem;
         flex-wrap: wrap;
+    }
+    .download-note {
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
     }
     p {
         text-align: center;
