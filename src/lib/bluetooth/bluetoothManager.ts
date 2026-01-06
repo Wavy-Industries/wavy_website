@@ -14,6 +14,7 @@ export class BluetoothManager {
     private device: BluetoothDevice | null = null;
     private mtu: number = 250;
     private state: ConnectionState = { type: 'disconnected' };
+    private gattQueue: Promise<void> = Promise.resolve();
 
     public onConnect: (() => void) | null = null;
     public onDisconnect: (() => void) | null = null;
@@ -32,17 +33,34 @@ export class BluetoothManager {
     public async getCharacteristic(serviceUUID: string, characteristicUUID: string): Promise<BluetoothRemoteGATTCharacteristic | null> {
         if (!this.device || !this.device.gatt) { console.error('No device connected'); return null; }
         try {
-            const service = await this.device.gatt.getPrimaryService(serviceUUID);
-            const characteristic = await service.getCharacteristic(characteristicUUID);
-            return characteristic;
+            return await this._queueGattOperation(async () => {
+                const service = await this.device!.gatt!.getPrimaryService(serviceUUID);
+                return service.getCharacteristic(characteristicUUID);
+            });
         } catch (error) {
             console.error(`Failed to get characteristic ${characteristicUUID} from service ${serviceUUID}:`, error);
             return null;
         }
     }
 
+    public async startNotifications(characteristic: BluetoothRemoteGATTCharacteristic): Promise<void> {
+        await this._queueGattOperation(() => characteristic.startNotifications());
+    }
+
+    public async stopNotifications(characteristic: BluetoothRemoteGATTCharacteristic): Promise<void> {
+        await this._queueGattOperation(() => characteristic.stopNotifications());
+    }
+
+    public async readCharacteristicValue(characteristic: BluetoothRemoteGATTCharacteristic): Promise<DataView> {
+        return this._queueGattOperation(() => characteristic.readValue());
+    }
+
+    public async writeCharacteristicValueWithoutResponse(characteristic: BluetoothRemoteGATTCharacteristic, value: BufferSource): Promise<void> {
+        await this._queueGattOperation(() => characteristic.writeValueWithoutResponse(value));
+    }
+
     private async _requestDevice(filters?: BluetoothLEScanFilter[]): Promise<BluetoothDevice> {
-        const params = { optionalServices: ['03b80e5a-ede8-4b33-a751-6ce34ec4c700', '8d53dc1d-1db7-4cd3-868b-8a527460aa84', '1a9f2b31-1c1a-4ef0-9fb2-6a5e26c03db9', '0000180f-0000-1000-8000-00805f9b34fb'] } as RequestDeviceOptions;
+        const params = { optionalServices: ['03b80e5a-ede8-4b33-a751-6ce34ec4c700', '8d53dc1d-1db7-4cd3-868b-8a527460aa84', '1a9f2b31-1c1a-4ef0-9fb2-6a5e26c03db9', '0000180f-0000-1000-8000-00805f9b34fb', '0000180a-0000-1000-8000-00805f9b34fb'] } as RequestDeviceOptions;
         if (filters) (params as { filters: BluetoothLEScanFilter[] }).filters = filters; else (params as { acceptAllDevices: boolean }).acceptAllDevices = true;
         this.onDeviceSelection?.();
         return navigator.bluetooth.requestDevice(params);
@@ -110,4 +128,12 @@ export class BluetoothManager {
     private async _handleDisconnected(): Promise<void> { this.state = { type: 'disconnected' }; this.onDisconnect?.(); this.device = null; }
     public get name(): string | undefined { return this.device?.name; }
     public get maxPayloadSize(): number { const MTU_OVERHEAD = 3; return this.mtu - MTU_OVERHEAD - 8; }
+
+    // Serialize GATT operations to avoid overlapping requests on some platforms.
+    private _queueGattOperation<T>(operation: () => Promise<T>): Promise<T> {
+        const run = () => operation();
+        const result = this.gattQueue.then(run, run);
+        this.gattQueue = result.then(() => undefined, () => undefined);
+        return result;
+    }
 }

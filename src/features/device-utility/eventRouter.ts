@@ -2,7 +2,7 @@
 connects modules together which relies on callbacks for event communication
 */
 
-import { batteryService, batteryState, bluetoothManager, bluetoothStateSetConnected, bluetoothStateSetConnecting, bluetoothStateSetDisconnected, bluetoothStateSetConnectionLoss, bluetoothStateSetConnectionReestablished, deviceStateService, smpService, midiService } from '~/lib/states/bluetooth.svelte';
+import { bluetoothManager, bluetoothStateSetConnected, bluetoothStateSetConnecting, bluetoothStateSetDisconnected, bluetoothStateSetConnectionLoss, bluetoothStateSetConnectionReestablished, deviceStateService, smpService, midiService } from '~/lib/states/bluetooth.svelte';
 import { refreshChangelog, refreshDeviceFirmwareVersion } from '~/lib/states/firmware.svelte';
 import { midiTesterOnNoteOn, midiTesterOnNoteOff, midiTesterOnCC } from '~/features/device-utility/states/midiTester.svelte';
 import { soundBackend } from '~/lib/soundBackend';
@@ -14,8 +14,20 @@ import { initPlaygroundSynthPersistence, midiControlOnCC, midiControlOnNoteOff, 
 import { windowState, DeviceUtilityView } from './states/window.svelte';
 import { deviceState, setDeviceStateFromSnapshot } from './states/deviceState.svelte';
 import { setTempo } from './states/tempo.svelte';
+import { initializeBatteryState, resetBatteryState } from './states/bas.svelte';
+import { refreshDisState, resetDisState } from './states/dis.svelte';
 
 export const callbacksSet = () => {
+    const _initializeBluetoothModules = async () => {
+        try {
+            const available = await deviceStateService.initialize();
+            deviceState.isAvailable = available;
+            await initializeBatteryState();
+            await midiService.initialize();
+            await refreshDisState();
+        } catch {}
+    };
+
     deviceStateService.onStateUpdate = (state) => {
         setDeviceStateFromSnapshot(state);
         if (state.bpm !== null) setTempo(state.bpm);
@@ -25,52 +37,41 @@ export const callbacksSet = () => {
         midiService.reset();
         deviceStateService.reset();
         smpService.reset();
+        resetDisState();
         deviceState.isAvailable = null;
-        batteryState.level = null;
-        batteryService.onBatteryLevel = (level) => { batteryState.level = level; };
-        batteryService.reset();
+        resetBatteryState();
 
         initPlaygroundSynthPersistence();
-        refreshDeviceFirmwareVersion();
-        refreshChangelog();
+        void refreshChangelog();
         setLocalSamplesMode(SampleMode.DRM);
+        bluetoothStateSetConnected();
         (async () => {
+            await _initializeBluetoothModules();
+            await refreshDeviceFirmwareVersion();
             await initialiseDeviceSamples();
             updaterNotifyIsSupported();
         })()
-        void batteryService.getBatteryLevel();
-        (async () => {
-            const available = await deviceStateService.initialize();
-            deviceState.isAvailable = available;
-        })()
-
-        bluetoothStateSetConnected();
     }
 
     bluetoothManager.onConnectionReestablished = () => {
         midiService.reset();
         deviceStateService.reset();
         smpService.reset();
+        resetDisState();
         deviceState.isAvailable = null;
-        batteryState.level = null;
-        batteryService.onBatteryLevel = (level) => { batteryState.level = level; };
-        batteryService.reset();
+        resetBatteryState();
 
         initPlaygroundSynthPersistence();
-        refreshDeviceFirmwareVersion();
-
-        (async () => {
-            await initialiseDeviceSamples();
-            updaterNotifyIsSupported();
-        })()
-        void batteryService.getBatteryLevel();
-        (async () => {
-            const available = await deviceStateService.initialize();
-            deviceState.isAvailable = available;
-        })()
+        void refreshChangelog();
         updaterNotifyConnectionReestablished();
         
         bluetoothStateSetConnectionReestablished();
+        (async () => {
+            await _initializeBluetoothModules();
+            await refreshDeviceFirmwareVersion();
+            await initialiseDeviceSamples();
+            updaterNotifyIsSupported();
+        })()
     }
 
     bluetoothManager.onConnecting = () => {
@@ -79,17 +80,17 @@ export const callbacksSet = () => {
 
     bluetoothManager.onDisconnect = () => {
         invalidateDeviceSamplesState();
+        resetDisState();
         deviceState.isAvailable = null;
-        batteryState.level = null;
-        batteryService.onBatteryLevel = null;
+        resetBatteryState();
         bluetoothStateSetDisconnected();
     }
 
     bluetoothManager.onConnectionLoss = () => {    
         invalidateDeviceSamplesState();
+        resetDisState();
         deviceState.isAvailable = null;
-        batteryState.level = null;
-        batteryService.onBatteryLevel = null;
+        resetBatteryState();
         bluetoothStateSetConnectionLoss();
     }
 

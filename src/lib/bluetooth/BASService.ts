@@ -23,7 +23,6 @@ export class BatteryService {
         this.characteristic = null;
         this.cachedLevel = null;
         this.initPromise = null;
-        this.initialize();
     }
 
     public async initialize(): Promise<boolean> {
@@ -35,7 +34,7 @@ export class BatteryService {
                 }
                 this.characteristic = await this.bluetoothManager.getCharacteristic(this.BAS_SERVICE_UUID, this.BATTERY_LEVEL_UUID);
                 if (!this.characteristic) { reject(new Error('Failed to get battery level characteristic')); return; }
-                try { await this.characteristic.startNotifications(); } catch {}
+                try { await this.bluetoothManager.startNotifications(this.characteristic); } catch {}
                 if (!this._boundCharHandler) this._boundCharHandler = this._handleBatteryLevel.bind(this);
                 this.characteristic.addEventListener('characteristicvaluechanged', this._boundCharHandler);
                 resolve();
@@ -48,7 +47,7 @@ export class BatteryService {
 
     public async getBatteryLevel(): Promise<number | null> {
         if (!this.characteristic) { const ok = await this.initialize(); if (!ok || !this.characteristic) return null; }
-        const view = await this.characteristic.readValue();
+        const view = await this.bluetoothManager.readCharacteristicValue(this.characteristic);
         if (!view || view.byteLength < 1) return null;
         const level = view.getUint8(0);
         this.cachedLevel = level;

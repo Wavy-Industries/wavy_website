@@ -412,8 +412,7 @@
           </tr>
         </tbody>
       </table>
-      {#if !hasEffect}
-      {:else if !isKnownEffect}
+      {#if hasEffect && !isKnownEffect}
         <span class="detail-note">unknown({selectedEffectId})</span>
       {/if}
       <table class="mini-table" aria-label="Effect preset selection">

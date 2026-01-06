@@ -350,12 +350,6 @@
         transition: background-color 0.5s;
     }
 
-    .keyboard-row {
-        display: flex;
-        position: relative;
-        height: 60px;
-    }
-
     .key {
         position: absolute;
         width: 28px;

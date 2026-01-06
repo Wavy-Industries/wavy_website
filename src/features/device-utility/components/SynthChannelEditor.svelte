@@ -453,7 +453,14 @@
       aria-label="Close dialog"
       onclick={() => showPatchDialog = false}
     ></button>
-    <div class="modal-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
+    <div
+      class="modal-dialog"
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+    >
       <h4>Save Patch</h4>
       <input type="text" bind:value={patchName} placeholder="Patch name" class="patch-input" />
       <div class="modal-actions">
@@ -472,7 +479,14 @@
       aria-label="Close dialog"
       onclick={() => showLoadDialog = false}
     ></button>
-    <div class="modal-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
+    <div
+      class="modal-dialog"
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+    >
       <h4>Load Patch</h4>
       <div class="patch-list">
         {#if patchManagerState.patches.length === 0}

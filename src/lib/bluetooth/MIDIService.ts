@@ -21,7 +21,10 @@ export class MIDIService {
     }
 
     public reset(): void {
-        this.characteristic = null; this.midiInitPromise = null; this.initialize();
+        if (this.characteristic && this._boundCharHandler) {
+            try { this.characteristic.removeEventListener('characteristicvaluechanged', this._boundCharHandler); } catch {}
+        }
+        this.characteristic = null; this.midiInitPromise = null;
     }
 
     public async initialize(): Promise<boolean> {
@@ -34,7 +37,7 @@ export class MIDIService {
                 }
                 this.characteristic = await this.bluetoothManager.getCharacteristic(this.MIDI_SERVICE_UUID, this.MIDI_CHARACTERISTIC_UUID);
                 if (!this.characteristic) { reject(new Error('Failed to get MIDI characteristic')); return; }
-                await this.characteristic.startNotifications();
+                await this.bluetoothManager.startNotifications(this.characteristic);
                 // Bind a stable handler and add exactly once
                 if (!this._boundCharHandler) this._boundCharHandler = this._handleMIDIMessage.bind(this);
                 this.characteristic.addEventListener('characteristicvaluechanged', this._boundCharHandler);
@@ -48,7 +51,7 @@ export class MIDIService {
         if (!this.characteristic) { const ok = await this.initialize(); if (!ok) throw new Error('Failed to initialize MIDI characteristic'); }
         if (!this.characteristic) throw new Error('MIDI characteristic not available');
         if (this.midiWritePromise) await this.midiWritePromise;
-        this.midiWritePromise = this.characteristic.writeValueWithoutResponse(message);
+        this.midiWritePromise = this.bluetoothManager.writeCharacteristicValueWithoutResponse(this.characteristic, message);
         await this.midiWritePromise; this.midiWritePromise = null;
     }
 

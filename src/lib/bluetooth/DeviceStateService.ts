@@ -77,9 +77,11 @@ export class DeviceStateService {
     }
 
     public reset(): void {
+        if (this.characteristic && this._boundCharHandler) {
+            try { this.characteristic.removeEventListener('characteristicvaluechanged', this._boundCharHandler); } catch {}
+        }
         this.characteristic = null;
         this.stateInitPromise = null;
-        this.initialize();
     }
 
     public async initialize(): Promise<boolean> {
@@ -91,7 +93,7 @@ export class DeviceStateService {
                 }
                 this.characteristic = await this.bluetoothManager.getCharacteristic(this.STATE_SERVICE_UUID, this.STATE_CHARACTERISTIC_UUID);
                 if (!this.characteristic) { reject(new Error('Failed to get device state characteristic')); return; }
-                await this.characteristic.startNotifications();
+                await this.bluetoothManager.startNotifications(this.characteristic);
                 if (!this._boundCharHandler) this._boundCharHandler = this._handleStateMessage.bind(this);
                 this.characteristic.addEventListener('characteristicvaluechanged', this._boundCharHandler);
                 resolve();

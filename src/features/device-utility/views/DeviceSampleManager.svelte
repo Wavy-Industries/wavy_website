@@ -612,10 +612,8 @@
 .mode-tabs button { border: 2px solid #9ca3af; background: #f3f4f6; color: var(--du-text); border-radius: var(--pe-radius) var(--pe-radius) 0 0; padding: 6px 12px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
 .mode-tabs button.active { background: #fff; color: #111827; border-color: #2f313a; border-bottom-color: #fff; font-weight: 800; margin-bottom: -3px; box-shadow: 0 3px 0 #fff; }
 .mode-tabs button:disabled { background: #f3f4f6; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; pointer-events: none; }
-.user-pack { display: flex; gap: 8px; align-items: center; }
 .dirty { background: repeating-linear-gradient(45deg, #FFFEAC, #FFFEAC 6px, #f1ea7d 6px, #f1ea7d 12px); color: #3a3200; border: 1px solid #b3ac5a; padding: 2px 6px; border-radius: var(--pe-radius); font-weight: 700; }
 .primary { background: var(--du-accent); color: var(--du-accent-contrast); }
-.icon { border-radius: var(--pe-radius); width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
 .status { display:flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--du-muted); background: #fff; border: 1px solid var(--du-border); border-radius: var(--pe-radius); padding: 10px 12px; }
 .progress { position: relative; width: 160px; height: 8px; background: #E9ECFF; border-radius: var(--pe-radius); overflow: hidden; border: 1px solid var(--du-border); }
 .progress::after { content: ""; position: absolute; inset: 0; width: calc(var(--p, 0) * 1%); background: black; border-radius: var(--du-radius); }
@@ -627,7 +625,6 @@
 .pill .spinner { width: 10px; height: 10px; border-radius: 999px; border: 2px solid currentColor; border-top-color: transparent; display: inline-block; margin-right: 6px; animation: pill-spin 0.9s linear infinite; vertical-align: -1px; }
 @keyframes pill-spin { to { transform: rotate(360deg); } }
 .transfer-details { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; border: 1px dashed var(--du-border); background: #fbfbfd; padding: 8px; border-radius: var(--pe-radius); margin-top: 6px; }
-.errors { display:flex; flex-direction: column; gap:4px; }
 .error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius: var(--pe-radius); }
 .pane { display: flex; flex-direction: column; gap: 8px; }
 .pane-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

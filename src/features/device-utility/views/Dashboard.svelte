@@ -1,5 +1,7 @@
 <script>
-    import { batteryState, bluetoothManager, bluetoothState } from '~/lib/states/bluetooth.svelte';
+    import { bluetoothManager, bluetoothState } from '~/lib/states/bluetooth.svelte';
+    import { batteryState } from '~/features/device-utility/states/bas.svelte';
+    import { disState } from '~/features/device-utility/states/dis.svelte';
     import ConnectionStatus from '~/features/device-utility/components/ConnectionStatus.svelte';
     import DeviceUpdate from '~/features/device-utility/views/DeviceUpdate.svelte';
     import DeviceSampleManager from '~/features/device-utility/views/DeviceSampleManager.svelte';
@@ -145,6 +147,22 @@
                     <div class="info-row">
                         <span class="info-label">BT timeout</span>
                         <span class="info-value">{deviceState.btConnTimeout == null ? 'unset' : `${deviceState.btConnTimeout} (${btConnTimeoutMs} ms)`}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Manufacturer</span>
+                        <span class="info-value">{disState.manufacturerName ?? 'unset'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Model</span>
+                        <span class="info-value">{disState.modelNumber ?? 'unset'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">HW rev</span>
+                        <span class="info-value">{disState.hardwareRevision ?? 'unset'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">FW rev</span>
+                        <span class="info-value">{disState.firmwareRevision ?? 'unset'}</span>
                     </div>
                 </div>
             </span>
