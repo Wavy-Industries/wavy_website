@@ -201,17 +201,31 @@ export const uplaodDeviceSamples = async (newSamples: DeviceSamples, mode: Sampl
   return true;
 }
 
-export const DEFAULT_SAMPLE_PACK_IDS_BY_MODE: Record<SampleMode, string[]> = {
-  [SampleMode.DRM]: ['W-MIXED', 'W-UNDRGND', 'W-OLLI', 'W-OG'],
-  [SampleMode.PAT]: ['W-OG', 'W-PATTEST'],
-};
+export const fetchDefaultPackIds = async (mode: SampleMode): Promise<string[]> => {
+  try {
+    const DEVICE_NAME = 'MONKEY';
+    const res = await fetch(`/assets/${DEVICE_NAME}/${sampleModeLabel(mode)}/default.json`);
+    if (!res.ok) {
+      log.error(`Failed to fetch default pack IDs for ${sampleModeLabel(mode)}`);
+      return [];
+    }
+    const ids = await res.json();
+    log.debug(`Fetched default pack IDs for ${sampleModeLabel(mode)}: ${JSON.stringify(ids)}`);
+    return ids;
+  } catch (error) {
+    log.error(`Error fetching default pack IDs: ${error}`);
+    return [];
+  }
+}
 
 export const uplaodDeviceDefaultSamples = async (mode: SampleMode = deviceSamplesState.activeMode) => {
   log.debug('Uploading default samples to device...');
   if (_isTransfering) { log.error('Transfer already in progress, aborting new upload request.'); deviceSampleTransferState.upload = { type: 'error', message: 'Transfer already in progress' }; return false; }
   const resolvedMode = typeof mode === 'number' ? mode : deviceSamplesState.activeMode;
   const effectiveMode = deviceSamplesState.modeSupported ? resolvedMode : SampleMode.DRM;
-  const deviceSamples = await buildDeviceSamplesFromIds(DEFAULT_SAMPLE_PACK_IDS_BY_MODE[effectiveMode], effectiveMode);
+  const defaultPackIds = await fetchDefaultPackIds(effectiveMode);
+  if (!defaultPackIds || defaultPackIds.length === 0) { log.error('Failed to fetch default pack IDs'); deviceSampleTransferState.upload = { type: 'error', message: 'Failed to fetch default pack IDs' }; return false; }
+  const deviceSamples = await buildDeviceSamplesFromIds(defaultPackIds, effectiveMode);
   if (!deviceSamples) { log.error('Failed to construct default sample packs'); deviceSampleTransferState.upload = { type: 'error', message: 'Failed to construct default sample packs' }; return false; }
   return await uplaodDeviceSamples(deviceSamples, effectiveMode);
 }
@@ -259,7 +273,7 @@ type SamplePack = { name: string; loops: any[] };
 const fetchServerPack = async (id: string, mode: SampleMode): Promise<SamplePack | null> => {
   try {
     const DEVICE_NAME = 'MONKEY';
-    const res = await fetch(`/samples/${DEVICE_NAME}/${sampleModeLabel(mode)}/${encodeURIComponent(id)}.json`);
+    const res = await fetch(`/assets/${DEVICE_NAME}/${sampleModeLabel(mode)}/${encodeURIComponent(id)}.json`);
     if (!res.ok) { log.error(`Failed to fetch pack ${id} from server`); return null; }
     const pack = await res.json();
     pack.name = id;

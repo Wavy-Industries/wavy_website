@@ -18,7 +18,7 @@ export const fetchServerPack = async (id: string, mode: SampleMode = SampleMode.
     const DEVICE_NAME = "MONKEY"; // TODO: fetch from device info
 
     try {
-        const res = await fetch(`/samples/${DEVICE_NAME}/${sampleModeLabel(mode)}/${encodeURIComponent(id)}.json`);
+        const res = await fetch(`/assets/${DEVICE_NAME}/${sampleModeLabel(mode)}/${encodeURIComponent(id)}.json`);
         if (res.ok) {
             const pack = await res.json() as SamplePack;
             pack.name = id;
@@ -33,7 +33,7 @@ export const fetchServerPack = async (id: string, mode: SampleMode = SampleMode.
 
 export const fetchAvailableServerPacks = async (mode: SampleMode = SampleMode.DRM): Promise<{[key: string]: SamplePackInfo}> => {
     log.debug("Fetching available server packs");
-    const res = await fetch(`/samples/MONKEY/${sampleModeLabel(mode)}/record.json`);
+    const res = await fetch(`/assets/MONKEY/${sampleModeLabel(mode)}/record.json`);
     if (res.ok) {
         const record = await res.json() as {[key: string]: SamplePackInfo};
         // Add display key to each pack info

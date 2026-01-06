@@ -1,6 +1,6 @@
 <script>
     import { constructSamplePacks, packDisplayName, getSamplePack, compareDeviceSample } from "~/features/device-utility/utils/samples";
-    import { DEFAULT_SAMPLE_PACK_IDS_BY_MODE, deviceSamplesState, deviceSampleTransferState, uplaodDeviceDefaultSamples, uplaodDeviceSamples } from "~/lib/states/samples.svelte";
+    import { fetchDefaultPackIds, deviceSamplesState, deviceSampleTransferState, uplaodDeviceDefaultSamples, uplaodDeviceSamples } from "~/lib/states/samples.svelte";
     import { fetchAvailableServerPacks } from "~/features/device-utility/services/serverSamplePacks";
     import { sampleParser_packSize } from "~/lib/parsers/device_samples_parser";
     import { compareSamplePack, getPackType } from "~/features/device-utility/utils/samples";
@@ -260,7 +260,7 @@
       await uplaodDeviceSamples(samples, activeMode);
     }
 
-    const getDefaultPackIds = (mode) => [...DEFAULT_SAMPLE_PACK_IDS_BY_MODE[mode]];
+    const getDefaultPackIds = async (mode) => await fetchDefaultPackIds(mode);
 
     const switchMode = (mode) => {
       if (mode === activeMode) return;
@@ -295,7 +295,7 @@
           </svg>
           <span class="sr-only">Reset to default</span>
         </button>
-        <button class="btn icon-btn" disabled={isTransferring} title="Sync selection from device" aria-label="Sync from device" onclick={() => selectedPacks.idsByMode[activeMode] = getDefaultPackIds(activeMode)}>
+        <button class="btn icon-btn" disabled={isTransferring} title="Sync selection from device" aria-label="Sync from device" onclick={async () => selectedPacks.idsByMode[activeMode] = await getDefaultPackIds(activeMode)}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 3v12"></path>
             <path d="M7 10l5 5 5-5"></path>

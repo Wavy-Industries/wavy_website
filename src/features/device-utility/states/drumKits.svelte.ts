@@ -12,7 +12,7 @@ export const drumKitState = $state({
 });
 
 async function fetchIndex(): Promise<DrumKitIndexEntry[]> {
-  const res = await fetch('/samples/drums/index.json');
+  const res = await fetch('/assets/drums/index.json');
   if (!res.ok) throw new Error('Failed to load drum kit index');
   const kits = (await res.json()) as DrumKitIndexEntry[];
   return Array.isArray(kits) ? kits : [];
@@ -30,7 +30,7 @@ function loadStoredSelection(): string | null {
 async function loadKitById(id: string) {
   const kit = drumKitState.kits.find((entry) => entry.id === id) ?? drumKitState.kits[0];
   if (!kit) return;
-  const path = `/samples/drums/${kit.path}`;
+  const path = `/assets/drums/${kit.path}`;
   await soundBackend.loadDrumKitFromPath(path, kit.id);
   drumKitState.selectedId = kit.id;
   persistSelected(kit.id);
