@@ -1,4 +1,4 @@
-import { SamplePack } from "~/lib/parsers/samples_parser";
+import { SamplePack } from "~/lib/parsers/device_samples_parser";
 import { SampleMode, sampleModeLabel } from "~/lib/types/sampleMode";
 import { getPackType, packDisplayName, SamplePackInfo, normalizePackId } from "../utils/samples";
 

@@ -1,4 +1,4 @@
-import { TICKS_PER_BEAT, type LoopData } from '~/lib/parsers/samples_parser';
+import { TICKS_PER_BEAT, type LoopData } from '~/lib/parsers/device_samples_parser';
 
 // Derive loop length (in beats) from events using power-of-two bars, clamped
 // - Bars are 4 beats. We round up to the next power of two in bars.

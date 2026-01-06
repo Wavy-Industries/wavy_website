@@ -1,4 +1,4 @@
-import { TICKS_PER_BEAT } from '~/lib/parsers/samples_parser';
+import { TICKS_PER_BEAT } from '~/lib/parsers/device_samples_parser';
 import { Log } from '~/lib/utils/Log';
 
 let log = new Log('tick_provider', Log.LEVEL_INFO);

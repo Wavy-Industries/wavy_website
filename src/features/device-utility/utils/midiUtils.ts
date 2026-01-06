@@ -1,5 +1,5 @@
-import { parseMidiToLoop } from '~/lib/parsers/midi_parser';
-import { TICKS_PER_BEAT, type LoopData, type DrumEvent } from '~/lib/parsers/samples_parser';
+import { parseMidiToLoop } from '~/lib/parsers/device_sample_parser';
+import { TICKS_PER_BEAT, type LoopData, type DrumEvent } from '~/lib/parsers/device_samples_parser';
 import { computeLoopEndTicks } from '~/lib/music/loop_utils';
 import { soundBackend } from '~/lib/soundBackend';
 

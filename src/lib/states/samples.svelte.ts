@@ -1,5 +1,5 @@
 /* Shared device samples state/API for use across features */
-import { DeviceSamples } from '~/lib/parsers/samples_parser';
+import { DeviceSamples } from '~/lib/parsers/device_samples_parser';
 import { smpService } from '~/lib/states/bluetooth.svelte';
 import { SampleManager } from '~/lib/bluetooth/smp/SampleManager';
 import { canonicalize } from '~/lib/utils/canonicalize';

@@ -1,6 +1,6 @@
 import { SMPService, MGMT_OP, MGMT_ERR, ResponseError } from '~/lib/bluetooth/SMPService';
 import { Log } from '~/lib/utils/Log';
-import { samplesParser_encode, DeviceSamples, samplesParser_decode, decodeAsciiString } from '~/lib/parsers/samples_parser';
+import { samplesParser_encode, DeviceSamples, samplesParser_decode, decodeAsciiString } from '~/lib/parsers/device_samples_parser';
 
 let log = new Log('smpl_mgr', Log.LEVEL_INFO);
 

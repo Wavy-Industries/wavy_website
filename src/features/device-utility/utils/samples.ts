@@ -1,4 +1,4 @@
-import { DeviceSamples, SamplePack } from "~/lib/parsers/samples_parser";
+import { DeviceSamples, SamplePack } from "~/lib/parsers/device_samples_parser";
 import { Log } from "~/lib/utils/Log";
 import { getLocalSamplePack } from "../states/samplesLocal.svelte";
 import { canonicalize } from "~/lib/utils/canonicalize";

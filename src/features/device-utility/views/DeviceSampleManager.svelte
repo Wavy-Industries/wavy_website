@@ -2,7 +2,7 @@
     import { constructSamplePacks, packDisplayName, getSamplePack, compareDeviceSample } from "~/features/device-utility/utils/samples";
     import { DEFAULT_SAMPLE_PACK_IDS_BY_MODE, deviceSamplesState, deviceSampleTransferState, uplaodDeviceDefaultSamples, uplaodDeviceSamples } from "~/lib/states/samples.svelte";
     import { fetchAvailableServerPacks } from "~/features/device-utility/services/serverSamplePacks";
-    import { sampleParser_packSize } from "~/lib/parsers/samples_parser";
+    import { sampleParser_packSize } from "~/lib/parsers/device_samples_parser";
     import { compareSamplePack, getPackType } from "~/features/device-utility/utils/samples";
     import { SampleMode, sampleModeLabel } from "~/lib/types/sampleMode";
 
