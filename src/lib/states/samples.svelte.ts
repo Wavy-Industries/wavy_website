@@ -6,8 +6,7 @@ import { canonicalize } from '~/lib/utils/canonicalize';
 import { Log } from '~/lib/utils/Log';
 import { SampleMode, sampleModeLabel } from '~/lib/types/sampleMode';
 
-const LOG_LEVEL = Log.LEVEL_DEBUG
-const log = new Log("device-samples", LOG_LEVEL);
+const log = new Log("device-samples", Log.LEVEL_INFO);
 
 export const sampleManager = new SampleManager(smpService);
 

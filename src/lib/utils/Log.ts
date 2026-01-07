@@ -1,10 +1,11 @@
 export class Log {
   static LEVEL_DEBUG = 0; static LEVEL_INFO = 1; static LEVEL_WARNING = 2; static LEVEL_ERROR = 3; static LEVEL_IMPORTANT = 4;
-  static #LEVEL_DEBUG_COLOR = 'gray'; static #LEVEL_INFO_COLOR = 'white'; static #LEVEL_WARNING_COLOR = 'yellow'; static #LEVEL_ERROR_COLOR = 'red'; static #LEVEL_IMPORTANT_COLOR = 'blue';
+  static LEVEL_STRING = {0: 'DEBUG', 1: 'INFO', 2: 'WARNING', 3: 'ERROR', 4: 'IMPORTANT'}
+  static #LEVEL_DEBUG_COLOR = 'gray'; static #LEVEL_INFO_COLOR = 'white'; static #LEVEL_WARNING_COLOR = 'yellow'; static #LEVEL_ERROR_COLOR = 'red'; static #LEVEL_IMPORTANT_COLOR = 'cyan';
   static #LEVEL_PROD = this.LEVEL_WARNING;
   static #NOOP = () => {};
   #name: string; #level: number;
-  constructor(name: string, level: number) { this.#name = name; this.#level = level; }
+  constructor(name: string, level: number) { this.#name = name; this.#level = level; this.important(`LOG ${name} - ${Log.LEVEL_STRING[level]}`) }
   get debug(): (...messages: any[]) => void { return this.#createLogger(Log.LEVEL_DEBUG, Log.#LEVEL_DEBUG_COLOR); }
   get info(): (...messages: any[]) => void { return this.#createLogger(Log.LEVEL_INFO, Log.#LEVEL_INFO_COLOR); }
   get warning(): (...messages: any[]) => void { return this.#createLogger(Log.LEVEL_WARNING, Log.#LEVEL_WARNING_COLOR); }
@@ -30,7 +31,7 @@ export class Log {
         }
       }
     }
-    const prefix = `${callsite}%c[ ${this.#name} ]`;
+    const prefix = `%c[ ${this.#name} ]`;
     return console.log.bind(console, prefix, `color: ${color}`);
   }
 }

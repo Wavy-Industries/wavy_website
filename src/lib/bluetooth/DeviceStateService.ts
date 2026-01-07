@@ -1,7 +1,7 @@
 import { Log } from '../utils/Log';
 import { BluetoothManager } from './bluetoothManager';
 
-let log = new Log('device_state', Log.LEVEL_DEBUG);
+let log = new Log('device_state', Log.LEVEL_INFO);
 
 const BT_STATE_CMD_OCTAVE = 0x0001;
 const BT_STATE_CMD_CHANNEL = 0x0002;
@@ -105,7 +105,7 @@ export class DeviceStateService {
     public isInitialized(): boolean { return this.characteristicKey !== null; }
 
     // A single snapshot log helps verify the full device state after any update.
-    public logStateSnapshot(): void {
+    public createSnapshot() {
         const effectLabel = this.deviceState.effectId === null ? 'unset' : (this.effectLabels[this.deviceState.effectId] ?? `unknown(${this.deviceState.effectId})`);
         const list = [
             `octave=${this.deviceState.octave ?? 'unset'}`,
@@ -123,7 +123,7 @@ export class DeviceStateService {
             `btConnLatency=${this.deviceState.btConnLatency ?? 'unset'}`,
             `btConnTimeout=${this.deviceState.btConnTimeout ?? 'unset'}`,
         ];
-        log.info(list);
+        return list
     }
 
     private _handleStateMessage(event: Event): void {
@@ -237,7 +237,8 @@ export class DeviceStateService {
 
         if (didUpdate) {
             this.onStateUpdate?.({ ...this.deviceState });
-            this.logStateSnapshot();
+            const snapshot = this.createSnapshot();
+            log.debug(snapshot)
         }
     }
 }

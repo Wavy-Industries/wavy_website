@@ -16,6 +16,7 @@ import { deviceState, setDeviceStateFromSnapshot } from './states/deviceState.sv
 import { setTempo } from './states/tempo.svelte';
 import { initializeBatteryState, resetBatteryState } from './states/bas.svelte';
 import { refreshDisState, resetDisState } from './states/dis.svelte';
+import { pianoDebugNoteOn, pianoDebugNoteOff } from './states/pianoDebug.svelte';
 
 export const callbacksSet = () => {
     const _initializeBluetoothModules = async () => {
@@ -102,6 +103,9 @@ export const callbacksSet = () => {
 
         midiControlOnNoteOn(note, vel, channel);
 
+        // Track note for piano debug preview
+        pianoDebugNoteOn(note);
+
         if (windowState.hash === DeviceUtilityView.DeviceTester)
             midiTesterOnNoteOn(note, velocity, channel);
     }
@@ -110,7 +114,10 @@ export const callbacksSet = () => {
         soundBackend.noteOff(note, velocity, channel);
 
         midiControlOnNoteOff(note, velocity, channel);
-        
+
+        // Track note for piano debug preview
+        pianoDebugNoteOff(note);
+
         if (windowState.hash === DeviceUtilityView.DeviceTester)
             midiTesterOnNoteOff(note, velocity, channel);
     }

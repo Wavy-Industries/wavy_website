@@ -6,6 +6,8 @@
   import PlayStopButton from '~/features/device-utility/components/PlayStopButton.svelte';
   import { soundBackend, type EffectInstance, type EffectType, type TrackId } from '~/lib/soundBackend';
   import { onMount } from 'svelte';
+  import PianoDebugPreview from '~/features/device-utility/components/PianoDebugPreview.svelte';
+  import { pianoDebugState } from '~/features/device-utility/states/pianoDebug.svelte';
 
   type TrackDefinition = {
     id: string;
@@ -312,8 +314,23 @@
         <span class="status-label">BPM:</span>
         <span class="status-value" class:placeholder={!deviceState.bpmFromDevice}>{deviceState.bpm}</span>
       </div>
+      <button
+        class="piano-toggle-btn"
+        class:active={pianoDebugState.isVisible}
+        onclick={() => pianoDebugState.toggle()}
+        title={pianoDebugState.isVisible ? "Hide piano debug preview" : "Show piano debug preview"}
+        aria-label="Toggle piano debug preview"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M2 1v12h2V1H2zm3 0v12h2V8h2v5h2V8h2v5h2V1h-2v7H9V1H7v7H5V1H3z" fill="currentColor"/>
+        </svg>
+      </button>
     </div>
   </div>
+
+  {#if pianoDebugState.isVisible}
+    <PianoDebugPreview />
+  {/if}
 
   {#if deviceState.isAvailable}
   <div class="state-details">
@@ -636,6 +653,35 @@
   .status-label { color: var(--du-muted); font-weight: 500; }
   .status-value { color: var(--du-text); font-weight: 600; font-family: monospace; font-size: 1.05em; }
   .status-value.placeholder { font-style: italic; }
+
+  .piano-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 0;
+  }
+  .piano-toggle-btn:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+    color: #374151;
+  }
+  .piano-toggle-btn.active {
+    background: #3b82f6;
+    border-color: #2563eb;
+    color: #ffffff;
+  }
+  .piano-toggle-btn.active:hover {
+    background: #2563eb;
+    border-color: #1d4ed8;
+  }
   .state-details {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     font-size: 11px;

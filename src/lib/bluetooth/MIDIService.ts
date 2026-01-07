@@ -2,7 +2,7 @@ import { parse_raw_to_midi_ble } from '~/lib/parsers/midi_parser_ble';
 import { Log } from '~/lib/utils/Log';
 import { BluetoothManager } from './bluetoothManager';
 
-let log = new Log('midi', Log.LEVEL_DEBUG);
+let log = new Log('midi_service', Log.LEVEL_INFO);
 
 export class MIDIService {
     private characteristicKey: string | null = null;
@@ -73,34 +73,30 @@ export class MIDIService {
         log.debug(['packet', hex]);
         this.onMIDIMessage?.(data);
 
-let midiEvents = parse_raw_to_midi_ble(data);
-for (let event of midiEvents) {
-  switch (event.type) {
-    case 'note_on':
-        this.onNoteOn?.(event.note, event.velocity, event.channel);
-        log.debug(`midi note on: ${event}`)
-        break;
-    
-    case 'note_off':
-        this.onNoteOff?.(event.note, event.velocity, event.channel);
-        log.debug(`midi note off: ${event}`)
-        break;
-    
-    case 'control_change':
-        this.onControlChange?.(event.controller, event.value, event.channel);
-        log.debug(`midi control change: ${event}`)
-        break;
-    
-    case 'poly_aftertouch':
-    case 'program_change':
-    case 'channel_aftertouch':
-    case 'pitch_bend':
-    case 'system':
-      // Do nothing for these event types
-      log.debug(`midi event type not handeled: ${event}`);
-      break;
-  }
-}
+        let midiEvents = parse_raw_to_midi_ble(data);
+        for (let event of midiEvents) {
+        switch (event.type) {
+            case 'note_on':
+                this.onNoteOn?.(event.note, event.velocity, event.channel);
+                log.debug(`midi note on: ${event}`)
+                break;
+            
+            case 'note_off':
+                this.onNoteOff?.(event.note, event.velocity, event.channel);
+                log.debug(`midi note off: ${event}`)
+                break;
+            
+            case 'control_change':
+                this.onControlChange?.(event.controller, event.value, event.channel);
+                log.debug(`midi control change: ${event}`)
+                break;
+            
+            default:
+            // Do nothing for these event types
+            log.error(`midi event type not handeled: ${event}`);
+            break;
+        }
+        }
     }
 
     private _buildNoteOnMessage(note: number, velocity: number, channel: number): Uint8Array { const ts = new Uint8Array([0,0]); const status = 0x90 | (channel & 0x0F); return new Uint8Array([...ts, status, note, velocity]); }
