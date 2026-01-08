@@ -12,7 +12,7 @@ type ConnectionState =
 
 export class BluetoothManager {
     private device: BluetoothDevice | null = null;
-    private mtu: number = 250;
+    private mtu: number = 200;
     private state: ConnectionState = { type: 'disconnected' };
     private gattQueue: Promise<void> = Promise.resolve();
     private characteristicCache: Map<string, BluetoothRemoteGATTCharacteristic> = new Map();

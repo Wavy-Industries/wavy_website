@@ -1,3 +1,6 @@
+# 1.2.92[8. Jan 2026] -dev
+- Support for selection of MIDI channel 11-16 by long pressing 1 during selection.
+
 # 1.2.90[5. Jan 2026] -dev
 - Dynamic PAT
 - device state Bluetooth service

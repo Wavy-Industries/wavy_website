@@ -1,7 +1,7 @@
 import { Log } from '../utils/Log';
 import { BluetoothManager } from './bluetoothManager';
 
-let log = new Log('device_state', Log.LEVEL_INFO);
+let log = new Log('device_state', Log.LEVEL_DEBUG);
 
 const BT_STATE_CMD_OCTAVE = 0x0001;
 const BT_STATE_CMD_CHANNEL = 0x0002;

@@ -186,7 +186,11 @@
     5: 'ECHO',
     6: 'PAT',
   };
-  const deviceChannelOrder = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const deviceChannelOrder = $derived(
+    deviceState.channel != null && deviceState.channel > 9
+      ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+      : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  );
   const effectOrder = [
     { id: 1, label: 'ARP' },
     { id: 2, label: 'DOUBLE' },
@@ -360,14 +364,14 @@
           <thead>
             <tr>
               {#each deviceChannelOrder as ch}
-                <th>{ch}</th>
+                <th class:extended={ch > 10}>{ch}</th>
               {/each}
             </tr>
           </thead>
           <tbody>
             <tr>
               {#each deviceChannelOrder as ch}
-                <td class:marked={selectedChannel === ch}>{selectedChannel === ch ? 'X' : ''}</td>
+                <td class:marked={selectedChannel === ch} class:extended={ch > 10}>{selectedChannel === ch ? 'X' : ''}</td>
               {/each}
             </tr>
           </tbody>
@@ -382,14 +386,14 @@
             <thead>
               <tr>
                 {#each deviceChannelOrder as ch}
-                  <th>{ch}</th>
+                  <th class:extended={ch > 10}>{ch}</th>
                 {/each}
               </tr>
             </thead>
             <tbody>
               <tr>
-                {#each muteBits as muted}
-                  <td class:muted={muted}>{muted ? 'X' : ''}</td>
+                {#each muteBits as muted, idx}
+                  <td class:muted={muted} class:extended={deviceChannelOrder[idx] > 10}>{muted ? 'X' : ''}</td>
                 {/each}
               </tr>
             </tbody>
@@ -717,8 +721,11 @@
   .mini-table { border-collapse: collapse; border: 1px solid var(--du-border); }
   .mini-table th, .mini-table td { border: 1px solid var(--du-border); padding: 2px 5px; text-align: center; font-size: 10px; min-width: 18px; height: 18px; line-height: 14px; }
   .mini-table th { background: #eef2f7; font-weight: 700; }
+  .mini-table th.extended { background: #fee2e2; color: #991b1b; }
   .mini-table td.marked { background: #111827; color: #fff; font-weight: 700; }
   .mini-table td.muted { background: #fff3a6; color: #6b5600; font-weight: 700; }
+  .mini-table td.extended { background: #fecaca; color: #991b1b; border-color: #f87171; }
+  .mini-table td.extended.marked { background: #dc2626; color: #fff; }
   .lever {
     min-width: 36px;
     height: 18px;
