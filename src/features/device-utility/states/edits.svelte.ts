@@ -1,5 +1,5 @@
 import { getPackType, getSamplePack } from "../utils/samples";
-import type { SamplePack } from "~/lib/parsers/device_samples_parser";
+import type { SamplePack } from "~/lib/parsers/device_storage_parser";
 import { newLocalSamplePack, updateLocalSamplePack } from "./samplesLocal.svelte";
 import { deviceSamplesState } from "~/lib/states/samples.svelte";
 

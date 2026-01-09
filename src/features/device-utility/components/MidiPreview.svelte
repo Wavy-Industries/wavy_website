@@ -1,6 +1,6 @@
 <script>
-  import { computeLoopEndTicks } from '~/lib/music/loop_utils';
-  import { TICKS_PER_BEAT } from '~/lib/parsers/device_samples_parser';
+  import { computeLoopEndTicks } from '~/lib/utils/loop_utils';
+  import { TICKS_PER_BEAT } from '~/lib/parsers/device_storage_parser';
 
   export let loop = null;
   export let w = 360;

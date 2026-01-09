@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {  samplesParser_decode, samplesParser_encode } from '~/lib/parsers/device_samples_parser';
+import {  samplesParser_decode, samplesParser_encode } from '~/lib/parsers/device_storage_parser';
 import {canonicalize} from '~/lib/utils/canonicalize';
 
 describe('Samples Parser', () => {

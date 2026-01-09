@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { samplesParser_encode } from '~/lib/parsers/device_samples_parser';
+import { samplesParser_encode } from '~/lib/parsers/device_storage_parser';
 import { SampleMode } from '~/lib/types/sampleMode';
 import { fetchDefaultPackIds, buildDeviceSamplesFromIds } from '~/lib/server/samplePackBuilder';
 

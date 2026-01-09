@@ -1,6 +1,9 @@
-/*
-connects modules together which relies on callbacks for event communication
-*/
+/**
+ * Event Router
+ *
+ * Connects modules together that rely on callbacks for event communication.
+ * Handles Bluetooth lifecycle events and MIDI routing.
+ */
 
 import { bluetoothManager, bluetoothStateSetConnected, bluetoothStateSetConnecting, bluetoothStateSetDisconnected, bluetoothStateSetConnectionLoss, bluetoothStateSetConnectionReestablished, deviceStateService, smpService, midiService } from '~/lib/states/bluetooth.svelte';
 import { refreshChangelog, refreshDeviceFirmwareVersion } from '~/lib/states/firmware.svelte';
@@ -17,24 +20,18 @@ import { setTempo } from './states/tempo.svelte';
 import { initializeBatteryState, resetBatteryState } from './states/bas.svelte';
 import { refreshDisState, resetDisState } from './states/dis.svelte';
 import { pianoDebugNoteOn, pianoDebugNoteOff } from './states/pianoDebug.svelte';
+import { Log } from '~/lib/utils/Log';
+
+const log = new Log('eventRouter', Log.LEVEL_INFO);
 
 export const callbacksSet = () => {
-    const _initializeBluetoothModules = async () => {
-        try {
-            const available = await deviceStateService.initialize();
-            deviceState.isAvailable = available;
-            await initializeBatteryState();
-            await midiService.initialize();
-            await refreshDisState();
-        } catch {}
-    };
-
     deviceStateService.onStateUpdate = (state) => {
         setDeviceStateFromSnapshot(state);
         if (state.bpm !== null) setTempo(state.bpm);
     };
 
     bluetoothManager.onConnect = () => {
+        // Reset services and state
         midiService.reset();
         deviceStateService.reset();
         smpService.reset();
@@ -46,15 +43,54 @@ export const callbacksSet = () => {
         void refreshChangelog();
         setLocalSamplesMode(SampleMode.DRM);
         bluetoothStateSetConnected();
+
+        // Initialize Bluetooth modules and device data
         (async () => {
-            await _initializeBluetoothModules();
-            await refreshDeviceFirmwareVersion();
-            await initialiseDeviceSamples();
+            try {
+                const available = await deviceStateService.initialize();
+                deviceState.isAvailable = available;
+            } catch (e) {
+                log.error('Failed to initialize device state service:', e);
+            }
+
+            try {
+                await initializeBatteryState();
+            } catch (e) {
+                log.error('Failed to initialize battery state:', e);
+            }
+
+            try {
+                await midiService.initialize();
+            } catch (e) {
+                log.error('Failed to initialize MIDI service:', e);
+            }
+
+            try {
+                await refreshDisState();
+            } catch (e) {
+                log.error('Failed to refresh DIS state:', e);
+            }
+
+            try {
+                await refreshDeviceFirmwareVersion();
+            } catch (e) {
+                log.error('Failed to refresh firmware version:', e);
+            }
+
+            try {
+                await initialiseDeviceSamples();
+            } catch (e) {
+                log.error('Failed to initialize device samples:', e);
+            }
+
             updaterNotifyIsSupported();
-        })()
-    }
+        })().catch((e) => {
+            log.error('Error during connection initialization:', e);
+        });
+    };
 
     bluetoothManager.onConnectionReestablished = () => {
+        // Reset services and state
         midiService.reset();
         deviceStateService.reset();
         smpService.reset();
@@ -65,19 +101,56 @@ export const callbacksSet = () => {
         initPlaygroundSynthPersistence();
         void refreshChangelog();
         updaterNotifyConnectionReestablished();
-        
         bluetoothStateSetConnectionReestablished();
+
+        // Initialize Bluetooth modules and device data
         (async () => {
-            await _initializeBluetoothModules();
-            await refreshDeviceFirmwareVersion();
-            await initialiseDeviceSamples();
+            try {
+                const available = await deviceStateService.initialize();
+                deviceState.isAvailable = available;
+            } catch (e) {
+                log.error('Failed to initialize device state service:', e);
+            }
+
+            try {
+                await initializeBatteryState();
+            } catch (e) {
+                log.error('Failed to initialize battery state:', e);
+            }
+
+            try {
+                await midiService.initialize();
+            } catch (e) {
+                log.error('Failed to initialize MIDI service:', e);
+            }
+
+            try {
+                await refreshDisState();
+            } catch (e) {
+                log.error('Failed to refresh DIS state:', e);
+            }
+
+            try {
+                await refreshDeviceFirmwareVersion();
+            } catch (e) {
+                log.error('Failed to refresh firmware version:', e);
+            }
+
+            try {
+                await initialiseDeviceSamples();
+            } catch (e) {
+                log.error('Failed to initialize device samples:', e);
+            }
+
             updaterNotifyIsSupported();
-        })()
-    }
+        })().catch((e) => {
+            log.error('Error during connection reestablishment:', e);
+        });
+    };
 
     bluetoothManager.onConnecting = () => {
         bluetoothStateSetConnecting();
-    }
+    };
 
     bluetoothManager.onDisconnect = () => {
         invalidateDeviceSamplesState();
@@ -85,15 +158,15 @@ export const callbacksSet = () => {
         deviceState.isAvailable = null;
         resetBatteryState();
         bluetoothStateSetDisconnected();
-    }
+    };
 
-    bluetoothManager.onConnectionLoss = () => {    
+    bluetoothManager.onConnectionLoss = () => {
         invalidateDeviceSamplesState();
         resetDisState();
         deviceState.isAvailable = null;
         resetBatteryState();
         bluetoothStateSetConnectionLoss();
-    }
+    };
 
     /* MIDI event router */
     midiService.onNoteOn = (note: number, velocity: number, channel: number) => {
@@ -108,7 +181,7 @@ export const callbacksSet = () => {
 
         if (windowState.hash === DeviceUtilityView.DeviceTester)
             midiTesterOnNoteOn(note, velocity, channel);
-    }
+    };
 
     midiService.onNoteOff = (note: number, velocity: number, channel: number) => {
         soundBackend.noteOff(note, velocity, channel);
@@ -120,17 +193,14 @@ export const callbacksSet = () => {
 
         if (windowState.hash === DeviceUtilityView.DeviceTester)
             midiTesterOnNoteOff(note, velocity, channel);
-    }
+    };
 
     midiService.onControlChange = (_controller: number, _value: number, _channel: number) => {
         soundBackend.setCC(_controller, _value, _channel);
-        
+
         midiControlOnCC(_controller, _value, _channel);
-        
-        // Track BPM from CC if device sends it
-        // (Note: may not be sent by device, BPM detection would need sequence timing analysis)
 
         if (windowState.hash === DeviceUtilityView.DeviceTester)
             midiTesterOnCC(_controller, _value, _channel);
-    }
-}
+    };
+};

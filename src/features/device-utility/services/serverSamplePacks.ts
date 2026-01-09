@@ -1,12 +1,18 @@
-import { SamplePack } from "~/lib/parsers/device_samples_parser";
+import { SamplePack } from "~/lib/parsers/device_storage_parser";
 import { SampleMode, sampleModeLabel } from "~/lib/types/sampleMode";
 import { getPackType, packDisplayName, SamplePackInfo, normalizePackId } from "../utils/samples";
+import { getDeviceName } from "~/lib/config/device";
+import { fetchServerPack as fetchServerPackBase } from "~/lib/services/samplePackFetcher";
 
 import { Log } from "~/lib/utils/Log";
 
 const LOG_LEVEL = Log.LEVEL_INFO
 const log = new Log("serverSamplePacks", LOG_LEVEL);
 
+/**
+ * Fetches a sample pack from the server with pack type validation.
+ * Only Official and User packs can be fetched from the cloud.
+ */
 export const fetchServerPack = async (id: string, mode: SampleMode = SampleMode.DRM): Promise<SamplePack | null> => {
     id = normalizePackId(id);
     const packType = getPackType(id);
@@ -14,26 +20,12 @@ export const fetchServerPack = async (id: string, mode: SampleMode = SampleMode.
         log.error(`Invalid pack type for cloud fetch: ${packType} (ID: ${id})`);
         return null;
     }
-
-    const DEVICE_NAME = "MONKEY"; // TODO: fetch from device info
-
-    try {
-        const res = await fetch(`/assets/${DEVICE_NAME}/${sampleModeLabel(mode)}/${encodeURIComponent(id)}.json`);
-        if (res.ok) {
-            const pack = await res.json() as SamplePack;
-            pack.name = id;
-            log.debug(`Fetched pack ${id} from cloud successfully.`);
-            return pack;
-        }
-    } catch (e) {
-        log.error(`Failed to fetch pack ${id} from cloud: ${e}`);
-    }
-    return null;
+    return fetchServerPackBase(id, mode);
 }
 
 export const fetchAvailableServerPacks = async (mode: SampleMode = SampleMode.DRM): Promise<{[key: string]: SamplePackInfo}> => {
     log.debug("Fetching available server packs");
-    const res = await fetch(`/assets/MONKEY/${sampleModeLabel(mode)}/record.json`);
+    const res = await fetch(`/assets/${getDeviceName()}/${sampleModeLabel(mode)}/record.json`);
     if (res.ok) {
         const record = await res.json() as {[key: string]: SamplePackInfo};
         // Add display key to each pack info

@@ -1,5 +1,5 @@
-import { TICKS_PER_BEAT, type LoopData } from '~/lib/parsers/device_samples_parser';
-import { computeLoopLengthBeatsFromEvents } from '~/lib/music/loop_utils';
+import { TICKS_PER_BEAT, type LoopData } from '~/lib/parsers/device_storage_parser';
+import { computeLoopLengthBeatsFromEvents } from '~/lib/utils/loop_utils';
 
 function readStr(buf: Uint8Array, o: number, len: number) { return String.fromCharCode(...buf.slice(o, o+len)); }
 function readU32(dv: DataView, o: number) { return dv.getUint32(o); }

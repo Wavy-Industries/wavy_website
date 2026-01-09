@@ -2,7 +2,7 @@
     import { constructSamplePacks, packDisplayName, getSamplePack, compareDeviceSample } from "~/features/device-utility/utils/samples";
     import { fetchDefaultPackIds, deviceSamplesState, deviceSampleTransferState, uplaodDeviceDefaultSamples, uplaodDeviceSamples } from "~/lib/states/samples.svelte";
     import { fetchAvailableServerPacks } from "~/features/device-utility/services/serverSamplePacks";
-    import { sampleParser_packSize } from "~/lib/parsers/device_samples_parser";
+    import { sampleParser_packSize } from "~/lib/parsers/device_storage_parser";
     import { compareSamplePack, getPackType } from "~/features/device-utility/utils/samples";
     import { SampleMode, sampleModeLabel } from "~/lib/types/sampleMode";
 
@@ -106,15 +106,6 @@
             pack && totalSnapshot ? (sampleParser_packSize(pack) / totalSnapshot) * 100 : null;
           const outOfSync =
             pack && page ? compareSamplePack(pack, page) : null;
-            // Log.debug(`Out of sync: ${outOfSync}`);
-            // Log.debug(`Pack: ${JSON.stringify(pack)}`);
-            // Log.debug(`Page: ${JSON.stringify(page)}`);
-            if (outOfSync?.areIdentical === false) {
-              console.log('Out of sync');
-            console.log(outOfSync);
-              console.log(`Pack: ${JSON.stringify(pack)}`);
-              console.log(`Page: ${JSON.stringify(page)}`);
-            }
           return { data: pack, percentageUsage, outOfSync };
         })();
       });
@@ -370,13 +361,34 @@
                   <span class=""></span>
                 {:then data}
                   {#if data?.outOfSync?.areIdentical === false}
-                    <span class="outofsync" title="Out of sync">
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <circle cx="12" cy="12" r="9"></circle>
-                        <path d="M12 7v6"></path>
-                        <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"></circle>
-                      </svg>
-                      <span class="sr-only">Out of sync</span>
+                    {@const changedLoops = data.outOfSync.packsIdentical
+                      ?.map((v, idx) => v === false ? idx + 1 : null)
+                      .filter(v => v !== null) ?? []}
+                    {@const allLoopsDifferent = data.outOfSync.packsIdentical?.every(v => v === false)}
+                    <span class="outofsync-wrap">
+                      <span class="outofsync">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <circle cx="12" cy="12" r="9"></circle>
+                          <path d="M12 7v6"></path>
+                          <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"></circle>
+                        </svg>
+                        <span class="sr-only">Out of sync</span>
+                      </span>
+                      <div class="outofsync-tooltip" role="tooltip">
+                        <div class="outofsync-title">Out of Sync</div>
+                        <div class="outofsync-note">Local changes have not been uploaded to your device yet.</div>
+                        {#if allLoopsDifferent}
+                          <div class="outofsync-detail">Pack replaced or all loops changed</div>
+                        {:else if changedLoops.length > 0}
+                          <ul class="outofsync-list">
+                            {#each changedLoops as loopNum}
+                              <li>Loop {loopNum} changed</li>
+                            {/each}
+                          </ul>
+                        {:else}
+                          <div class="outofsync-detail">Pack content differs from device</div>
+                        {/if}
+                      </div>
                     </span>
                   {/if}
                 {:catch e}
@@ -677,8 +689,32 @@
 .name.muted { color: #9ca3af; font-style: italic; }
 .button-link { display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border: 1px solid var(--du-border); border-radius: var(--pe-radius); text-decoration: none; color: inherit; white-space: nowrap; background: #fff; font-size: 13px; }
 .desc { color:#444; font-size: 0.9em; }
-.outofsync { margin-left: 8px; color: #a40000; display: inline-flex; align-items: center; }
+.outofsync-wrap { position: relative; display: inline-flex; align-items: center; margin-left: 8px; }
+.outofsync { color: #a40000; display: inline-flex; align-items: center; cursor: help; }
 .outofsync svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+.outofsync-tooltip {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111827;
+  color: #fff;
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-width: 180px;
+  display: none;
+  z-index: 10;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.outofsync-wrap:hover .outofsync-tooltip { display: block; }
+.outofsync-title { font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; color: #f87171; }
+.outofsync-note { color: #9ca3af; margin-bottom: 6px; white-space: normal; }
+.outofsync-detail { color: #d1d5db; }
+.outofsync-list { list-style: none; margin: 0; padding: 0; color: #d1d5db; }
+.outofsync-list li { padding: 2px 0; }
 
 @media (max-width: 900px) {
   .content { padding: 12px; max-width: 100%; }

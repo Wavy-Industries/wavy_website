@@ -1,4 +1,4 @@
-import { SamplePack } from "~/lib/parsers/device_samples_parser";
+import { SamplePack } from "~/lib/parsers/device_storage_parser";
 import { Log } from "~/lib/utils/Log";
 import { SampleMode } from "~/lib/types/sampleMode";
 import { packDisplayName } from "../utils/samples";

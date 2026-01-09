@@ -1,4 +1,6 @@
-const DEVOUNCE_REQUIREMENT = 300; // ms
+import { playTickSound, playFailSound, playCCSound } from '../utils/testSounds';
+
+const DEBOUNCE_REQUIREMENT_MS = 300;
 
 // DeviceTester state - persists across component mounts
 export const deviceTesterState = $state({
@@ -28,7 +30,7 @@ export function markKeyActive(note: number) {
         playTickSound();
     } else {
         const diff = now - key.timestamp;
-        if (diff < DEVOUNCE_REQUIREMENT) {
+        if (diff < DEBOUNCE_REQUIREMENT_MS) {
             // Two presses within 300ms: mark as failed
             if (key.tested !== 'failed') {
                 key.tested = 'failed';
@@ -98,46 +100,6 @@ export function checkTestCompletion() {
 
     // Check if CC modulation is active
     deviceTesterState.testCompleted = firstTwoOctavesComplete && higherKeyPassed && deviceTesterState.ccActive;
-}
-
-// Audio functions
-function playTickSound() {
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    oscillator.type = 'sine';
-    oscillator.frequency.value = 400;
-    gainNode.gain.value = 0.2;
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + 0.05);
-}
-
-function playFailSound() {
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    oscillator.type = 'sine';
-    oscillator.frequency.value = 200;
-    gainNode.gain.value = 0.2;
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + 0.1);
-}
-
-function playCCSound() {
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    oscillator.type = 'sine';
-    oscillator.frequency.value = 500;
-    gainNode.gain.value = 0.1;
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + 0.05);
 }
 
 export const midiTesterOnNoteOn = (note: number, velocity: number, channel: number) => {

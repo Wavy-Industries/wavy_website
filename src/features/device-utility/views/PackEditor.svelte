@@ -1,11 +1,11 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { editState, closePackEditor, setEditorLoopData, saveEditor, saveEditorAsNew, setEditorName7 } from '~/features/device-utility/states/edits.svelte';
-  import { sampleParser_packSize, TICKS_PER_BEAT } from '~/lib/parsers/device_samples_parser';
+  import { sampleParser_packSize, TICKS_PER_BEAT } from '~/lib/parsers/device_storage_parser';
   import { soundBackend } from '~/lib/soundBackend';
   import MidiEditor from '~/features/device-utility/views/MidiEditor.svelte';
   import MidiPreview from '~/features/device-utility/components/MidiPreview.svelte';
-  import { computeLoopEndTicks } from '~/lib/music/loop_utils';
+  import { computeLoopEndTicks } from '~/lib/utils/loop_utils';
   import { parseMidiFile, indexLoopEvents, clampVelocity } from '~/features/device-utility/utils/midiUtils';
   import { validatePage, getSamplePack } from '~/features/device-utility/utils/samples';
   import { deviceSamplesState } from '~/lib/states/samples.svelte';

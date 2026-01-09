@@ -2,21 +2,18 @@
     import { onMount } from 'svelte';
     import { bluetoothState } from '~/lib/states/bluetooth.svelte';
     import { deviceTesterState, clearDeviceTesterState } from '~/features/device-utility/states/midiTester.svelte';
-
-    // Both SMP and MIDI services work at the same level:
-    // - SMP service: Used by DeviceUpdate, SampleManager, etc.
-    // - MIDI service: Used by DeviceTester for testing MIDI functionality
-    // Both services are accessible simultaneously through their respective managers
+    import { setTestSoundEnabled, isTestSoundEnabled } from '~/features/device-utility/utils/testSounds';
 
     let currentOctaves = $state(3);
     const startingNote = 41;
-    let audioCtx = $state(null);
-    let soundEnabled = $state(true);
+    let soundEnabled = $state(isTestSoundEnabled());
 
-    // UI state
-    let ccValue = $state('N/A');
-    let ccActive = $state(false);
-    let testCompleted = $state(false);
+    // Sync sound toggle with utility
+    function onSoundToggle(event) {
+        const enabled = event.target.checked;
+        soundEnabled = enabled;
+        setTestSoundEnabled(enabled);
+    }
 
     // Key states
     let keys = $state([]);
@@ -38,55 +35,6 @@
 
     // Reactive statement to ensure Svelte detects set changes
     let momentaryPressedKeysSize = $derived(momentaryPressedKeys.size);
-
-    function getAudioContext() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        return audioCtx;
-    }
-
-    function playTickSound() {
-        if (!soundEnabled) return;
-        const ctx = getAudioContext();
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        oscillator.type = 'sine';
-        oscillator.frequency.value = 400;
-        gainNode.gain.value = 0.2;
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        oscillator.start();
-        oscillator.stop(ctx.currentTime + 0.05);
-    }
-
-    function playCCSound() {
-        if (!soundEnabled) return;
-        const ctx = getAudioContext();
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        oscillator.type = 'sine';
-        oscillator.frequency.value = 500;
-        gainNode.gain.value = 0.1;
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        oscillator.start();
-        oscillator.stop(ctx.currentTime + 0.05);
-    }
-
-    function playFailSound() {
-        if (!soundEnabled) return;
-        const ctx = getAudioContext();
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        oscillator.type = 'sine';
-        oscillator.frequency.value = 200;
-        gainNode.gain.value = 0.2;
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        oscillator.start();
-        oscillator.stop(ctx.currentTime + 0.1);
-    }
 
     function renderKeybed() {
         keys = [];
@@ -197,7 +145,7 @@
             </button>
             
             <div class="sound-toggle">
-                <input type="checkbox" bind:checked={soundEnabled} id="soundToggle">
+                <input type="checkbox" checked={soundEnabled} onchange={onSoundToggle} id="soundToggle">
                 <label for="soundToggle">Enable Sound</label>
             </div>
         </div>

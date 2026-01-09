@@ -1,6 +1,7 @@
 import { smpService } from '~/lib/states/bluetooth.svelte';
 import { FirmwareManager, FirmwareVersion } from '~/lib/bluetooth/smp/FirmwareManager';
 import { Changelog, parseChangelog } from '~/lib/parsers/changelog_parser';
+import { getDeviceName } from '~/lib/config/device';
 
 import { Log } from '~/lib/utils/Log';
 const LOG_LEVEL = Log.LEVEL_INFO
@@ -15,8 +16,7 @@ export const firmwareState = $state({
 
 export async function refreshChangelog() {
     try {
-        const device_name = "MONKEY"; // TODO: derive via DIS
-        const url = `/firmware/${device_name}/changelog.md?_=${Date.now()}`;
+        const url = `/firmware/${getDeviceName()}/changelog.md?_=${Date.now()}`;
         const response = await fetch(url, { cache: 'no-store' });
         const data = await response.text();
         const changelog = parseChangelog(data);

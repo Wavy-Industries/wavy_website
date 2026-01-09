@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { editState, setEditorLoopData } from '~/features/device-utility/states/edits.svelte';
-  import { TICKS_PER_BEAT, type LoopData, type DrumEvent } from '~/lib/parsers/device_samples_parser';
+  import { TICKS_PER_BEAT, type LoopData, type DrumEvent } from '~/lib/parsers/device_storage_parser';
   import { soundBackend } from '~/lib/soundBackend';
   import { deviceSamplesState } from '~/lib/states/samples.svelte';
   import { SampleMode } from '~/lib/types/sampleMode';
   import { packDisplayName } from "../utils/samples";
-  import { computeLoopLengthBeatsFromEvents } from '~/lib/music/loop_utils';
+  import { computeLoopLengthBeatsFromEvents } from '~/lib/utils/loop_utils';
   import { parseMidiFile, indexLoopEvents, clampVelocity } from '~/features/device-utility/utils/midiUtils';
   import { deviceState } from '~/features/device-utility/states/deviceState.svelte';
   import PackTypeBadge from "~/features/device-utility/components/PackTypeBadge.svelte";

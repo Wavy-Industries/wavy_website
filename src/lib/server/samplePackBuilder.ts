@@ -1,6 +1,6 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
-import type { DeviceSamples, SamplePack } from '~/lib/parsers/device_samples_parser';
+import type { DeviceSamples, SamplePack } from '~/lib/parsers/device_storage_parser';
 import { sampleModeLabel, type SampleMode } from '~/lib/types/sampleMode';
 
 const DEVICE_NAME = 'MONKEY';

@@ -1,10 +1,12 @@
 /* Shared device samples state/API for use across features */
-import { DeviceSamples } from '~/lib/parsers/device_samples_parser';
+import { DeviceSamples, SamplePack } from '~/lib/parsers/device_storage_parser';
 import { smpService } from '~/lib/states/bluetooth.svelte';
 import { SampleManager } from '~/lib/bluetooth/smp/SampleManager';
 import { canonicalize } from '~/lib/utils/canonicalize';
 import { Log } from '~/lib/utils/Log';
 import { SampleMode, sampleModeLabel } from '~/lib/types/sampleMode';
+import { getDeviceName } from '~/lib/config/device';
+import { fetchServerPack } from '~/lib/services/samplePackFetcher';
 
 const log = new Log("device-samples", Log.LEVEL_INFO);
 
@@ -202,8 +204,7 @@ export const uplaodDeviceSamples = async (newSamples: DeviceSamples, mode: Sampl
 
 export const fetchDefaultPackIds = async (mode: SampleMode): Promise<string[]> => {
   try {
-    const DEVICE_NAME = 'MONKEY';
-    const res = await fetch(`/assets/${DEVICE_NAME}/${sampleModeLabel(mode)}/default.json`);
+    const res = await fetch(`/assets/${getDeviceName()}/${sampleModeLabel(mode)}/default.json`);
     if (!res.ok) {
       log.error(`Failed to fetch default pack IDs for ${sampleModeLabel(mode)}`);
       return [];
@@ -264,21 +265,6 @@ export const waitForUploadToFinish = async () => {
   while (deviceSampleTransferState.supportCheck.type === 'transferring' || deviceSampleTransferState.download.type === 'transferring' || deviceSampleTransferState.upload.type === 'transferring') {
     await new Promise(r => setTimeout(r, 100));
   }
-}
-
-// Minimal helpers to keep lib independent from feature code
-type SamplePack = { name: string; loops: any[] };
-
-const fetchServerPack = async (id: string, mode: SampleMode): Promise<SamplePack | null> => {
-  try {
-    const DEVICE_NAME = 'MONKEY';
-    const res = await fetch(`/assets/${DEVICE_NAME}/${sampleModeLabel(mode)}/${encodeURIComponent(id)}.json`);
-    if (!res.ok) { log.error(`Failed to fetch pack ${id} from server`); return null; }
-    const pack = await res.json();
-    pack.name = id;
-    log.debug(`Fetched pack ${id} from server`);
-    return pack;
-  } catch { return null; }
 }
 
 const buildDeviceSamplesFromIds = async (ids: string[], mode: SampleMode): Promise<DeviceSamples | null> => {

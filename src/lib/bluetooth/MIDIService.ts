@@ -1,4 +1,4 @@
-import { parse_raw_to_midi_ble } from '~/lib/parsers/midi_parser_ble';
+import { parse_raw_to_midi_ble } from '~/lib/parsers/midi_ble_parser';
 import { Log } from '~/lib/utils/Log';
 import { BluetoothManager } from './bluetoothManager';
 
