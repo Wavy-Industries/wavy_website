@@ -1,4 +1,7 @@
 import { BluetoothManager } from './bluetoothManager';
+import { Log } from '../utils/Log';
+
+let log = new Log('bas_service', Log.LEVEL_INFO);
 
 export class BatteryService {
     private readonly BAS_SERVICE_UUID = '0000180f-0000-1000-8000-00805f9b34fb';
@@ -6,7 +9,7 @@ export class BatteryService {
 
     private bluetoothManager: BluetoothManager;
     private characteristicKey: string | null = null;
-    private initPromise: Promise<void> | null = null;
+    private initPromise: Promise<boolean> | null = null;
     private _boundCharHandler: ((event: Event) => void) | null = null;
     private cachedLevel: number | null = null;
 
@@ -26,21 +29,28 @@ export class BatteryService {
     }
 
     public async initialize(): Promise<boolean> {
-        if (this.initPromise) { await this.initPromise; return this.characteristic !== null; }
-        this.initPromise = new Promise<void>(async (resolve, reject) => {
+        // Deduplicate concurrent calls - return existing promise if initialization is in progress
+        if (this.initPromise) return this.initPromise;
+        this.initPromise = (async () => {
             try {
                 if (this.characteristicKey && this._boundCharHandler) {
                     try { await this.bluetoothManager.removeCharacteristicListener(this.characteristicKey, 'characteristicvaluechanged', this._boundCharHandler); } catch {}
                 }
                 this.characteristicKey = await this.bluetoothManager.getCharacteristicKey(this.BAS_SERVICE_UUID, this.BATTERY_LEVEL_UUID);
-                if (!this.characteristicKey) { reject(new Error('Failed to get battery level characteristic')); return; }
+                if (!this.characteristicKey) {
+                    log.warning('Device does not support Battery Service');
+                    return false;
+                }
                 try { await this.bluetoothManager.startNotifications(this.characteristicKey); } catch {}
                 if (!this._boundCharHandler) this._boundCharHandler = this._handleBatteryLevel.bind(this);
                 await this.bluetoothManager.addCharacteristicListener(this.characteristicKey, 'characteristicvaluechanged', this._boundCharHandler);
-                resolve();
-            } catch (error) { reject(error); } finally { this.initPromise = null; }
-        });
-        try { await this.initPromise; return true; } catch { return false; }
+                return true;
+            } catch (error) {
+                log.warning('Device does not support Battery Service:', error);
+                return false;
+            } finally { this.initPromise = null; }
+        })();
+        return this.initPromise;
     }
 
     public isInitialized(): boolean { return this.characteristicKey !== null; }

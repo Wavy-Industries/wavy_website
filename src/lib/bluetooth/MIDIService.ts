@@ -4,6 +4,8 @@ import { BluetoothManager } from './bluetoothManager';
 
 let log = new Log('midi_service', Log.LEVEL_INFO);
 
+export const BT_MIDI_SERVICE_UUID = '03b80e5a-ede8-4b33-a751-6ce34ec4c700';
+
 export class MIDIService {
     private characteristicKey: string | null = null;
     private _boundCharHandler: ((event: Event) => void) | null = null;
@@ -13,9 +15,8 @@ export class MIDIService {
     public onControlChange: ((controller: number, value: number, channel: number) => void) | null = null;
 
     private midiWritePromise: Promise<void> | null = null;
-    private midiInitPromise: Promise<void> | null = null;
+    private midiInitPromise: Promise<boolean> | null = null;
 
-    private readonly MIDI_SERVICE_UUID = '03b80e5a-ede8-4b33-a751-6ce34ec4c700';
     private readonly MIDI_CHARACTERISTIC_UUID = '7772e5db-3868-4112-a1a9-f2669d106bf3';
 
     private bluetoothManager: BluetoothManager;
@@ -32,23 +33,30 @@ export class MIDIService {
     }
 
     public async initialize(): Promise<boolean> {
-        if (this.midiInitPromise) { await this.midiInitPromise; return this.characteristicKey !== null; }
-        this.midiInitPromise = new Promise<void>(async (resolve, reject) => {
+        // Deduplicate concurrent calls - return existing promise if initialization is in progress
+        if (this.midiInitPromise) return this.midiInitPromise;
+        this.midiInitPromise = (async () => {
             try {
                 // Remove old listener if any
                 if (this.characteristicKey && this._boundCharHandler) {
                     try { await this.bluetoothManager.removeCharacteristicListener(this.characteristicKey, 'characteristicvaluechanged', this._boundCharHandler); } catch {}
                 }
-                this.characteristicKey = await this.bluetoothManager.getCharacteristicKey(this.MIDI_SERVICE_UUID, this.MIDI_CHARACTERISTIC_UUID);
-                if (!this.characteristicKey) { reject(new Error('Failed to get MIDI characteristic')); return; }
+                this.characteristicKey = await this.bluetoothManager.getCharacteristicKey(BT_MIDI_SERVICE_UUID, this.MIDI_CHARACTERISTIC_UUID);
+                if (!this.characteristicKey) {
+                    log.warning('Device does not support MIDI');
+                    return false;
+                }
                 await this.bluetoothManager.startNotifications(this.characteristicKey);
                 // Bind a stable handler and add exactly once
                 if (!this._boundCharHandler) this._boundCharHandler = this._handleMIDIMessage.bind(this);
                 await this.bluetoothManager.addCharacteristicListener(this.characteristicKey, 'characteristicvaluechanged', this._boundCharHandler);
-                resolve();
-            } catch (error) { reject(error); } finally { this.midiInitPromise = null; }
-        });
-        try { await this.midiInitPromise; return true; } catch { return false; }
+                return true;
+            } catch (error) {
+                log.warning('Device does not support MIDI:', error);
+                return false;
+            } finally { this.midiInitPromise = null; }
+        })();
+        return this.midiInitPromise;
     }
 
     public async sendMIDIMessage(message: Uint8Array): Promise<void> {

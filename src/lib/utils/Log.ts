@@ -1,5 +1,5 @@
 export class Log {
-  static LEVEL_DEBUG = 0; static LEVEL_INFO = 1; static LEVEL_WARNING = 2; static LEVEL_ERROR = 3; static LEVEL_IMPORTANT = 4;
+  static LEVEL_DEBUG = 0; static LEVEL_INFO = 1; static LEVEL_IMPORTANT = 2; static LEVEL_WARNING = 3; static LEVEL_ERROR = 4;
   static LEVEL_STRING = {0: 'DEBUG', 1: 'INFO', 2: 'WARNING', 3: 'ERROR', 4: 'IMPORTANT'}
   static #LEVEL_DEBUG_COLOR = 'gray'; static #LEVEL_INFO_COLOR = 'white'; static #LEVEL_WARNING_COLOR = 'yellow'; static #LEVEL_ERROR_COLOR = 'red'; static #LEVEL_IMPORTANT_COLOR = 'cyan';
   static #LEVEL_PROD = this.LEVEL_WARNING;

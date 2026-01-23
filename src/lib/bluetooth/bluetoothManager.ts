@@ -2,6 +2,9 @@ import { Log } from '../utils/Log';
 
 let log = new Log('bluetooth', Log.LEVEL_INFO);
 
+const BT_DEFAULT_MTU = 252; // Default MTU - device will report actual MTU once connected. Needed for firmware upload
+const BT_ATT_HEADER_SIZE = 3;
+
 type ConnectionState =
   | { type: 'disconnected' }
   | { type: 'selectingDevice' }
@@ -12,7 +15,7 @@ type ConnectionState =
 
 export class BluetoothManager {
     private device: BluetoothDevice | null = null;
-    private mtu: number = 200;
+    private mtuRxGetter: (() => number | null) | null = null;
     private state: ConnectionState = { type: 'disconnected' };
     private gattQueue: Promise<void> = Promise.resolve();
     private characteristicCache: Map<string, BluetoothRemoteGATTCharacteristic> = new Map();
@@ -74,6 +77,11 @@ export class BluetoothManager {
         characteristic.removeEventListener(eventName, handler);
     }
 
+    public async getCharacteristicProperties(characteristicKey: string): Promise<BluetoothCharacteristicProperties | null> {
+        const characteristic = await this._getCharacteristicForKey(characteristicKey);
+        return characteristic?.properties ?? null;
+    }
+
     private async _requestDevice(filters?: BluetoothLEScanFilter[]): Promise<BluetoothDevice> {
         const params = { optionalServices: ['03b80e5a-ede8-4b33-a751-6ce34ec4c700', '8d53dc1d-1db7-4cd3-868b-8a527460aa84', '1a9f2b31-1c1a-4ef0-9fb2-6a5e26c03db9', '0000180f-0000-1000-8000-00805f9b34fb', '0000180a-0000-1000-8000-00805f9b34fb'] } as RequestDeviceOptions;
         if (filters) (params as { filters: BluetoothLEScanFilter[] }).filters = filters; else (params as { acceptAllDevices: boolean }).acceptAllDevices = true;
@@ -81,7 +89,8 @@ export class BluetoothManager {
         return navigator.bluetooth.requestDevice(params);
     }
 
-    public async connect(filters?: BluetoothLEScanFilter[]): Promise<void> {
+    /** Prompt user to select a device and connect (only works from disconnected state) */
+    public async connectDialogue(filters?: BluetoothLEScanFilter[]): Promise<void> {
         if (this.state.type !== 'disconnected') { console.warn('Already connecting or connected.'); return; }
         this.state = { type: 'selectingDevice' };
         try {
@@ -105,12 +114,12 @@ export class BluetoothManager {
             return;
         }
         // Exponential backoff retry
-        const MAX_ATTEMPTS = 20; // configurable upper bound
+        const MAX_ATTEMPTS = 3; // configurable upper bound
         const BASE_DELAY = 300;   // ms
         const MAX_DELAY = 5000;   // ms
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                await this.device.gatt!.connect();
+                await this.device.gatt?.connect();
                 if (this.state.type === 'connecting' || this.state.type === 'connectionLoss') {
                     if (this.state.type === 'connectionLoss') this.onConnectionReestablished?.();
                     else this.onConnect()
@@ -134,6 +143,30 @@ export class BluetoothManager {
         this.device?.gatt?.disconnect();
     }
 
+    /** Prompt user to select device during connection loss (manual reconnect). Stays in connectionLoss until connected. */
+    public async reconnectDialogue(filters?: BluetoothLEScanFilter[]): Promise<void> {
+        if (this.state.type !== 'connectionLoss') {
+            console.warn('reconnectDialogue only works during connection loss');
+            return;
+        }
+        this._resetCharacteristicCache();
+        try {
+            this.device = await this._requestDevice(filters);
+            this.device.addEventListener('gattserverdisconnected', this._handleDisconnection.bind(this));
+            await this.device.gatt!.connect();
+            // Only transition to connected after successful connection
+            this.state = { type: 'connected' };
+            this.onConnectionReestablished?.();
+        } catch (error: any) {
+            // Stay in connectionLoss state on any error - user can retry
+            if (error.name === 'NotFoundError') {
+                this.onDeviceSelectionCancel?.();
+            } else {
+                console.error('Reconnection error:', error);
+            }
+        }
+    }
+
     private async _handleDisconnection(): Promise<void> {
         this._resetCharacteristicCache();
         if (this.state.type === 'connected') { this.state = { type: 'connectionLoss' }; this.onConnectionLoss?.(); await this._reconnect(); }
@@ -148,7 +181,29 @@ export class BluetoothManager {
         this.device = null;
     }
     public get name(): string | undefined { return this.device?.name; }
-    public get maxPayloadSize(): number { const MTU_OVERHEAD = 3; return this.mtu - MTU_OVERHEAD - 8; }
+
+    /** Extract the device model name (e.g., "MONKEY" from "WAVY MONKEY") */
+    public getDeviceName(): string | null {
+        const fullName = this.device?.name;
+        if (!fullName) return null;
+        // Expect format: "WAVY <DEVICE_NAME>"
+        const parts = fullName.split(' ');
+        if (parts.length < 2 || parts[0] !== 'WAVY') {
+            log.warning(`Unexpected device name format: ${fullName}`);
+            return null;
+        }
+        return parts[1];
+    }
+
+    public setMtuRxGetter(getter: () => number | null): void {
+        this.mtuRxGetter = getter;
+    }
+
+    public get maxPayloadSize(): number {
+        const deviceMtu = this.mtuRxGetter?.() ?? null;
+        const mtu = (deviceMtu !== null && deviceMtu >= BT_DEFAULT_MTU) ? deviceMtu : BT_DEFAULT_MTU;
+        return mtu - BT_ATT_HEADER_SIZE;
+    }
 
     // Serialize GATT operations to avoid overlapping requests on some platforms.
     private _queueGattOperation<T>(operation: () => Promise<T>): Promise<T> {
@@ -176,7 +231,7 @@ export class BluetoothManager {
             this.characteristicCache.set(characteristicKey, characteristic);
             return characteristic;
         } catch (error) {
-            console.error(`Failed to get characteristic ${characteristicUUID} from service ${serviceUUID}:`, error);
+            // Service/characteristic not available - caller should handle this
             return null;
         }
     }

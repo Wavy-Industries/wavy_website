@@ -7,11 +7,7 @@
     import { bluetoothManager, bluetoothState } from '~/lib/states/bluetooth.svelte';
     import DeviceBluetoothBrowsers from '~/features/device-utility/components/DeviceBluetoothBrowsers.svelte';
     import { soundBackend } from '~/lib/soundBackend';
-    
-    // The device advertises the MIDI service, so we use that for discovery
-    // Both SMP and MIDI services are treated equally once connected
-    const BT_MIDI_SERVICE_UUID = '03b80e5a-ede8-4b33-a751-6ce34ec4c700';
-    const filters = [{ namePrefix: 'WAVY MONKEY', services: [BT_MIDI_SERVICE_UUID] }];
+    import { BT_DEVICE_FILTERS } from '~/lib/config/device';
   
     let isBluetoothAvailable = $state(false);
     let isChecking = $state(true);
@@ -38,7 +34,7 @@
   
     async function handleConnectClick() {
       try { await soundBackend.resume?.(); } catch {} // used for enabling Audio on IOS devices
-      await bluetoothManager.connect(filters);
+      await bluetoothManager.connectDialogue(BT_DEVICE_FILTERS);
     }
   </script>
   

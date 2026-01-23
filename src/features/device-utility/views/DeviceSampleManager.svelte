@@ -269,7 +269,7 @@
 <div class="content">
   <div class="beta-banner">
     <span class="beta-badge">BETA</span>
-    <span>This feature is in beta — please report issues to <a href="mailto:hello@wavyindustries.com">hello@wavyindustries.com</a>.</span>
+    <span>This feature is experimental — please report issues to <a href="mailto:hello@wavyindustries.com">hello@wavyindustries.com</a>.</span>
   </div>
   <div class="toolbar">
     <div class="left">

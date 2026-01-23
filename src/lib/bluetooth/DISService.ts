@@ -1,5 +1,8 @@
 // DeviceInformationService.ts
 import { BluetoothManager } from './bluetoothManager';
+import { Log } from '../utils/Log';
+
+let log = new Log('dis_service', Log.LEVEL_INFO);
 
 export class DeviceInformationService {
   private readonly DIS_SERVICE_UUID = '0000180a-0000-1000-8000-00805f9b34fb';
@@ -10,7 +13,7 @@ export class DeviceInformationService {
     firmwareRev:      '00002a26-0000-1000-8000-00805f9b34fb',
   } as const;
 
-  private initPromise: Promise<void> | null = null;
+  private initPromise: Promise<boolean> | null = null;
   private cache: Partial<Record<keyof typeof this.CH, string | null>> = {};
   private inflight: Partial<Record<keyof typeof this.CH, Promise<string | null>>> = {};
 
@@ -27,13 +30,25 @@ export class DeviceInformationService {
   }
 
   public async initialize(): Promise<boolean> {
-    if (this.initPromise) { await this.initPromise; return true; }
+    // Deduplicate concurrent calls - return existing promise if initialization is in progress
+    if (this.initPromise) return this.initPromise;
     // Touch one char to ensure the service is reachable
     this.initPromise = (async () => {
-      await this.bluetoothManager.getCharacteristicKey(this.DIS_SERVICE_UUID, this.CH.modelNumber);
-    })().finally(() => { this.initPromise = null; });
-
-    try { await this.initPromise; return true; } catch { return false; }
+      try {
+        const key = await this.bluetoothManager.getCharacteristicKey(this.DIS_SERVICE_UUID, this.CH.modelNumber);
+        if (!key) {
+          log.warning('Device does not support Device Information Service');
+          return false;
+        }
+        return true;
+      } catch (error) {
+        log.warning('Device does not support Device Information Service:', error);
+        return false;
+      } finally {
+        this.initPromise = null;
+      }
+    })();
+    return this.initPromise;
   }
 
   // ---- Cached getters ----
@@ -79,10 +94,10 @@ export class DeviceInformationService {
       if (!(await this.initialize())) return null;
 
       const charUuid = this.CH[key];
-      const key = await this.bluetoothManager.getCharacteristicKey(this.DIS_SERVICE_UUID, charUuid);
-      if (!key) return null;
+      const charKey = await this.bluetoothManager.getCharacteristicKey(this.DIS_SERVICE_UUID, charUuid);
+      if (!charKey) return null;
 
-      const view = await this.bluetoothManager.readCharacteristicValue(key);
+      const view = await this.bluetoothManager.readCharacteristicValue(charKey);
       if (!view) return null;
 
       const u8 = new Uint8Array(view.buffer);

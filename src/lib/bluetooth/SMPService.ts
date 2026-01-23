@@ -55,6 +55,7 @@ export class SMPService {
     private readonly SMP_HEADER_GROUP_LO_IDX: number = 5;
     private readonly SMP_HEADER_SEQ_IDX: number = 6;
     private readonly SMP_HEADER_ID_IDX: number = 7;
+    private readonly RESPONSE_TIMEOUT_MS: number = 30000;
 
     private readonly SMP_SERVICE_UUID = '8d53dc1d-1db7-4cd3-868b-8a527460aa84';
     private readonly SMP_CHARACTERISTIC_UUID = 'da2e7828-fbce-4e01-ae9e-261174997c48';
@@ -62,8 +63,9 @@ export class SMPService {
     private _boundCharHandler: ((event: Event) => void) | null = null;
     private smpInitialized: boolean = false;
     private smpBuffer: Uint8Array = new Uint8Array([]);
-    private smpInitPromise: Promise<void> | null = null;
+    private smpInitPromise: Promise<boolean> | null = null;
     private smpWritePromise: Promise<void> | null = null;
+    private supportsWriteWithResponse: boolean = false;
 
     private bluetoothManager: BluetoothManager;
 
@@ -80,23 +82,36 @@ export class SMPService {
         this.smpCharacteristicKey = null;
     }
 
-    private async _initializeSMP(): Promise<void> {
+    private async _initializeSMP(): Promise<boolean> {
+        // Deduplicate concurrent calls - return existing promise if initialization is in progress
         if (this.smpInitPromise) return this.smpInitPromise;
-        this.smpInitPromise = new Promise<void>(async (resolve, reject) => {
+        this.smpInitPromise = (async () => {
             try {
                 this.smpCharacteristicKey = await this.bluetoothManager.getCharacteristicKey(this.SMP_SERVICE_UUID, this.SMP_CHARACTERISTIC_UUID);
-                if (!this.smpCharacteristicKey) { reject(new Error('Failed to get SMP characteristic')); return; }
+                if (!this.smpCharacteristicKey) {
+                    log.warning('Device does not support SMP (firmware updates)');
+                    return false;
+                }
+
+                // Check characteristic properties
+                const props = await this.bluetoothManager.getCharacteristicProperties(this.smpCharacteristicKey);
+                this.supportsWriteWithResponse = props?.write ?? false;
+                log.info("SMP characteristic properties - writeWithResponse:", this.supportsWriteWithResponse, "writeWithoutResponse:", props?.writeWithoutResponse);
+
                 await this.bluetoothManager.startNotifications(this.smpCharacteristicKey);
                 if (!this._boundCharHandler) this._boundCharHandler = this._handleSMPMessage.bind(this);
                 await this.bluetoothManager.addCharacteristicListener(this.smpCharacteristicKey, 'characteristicvaluechanged', this._boundCharHandler);
                 this.smpInitialized = true;
-                resolve();
-            } catch (error) { reject(error); } finally { this.smpInitPromise = null; }
-        });
+                return true;
+            } catch (error) {
+                log.warning('Device does not support SMP (firmware updates):', error);
+                return false;
+            } finally { this.smpInitPromise = null; }
+        })();
         return this.smpInitPromise;
     }
 
-    public get maxPayloadSize(): number { return this.bluetoothManager.maxPayloadSize; }
+    public get maxPayloadSize(): number { return this.bluetoothManager.maxPayloadSize - this.SMP_HEADER_SIZE; }
     private _buildSMPMessage(op: number, flags: number, group: number, sequenceNumber: number, commandId: number, payload: Uint8Array = new Uint8Array([])): Uint8Array {
         const length = payload.length;
         const header = new Uint8Array(this.SMP_HEADER_SIZE);
@@ -104,16 +119,48 @@ export class SMPService {
     }
 
     public async sendMessage(op: number, group: number, id: number, payload: Uint8Array = new Uint8Array([])): Promise<Object> {
-        if (!this.smpInitialized) await this._initializeSMP();
-        const sequenceNumber = this.smpSequenceNumber; this.smpSequenceNumber = (this.smpSequenceNumber + 1) % 256; const flags = 0; const message = this._buildSMPMessage(op, flags, group, sequenceNumber, id, payload);
+        if (!this.smpInitialized) {
+            const ok = await this._initializeSMP();
+            if (!ok) throw new Error('SMP service not available on this device');
+        }
+
+        const sequenceNumber = this.smpSequenceNumber;
+        this.smpSequenceNumber = (this.smpSequenceNumber + 1) % 256;
+        const flags = 0;
+        const message = this._buildSMPMessage(op, flags, group, sequenceNumber, id, payload);
+
+        // Check if message exceeds MTU
+        const maxMessageSize = this.bluetoothManager.maxPayloadSize;
+        if (message.byteLength > maxMessageSize) {
+            const err = new Error(`SMP message size (${message.byteLength}) exceeds MTU limit (${maxMessageSize}). This will likely fail silently.`);
+            log.error(err.message);
+            throw err;
+        }
+
+        log.debug("sendMessage seq:", sequenceNumber, "msgSize:", message.byteLength, "maxSize:", maxMessageSize);
+
         return new Promise<any>(async (resolve, reject) => {
-            this.responseResolvers[sequenceNumber] = { resolve, reject };
+            // Set up timeout
+            const timeoutId = setTimeout(() => {
+                delete this.responseResolvers[sequenceNumber];
+                const err = new Error(`SMP response timeout after ${this.RESPONSE_TIMEOUT_MS}ms for seq ${sequenceNumber}`);
+                log.error(err.message);
+                reject(err);
+            }, this.RESPONSE_TIMEOUT_MS);
+
+            this.responseResolvers[sequenceNumber] = {
+                resolve: (data) => { clearTimeout(timeoutId); resolve(data); },
+                reject: (error) => { clearTimeout(timeoutId); reject(error); }
+            };
+
             try {
                 if (this.smpWritePromise) await this.smpWritePromise;
                 if (!this.smpCharacteristicKey) throw new Error('SMP characteristic not available');
                 this.smpWritePromise = this.bluetoothManager.writeCharacteristicValueWithoutResponse(this.smpCharacteristicKey, message);
                 await this.smpWritePromise; this.smpWritePromise = null;
+                log.debug("write complete, waiting for response seq:", sequenceNumber);
             } catch (error: any) {
+                clearTimeout(timeoutId);
                 log.debug(`Failed to send SMP message: ${error}`);
                 delete this.responseResolvers[sequenceNumber]; this.smpWritePromise = null;
                 if (error.message?.includes('no longer valid') || error.message?.includes('Characteristic')) {
@@ -141,6 +188,8 @@ export class SMPService {
         // Ensure we pass a tightly sliced ArrayBuffer to the decoder
         const ab = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength);
         let data; try { data = CBOR.decode(ab); } catch (error) { log.error(`Error decoding CBOR: ${error}`); return; }
-        const seq = message[this.SMP_HEADER_SEQ_IDX]; const resolver = this.responseResolvers[seq]; if (resolver) { resolver.resolve(data); delete this.responseResolvers[seq]; }
+        const seq = message[this.SMP_HEADER_SEQ_IDX];
+        log.debug("received response seq:", seq, "hasResolver:", !!this.responseResolvers[seq]);
+        const resolver = this.responseResolvers[seq]; if (resolver) { resolver.resolve(data); delete this.responseResolvers[seq]; }
     }
 }

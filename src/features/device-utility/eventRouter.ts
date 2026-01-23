@@ -6,16 +6,16 @@
  */
 
 import { bluetoothManager, bluetoothStateSetConnected, bluetoothStateSetConnecting, bluetoothStateSetDisconnected, bluetoothStateSetConnectionLoss, bluetoothStateSetConnectionReestablished, deviceStateService, smpService, midiService } from '~/lib/states/bluetooth.svelte';
-import { refreshChangelog, refreshDeviceFirmwareVersion } from '~/lib/states/firmware.svelte';
+import { refreshChangelog, refreshDeviceFirmwareVersion, resetFirmwareState } from '~/lib/states/firmware.svelte';
 import { midiTesterOnNoteOn, midiTesterOnNoteOff, midiTesterOnCC } from '~/features/device-utility/states/midiTester.svelte';
 import { soundBackend } from '~/lib/soundBackend';
 import { setLocalSamplesMode } from './states/samplesLocal.svelte';
 import { SampleMode } from '~/lib/types/sampleMode';
 import { initialiseDeviceSamples, invalidateDeviceSamplesState } from '~/lib/states/samples.svelte';
-import { updaterNotifyConnectionReestablished, updaterNotifyIsSupported } from '~/lib/states/updater.svelte';
+import { updaterNotifyConnectionReestablished, updaterNotifyIsSupported, updaterNotifyConnected } from '~/lib/states/updater.svelte';
 import { initPlaygroundSynthPersistence, midiControlOnCC, midiControlOnNoteOff, midiControlOnNoteOn } from './states/playground.svelte';
 import { windowState, DeviceUtilityView } from './states/window.svelte';
-import { deviceState, setDeviceStateFromSnapshot } from './states/deviceState.svelte';
+import { deviceState, setDeviceStateFromSnapshot, resetDeviceState } from './states/deviceState.svelte';
 import { setTempo } from './states/tempo.svelte';
 import { initializeBatteryState, resetBatteryState } from './states/bas.svelte';
 import { refreshDisState, resetDisState } from './states/dis.svelte';
@@ -36,13 +36,15 @@ export const callbacksSet = () => {
         deviceStateService.reset();
         smpService.reset();
         resetDisState();
-        deviceState.isAvailable = null;
+        resetDeviceState();
+        resetFirmwareState();
         resetBatteryState();
 
         initPlaygroundSynthPersistence();
         void refreshChangelog();
         setLocalSamplesMode(SampleMode.DRM);
         bluetoothStateSetConnected();
+        updaterNotifyConnected(); // Notify updater of connection (for manual reconnect flow)
 
         // Initialize Bluetooth modules and device data
         (async () => {
@@ -95,7 +97,8 @@ export const callbacksSet = () => {
         deviceStateService.reset();
         smpService.reset();
         resetDisState();
-        deviceState.isAvailable = null;
+        resetDeviceState();
+        resetFirmwareState();
         resetBatteryState();
 
         initPlaygroundSynthPersistence();
@@ -155,7 +158,8 @@ export const callbacksSet = () => {
     bluetoothManager.onDisconnect = () => {
         invalidateDeviceSamplesState();
         resetDisState();
-        deviceState.isAvailable = null;
+        resetDeviceState();
+        resetFirmwareState();
         resetBatteryState();
         bluetoothStateSetDisconnected();
     };
@@ -163,7 +167,8 @@ export const callbacksSet = () => {
     bluetoothManager.onConnectionLoss = () => {
         invalidateDeviceSamplesState();
         resetDisState();
-        deviceState.isAvailable = null;
+        resetDeviceState();
+        resetFirmwareState();
         resetBatteryState();
         bluetoothStateSetConnectionLoss();
     };

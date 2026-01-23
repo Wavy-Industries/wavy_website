@@ -1,22 +1,27 @@
 import { Log } from '../utils/Log';
 import { BluetoothManager } from './bluetoothManager';
 
-let log = new Log('device_state', Log.LEVEL_DEBUG);
+let log = new Log('device_state', Log.LEVEL_INFO);
 
-const BT_STATE_CMD_OCTAVE = 0x0001;
-const BT_STATE_CMD_CHANNEL = 0x0002;
-const BT_STATE_CMD_MUTE_MASK = 0x0003;
-const BT_STATE_CMD_PLAYBACK = 0x0005;
-const BT_STATE_CMD_RECORDING = 0x0006;
-const BT_STATE_CMD_BPM = 0x0007;
-const BT_STATE_CMD_EFFECT = 0x0008;
-const BT_STATE_CMD_EFFECT_PRESET = 0x0009;
-const BT_STATE_CMD_HOLD = 0x000a;
-const BT_STATE_CMD_UNDO_SESSION = 0x000b;
-const DEVICE_STATE_CMD_POWER_STATE = 0x000c;
-const DEVICE_STATE_CMD_BT_CONN_INTERVAL = 0x000d;
-const DEVICE_STATE_CMD_BT_CONN_LATENCY = 0x000e;
-const DEVICE_STATE_CMD_BT_CONN_TIMEOUT = 0x000f;
+// 0 - 99 user interface functionality
+const DEVICE_STATE_CMD_OCTAVE = 0;
+const DEVICE_STATE_CMD_CHANNEL = 1;
+const DEVICE_STATE_CMD_MUTE_MASK = 2;
+const DEVICE_STATE_CMD_PLAYBACK = 3;
+const DEVICE_STATE_CMD_RECORDING = 4;
+const DEVICE_STATE_CMD_BPM = 5;
+const DEVICE_STATE_CMD_EFFECT = 6;
+const DEVICE_STATE_CMD_EFFECT_PRESET = 7;
+const DEVICE_STATE_CMD_HOLD = 8;
+const DEVICE_STATE_CMD_UNDO_SESSION = 9;
+// 100 - 199 Bluetooth state (interval, latency, timeout, MTU)
+const DEVICE_STATE_CMD_BT_CONN_INTERVAL = 100;
+const DEVICE_STATE_CMD_BT_CONN_LATENCY = 101;
+const DEVICE_STATE_CMD_BT_CONN_TIMEOUT = 102;
+const DEVICE_STATE_CMD_BT_CONN_MTU_RX = 103;
+const DEVICE_STATE_CMD_BT_CONN_MTU_TX = 104;
+// 200 - 299 Internal state
+const DEVICE_STATE_CMD_POWER_STATE = 200;
 
 export type DeviceStateSnapshot = {
     octave: number | null;
@@ -33,6 +38,8 @@ export type DeviceStateSnapshot = {
     btConnInterval: number | null;
     btConnLatency: number | null;
     btConnTimeout: number | null;
+    btMtuRx: number | null;
+    btMtuTx: number | null;
 };
 
 export class DeviceStateService {
@@ -51,7 +58,7 @@ export class DeviceStateService {
 
     private bluetoothManager: BluetoothManager;
     private characteristicKey: string | null = null;
-    private stateInitPromise: Promise<void> | null = null;
+    private stateInitPromise: Promise<boolean> | null = null;
     private _boundCharHandler: ((event: Event) => void) | null = null;
     private deviceState: DeviceStateSnapshot = {
         octave: null as number | null,
@@ -68,12 +75,15 @@ export class DeviceStateService {
         btConnInterval: null as number | null,
         btConnLatency: null as number | null,
         btConnTimeout: null as number | null,
+        btMtuRx: null as number | null,
+        btMtuTx: null as number | null,
     };
 
     public onStateUpdate: ((state: DeviceStateSnapshot) => void) | null = null;
 
     public constructor(bluetoothManager: BluetoothManager) {
         this.bluetoothManager = bluetoothManager;
+        this.bluetoothManager.setMtuRxGetter(() => this.deviceState.btMtuRx);
     }
 
     public reset(): void {
@@ -85,21 +95,30 @@ export class DeviceStateService {
     }
 
     public async initialize(): Promise<boolean> {
-        if (this.stateInitPromise) { await this.stateInitPromise; return this.characteristic !== null; }
-        this.stateInitPromise = new Promise<void>(async (resolve, reject) => {
+        // Deduplicate concurrent calls - return existing promise if initialization is in progress
+        if (this.stateInitPromise) return this.stateInitPromise;
+        this.stateInitPromise = (async () => {
             try {
                 if (this.characteristicKey && this._boundCharHandler) {
                     try { await this.bluetoothManager.removeCharacteristicListener(this.characteristicKey, 'characteristicvaluechanged', this._boundCharHandler); } catch {}
                 }
                 this.characteristicKey = await this.bluetoothManager.getCharacteristicKey(this.STATE_SERVICE_UUID, this.STATE_CHARACTERISTIC_UUID);
-                if (!this.characteristicKey) { reject(new Error('Failed to get device state characteristic')); return; }
+                if (!this.characteristicKey) {
+                    log.warning('Device does not support device state');
+                    return false;
+                }
                 await this.bluetoothManager.startNotifications(this.characteristicKey);
                 if (!this._boundCharHandler) this._boundCharHandler = this._handleStateMessage.bind(this);
                 await this.bluetoothManager.addCharacteristicListener(this.characteristicKey, 'characteristicvaluechanged', this._boundCharHandler);
-                resolve();
-            } catch (error) { reject(error); } finally { this.stateInitPromise = null; }
-        });
-        try { await this.stateInitPromise; return true; } catch { return false; }
+                return true;
+            } catch (error) {
+                log.warning('Device does not support device state:', error);
+                return false;
+            } finally {
+                this.stateInitPromise = null;
+            }
+        })();
+        return this.stateInitPromise;
     }
 
     public isInitialized(): boolean { return this.characteristicKey !== null; }
@@ -122,6 +141,8 @@ export class DeviceStateService {
             `btConnInterval=${this.deviceState.btConnInterval ?? 'unset'}`,
             `btConnLatency=${this.deviceState.btConnLatency ?? 'unset'}`,
             `btConnTimeout=${this.deviceState.btConnTimeout ?? 'unset'}`,
+            `btMtuRx=${this.deviceState.btMtuRx ?? 'unset'}`,
+            `btMtuTx=${this.deviceState.btMtuTx ?? 'unset'}`,
         ];
         return list
     }
@@ -143,62 +164,62 @@ export class DeviceStateService {
             const signedValue = view.getInt16(offset + 2, true);
 
             switch (cmd) {
-                case BT_STATE_CMD_OCTAVE: {
+                case DEVICE_STATE_CMD_OCTAVE: {
                     log.debug(`Device state octave ${signedValue}`)
 
                     this.deviceState.octave = signedValue;
                     didUpdate = true;
                     break;
                 }
-                case BT_STATE_CMD_CHANNEL: {
+                case DEVICE_STATE_CMD_CHANNEL: {
                     log.debug(`Device state channel ${signedValue}`)
                     this.deviceState.channel = rawValue & 0xff;
                     didUpdate = true;
                     break;
                 }
-                case BT_STATE_CMD_MUTE_MASK: {
+                case DEVICE_STATE_CMD_MUTE_MASK: {
                     log.debug(`Device state mute mask ${signedValue}`)
                     this.deviceState.muteMask = rawValue;
                     didUpdate = true;
                     break;
                 }
-                case BT_STATE_CMD_PLAYBACK: {
+                case DEVICE_STATE_CMD_PLAYBACK: {
                     log.debug(`Device state playback ${signedValue}`)
                     this.deviceState.playback = rawValue !== 0;
                     didUpdate = true;
                     break;
                 }
-                case BT_STATE_CMD_RECORDING: {
+                case DEVICE_STATE_CMD_RECORDING: {
                     log.debug(`Device state recording ${signedValue}`)
                     this.deviceState.recording = rawValue !== 0;
                     didUpdate = true;
                     break;
                 }
-                case BT_STATE_CMD_BPM: {
+                case DEVICE_STATE_CMD_BPM: {
                     log.debug(`Device state bpm ${signedValue}`)
                     this.deviceState.bpm = rawValue;
                     didUpdate = true;
                     break;
                 }
-                case BT_STATE_CMD_EFFECT: {
+                case DEVICE_STATE_CMD_EFFECT: {
                     log.debug(`Device state effect ${signedValue}`)
                     this.deviceState.effectId = rawValue;
                     didUpdate = true;
                     break;
                 }
-                case BT_STATE_CMD_EFFECT_PRESET: {
+                case DEVICE_STATE_CMD_EFFECT_PRESET: {
                     log.debug(`Device state effect preset ${signedValue}`)
                     this.deviceState.effectPreset = rawValue;
                     didUpdate = true;
                     break;
                 }
-                case BT_STATE_CMD_HOLD: {
+                case DEVICE_STATE_CMD_HOLD: {
                     log.debug(`Device state hold ${signedValue}`)
                     this.deviceState.hold = rawValue !== 0;
                     didUpdate = true;
                     break;
                 }
-                case BT_STATE_CMD_UNDO_SESSION: {
+                case DEVICE_STATE_CMD_UNDO_SESSION: {
                     log.debug(`Device state undo session ${signedValue}`)
                     this.deviceState.undoSession = rawValue;
                     didUpdate = true;
@@ -228,8 +249,20 @@ export class DeviceStateService {
                     didUpdate = true;
                     break;
                 }
+                case DEVICE_STATE_CMD_BT_CONN_MTU_RX: {
+                    log.debug(`Device state bt mtu rx ${signedValue}`)
+                    this.deviceState.btMtuRx = rawValue;
+                    didUpdate = true;
+                    break;
+                }
+                case DEVICE_STATE_CMD_BT_CONN_MTU_TX: {
+                    log.debug(`Device state bt mtu tx ${signedValue}`)
+                    this.deviceState.btMtuTx = rawValue;
+                    didUpdate = true;
+                    break;
+                }
                 default: {
-                    log.warning(`state unknown cmd 0x${cmd.toString(16)} value ${rawValue}`);
+                    log.warning(`state unknown cmd ${cmd} value ${rawValue}`);
                     break;
                 }
             }

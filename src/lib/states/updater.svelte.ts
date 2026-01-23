@@ -1,11 +1,15 @@
 import { firmwareManager } from "~/lib/states/firmware.svelte";
 import { deviceSamplesState, waitForUploadToFinish } from "~/lib/states/samples.svelte";
 import { Log } from "~/lib/utils/Log";
+import { bluetoothManager } from "~/lib/states/bluetooth.svelte";
+import { BT_DEVICE_FILTERS } from "~/lib/config/device";
+
+const RECONNECT_TIMEOUT_MS = 30000; // 30 second timeout for auto-reconnect
 
 const log = new Log("updater", Log.LEVEL_INFO);
 
 export const updaterState = $state({
-    stage: 'idle' as 'idle' | 'fetching' | 'uploading' | 'applying' | 'verifying' | 'done' | 'failed',
+    stage: 'idle' as 'idle' | 'fetching' | 'uploading' | 'applying' | 'reconnect_required' | 'verifying' | 'done' | 'failed',
     uploadProgress: null as number | null,
 });
 
@@ -21,6 +25,18 @@ export function updaterNotifyIsSupported() {
 export function updaterNotifyConnectionReestablished() {
     deviceReconnectedResolve?.();
     deviceReconnectedResolve = null;
+}
+
+/** Called from onConnect - also resolves reconnect promise for manual reconnect flow */
+export function updaterNotifyConnected() {
+    deviceReconnectedResolve?.();
+    deviceReconnectedResolve = null;
+}
+
+/** Called from UI when user clicks reconnect button during reconnect_required stage */
+export async function updaterTriggerReconnect() {
+    if (updaterState.stage !== 'reconnect_required') return;
+    await bluetoothManager.reconnectDialogue(BT_DEVICE_FILTERS);
 }
 
 export async function deviceUpdate(firmwareVersion: string) {
@@ -40,10 +56,21 @@ export async function deviceUpdate(firmwareVersion: string) {
 
         const deviceReconnectedPromise = new Promise<void>((resolve) => { deviceReconnectedResolve = resolve; });
         const isSupportedPromise = new Promise<void>((resolve) => { isSupportedResolve = resolve; });
-        
+
         updaterState.stage = 'applying';
         log.debug('Waiting for device to apply update and reconnect...');
+
+        // Show reconnect button after timeout (doesn't block the connection wait)
+        const uiTimeoutId = setTimeout(() => {
+            if (updaterState.stage === 'applying') {
+                log.warning('Auto-reconnect taking too long, showing manual reconnect button');
+                updaterState.stage = 'reconnect_required';
+            }
+        }, RECONNECT_TIMEOUT_MS);
+
+        // Wait indefinitely for connection (either auto-reconnect or manual)
         await deviceReconnectedPromise;
+        clearTimeout(uiTimeoutId);
         
         updaterState.stage = 'verifying';
         log.debug('Verifying updated firmware version...');

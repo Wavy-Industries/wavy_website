@@ -1,3 +1,6 @@
+# 1.2.93[23. Jan 2026] -dev
+- Bluetooth MTU over device state
+
 # 1.2.92[8. Jan 2026] -dev
 - Support for selection of MIDI channel 11-16 by long pressing 1 during selection.
 

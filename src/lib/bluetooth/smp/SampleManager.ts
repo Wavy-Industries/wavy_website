@@ -95,6 +95,13 @@ export class SampleManager {
         log.debug('Reading sample bank mode');
         const response = await this.smpBluetoothCharacteristic.sendMessage(MGMT_OP.READ, this.GROUP_ID, _MGMT_ID.MODE) as { mode?: number } | ResponseError;
         if ((response as ResponseError).rc !== undefined && (response as ResponseError).rc !== MGMT_ERR.EOK) {
+
+            /* silent error, assume caller handles no support */
+            if ((response as ResponseError).rc == MGMT_ERR.ENOTSUP) {
+                log.debug("device does not support mode");
+                return Promise.reject((response as ResponseError).rc);
+            }
+
             log.error(`Error response received, rc: ${(response as ResponseError).rc}`);
             return Promise.reject((response as ResponseError).rc);
         }
@@ -203,7 +210,7 @@ export class SampleManager {
             log.debug(`Initial payload size (without data): ${payloadEncoded.byteLength} bytes`);
 
             // Calculate the maximum data size that fits within the MTU
-            const maxDataSize = maxPayloadSize - payloadEncoded.byteLength - 20;
+            const maxDataSize = maxPayloadSize - payloadEncoded.byteLength;
             log.debug(`Max data size for this chunk: ${maxDataSize} bytes`);
 
             if (maxDataSize <= 0) {

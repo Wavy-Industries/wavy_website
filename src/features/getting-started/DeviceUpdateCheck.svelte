@@ -5,16 +5,14 @@
   import { firmwareState } from '~/lib/states/firmware.svelte';
   import { routes } from '~/routes';
   import { firmwareRhsIsNewer } from '~/lib/bluetooth/smp/FirmwareManager';
+  import { BT_DEVICE_FILTERS } from '~/lib/config/device';
 
   const supportsBluetooth = navigator?.bluetooth !== undefined;
   onMount(() => {
     callbacksSet();
   });
 
-  const BT_MIDI_SERVICE_UUID = '03b80e5a-ede8-4b33-a751-6ce34ec4c700';
-  const filters = [{ namePrefix: 'WAVY MONKEY', services: [BT_MIDI_SERVICE_UUID] }];
-
-  async function connectAndCheck() { await bluetoothManager.connect(filters); }
+  async function connectAndCheck() { await bluetoothManager.connectDialogue(BT_DEVICE_FILTERS); }
 
   // Local deriveds (Svelte runes: do not export derived from modules)
   const updateAvailable = $derived.by(() => {

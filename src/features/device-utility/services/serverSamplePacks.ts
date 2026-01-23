@@ -1,7 +1,7 @@
 import { SamplePack } from "~/lib/parsers/device_storage_parser";
 import { SampleMode, sampleModeLabel } from "~/lib/types/sampleMode";
 import { getPackType, packDisplayName, SamplePackInfo, normalizePackId } from "../utils/samples";
-import { getDeviceName } from "~/lib/config/device";
+import { bluetoothManager } from "~/lib/states/bluetooth.svelte";
 import { fetchServerPack as fetchServerPackBase } from "~/lib/services/samplePackFetcher";
 
 import { Log } from "~/lib/utils/Log";
@@ -25,7 +25,7 @@ export const fetchServerPack = async (id: string, mode: SampleMode = SampleMode.
 
 export const fetchAvailableServerPacks = async (mode: SampleMode = SampleMode.DRM): Promise<{[key: string]: SamplePackInfo}> => {
     log.debug("Fetching available server packs");
-    const res = await fetch(`/assets/${getDeviceName()}/${sampleModeLabel(mode)}/record.json`);
+    const res = await fetch(`/assets/${bluetoothManager.getDeviceName()}/${sampleModeLabel(mode)}/record.json`);
     if (res.ok) {
         const record = await res.json() as {[key: string]: SamplePackInfo};
         // Add display key to each pack info

@@ -1,11 +1,10 @@
 /* Shared device samples state/API for use across features */
 import { DeviceSamples, SamplePack } from '~/lib/parsers/device_storage_parser';
-import { smpService } from '~/lib/states/bluetooth.svelte';
+import { smpService, bluetoothManager } from '~/lib/states/bluetooth.svelte';
 import { SampleManager } from '~/lib/bluetooth/smp/SampleManager';
 import { canonicalize } from '~/lib/utils/canonicalize';
 import { Log } from '~/lib/utils/Log';
 import { SampleMode, sampleModeLabel } from '~/lib/types/sampleMode';
-import { getDeviceName } from '~/lib/config/device';
 import { fetchServerPack } from '~/lib/services/samplePackFetcher';
 
 const log = new Log("device-samples", Log.LEVEL_INFO);
@@ -109,6 +108,7 @@ const detectModeSupport = async (): Promise<boolean> => {
     deviceSamplesState.modeSupported = true;
     return true;
   } catch {
+    log.warning("device does not support samples mode")
     deviceSamplesState.modeSupported = false;
     deviceSamplesState.activeMode = SampleMode.DRM;
     return false;
@@ -204,7 +204,7 @@ export const uplaodDeviceSamples = async (newSamples: DeviceSamples, mode: Sampl
 
 export const fetchDefaultPackIds = async (mode: SampleMode): Promise<string[]> => {
   try {
-    const res = await fetch(`/assets/${getDeviceName()}/${sampleModeLabel(mode)}/default.json`);
+    const res = await fetch(`/assets/${bluetoothManager.getDeviceName()}/${sampleModeLabel(mode)}/default.json`);
     if (!res.ok) {
       log.error(`Failed to fetch default pack IDs for ${sampleModeLabel(mode)}`);
       return [];

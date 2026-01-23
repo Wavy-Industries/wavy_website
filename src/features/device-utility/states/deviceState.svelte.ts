@@ -17,7 +17,30 @@ export const deviceState = $state({
   btConnInterval: null as number | null,
   btConnLatency: null as number | null,
   btConnTimeout: null as number | null,
+  btMtuRx: null as number | null,
+  btMtuTx: null as number | null,
 });
+
+export function resetDeviceState() {
+  deviceState.isAvailable = null;
+  deviceState.octave = 0;
+  deviceState.bpm = 120;
+  deviceState.bpmFromDevice = false;
+  deviceState.channel = null;
+  deviceState.muteMask = null;
+  deviceState.playback = null;
+  deviceState.recording = null;
+  deviceState.effectId = null;
+  deviceState.effectPreset = null;
+  deviceState.hold = null;
+  deviceState.undoSession = null;
+  deviceState.powerState = null;
+  deviceState.btConnInterval = null;
+  deviceState.btConnLatency = null;
+  deviceState.btConnTimeout = null;
+  deviceState.btMtuRx = null;
+  deviceState.btMtuTx = null;
+}
 
 export function setDeviceOctave(octave: number) {
   deviceState.octave = octave;
@@ -44,4 +67,6 @@ export function setDeviceStateFromSnapshot(state: DeviceStateSnapshot) {
   if (state.btConnInterval !== null) deviceState.btConnInterval = state.btConnInterval;
   if (state.btConnLatency !== null) deviceState.btConnLatency = state.btConnLatency;
   if (state.btConnTimeout !== null) deviceState.btConnTimeout = state.btConnTimeout;
+  if (state.btMtuRx !== null) deviceState.btMtuRx = state.btMtuRx;
+  if (state.btMtuTx !== null) deviceState.btMtuTx = state.btMtuTx;
 }

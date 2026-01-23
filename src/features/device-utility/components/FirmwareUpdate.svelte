@@ -1,5 +1,6 @@
 <script>
     import { deviceSampleTransferState } from "~/lib/states/samples.svelte";
+    import { updaterTriggerReconnect } from "~/lib/states/updater.svelte";
 
     const { stage, uploadProgress, sampleUploadProgress } = $props();
     const hasSampleProgress = $derived(typeof sampleUploadProgress === 'number');
@@ -9,7 +10,7 @@
     <div class="stage" class:active={stage === 'fetching'}>
         {#if stage === 'fetching'}
             <div class="spinner"></div>
-        {:else if ['uploading', 'applying', 'verifying', 'done'].includes(stage)}
+        {:else if ['uploading', 'applying', 'reconnect_required', 'verifying', 'done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
         Preparing firmware
@@ -17,25 +18,33 @@
     <div class="stage" class:active={stage === 'uploading'}>
         {#if stage === 'uploading'}
             <div class="spinner"></div>
-        {:else if ['applying', 'verifying', 'done'].includes(stage)}
+        {:else if ['applying', 'reconnect_required', 'verifying', 'done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
-        Uploading firmware 
+        Uploading firmware
         {#if stage === 'uploading'}
             <span class="stage-info">{#if uploadProgress === null}preparing device{:else}Progress {uploadProgress}%{/if}</span>
         {/if}
     </div>
-    <div class="stage" class:active={stage === 'applying'}>
+    <div class="stage" class:active={stage === 'applying' || stage === 'reconnect_required'}>
         {#if stage === 'applying'}
             <div class="spinner"></div>
-        {:else if ['verifying', 'done'].includes(stage)}
+        {:else if ['reconnect_required', 'verifying', 'done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
-        Applying update 
+        Applying update
         {#if stage === 'applying'}
             <span class="stage-info">Waiting on device</span>
         {/if}
     </div>
+    {#if stage === 'reconnect_required'}
+    <div class="stage active">
+        <span class="stage-info reconnect-info">
+            Failed to auto connect. Please reconnect manually:
+            <button class="reconnect-btn" onclick={() => updaterTriggerReconnect()}>Reconnect</button>
+        </span>
+    </div>
+    {/if}
     <div class="stage" class:active={stage === 'verifying'}>
         {#if stage === 'verifying'}
             <div class="spinner"></div>
@@ -101,6 +110,27 @@
         display: inline-block;
         margin-right: 0.5em;
         color: green;
+    }
+
+    .reconnect-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-style: normal;
+    }
+
+    .reconnect-btn {
+        background-color: #0082FC;
+        color: #fff;
+        border: 1px solid #005ECB;
+        border-radius: var(--du-radius, 4px);
+        padding: 6px 12px;
+        font-size: 13px;
+        cursor: pointer;
+    }
+
+    .reconnect-btn:hover {
+        background-color: #006ed4;
     }
 
     @keyframes spin {

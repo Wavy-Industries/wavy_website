@@ -42,9 +42,9 @@
 
     async function waitForInitialData(timeoutMs = 1500) {
         const start = Date.now();
-        // Ready when firmware known AND (samples unsupported OR basic sample info fetched)
+        // Ready when firmware resolved (supported or not) AND (samples unsupported OR basic sample info fetched)
         while (Date.now() - start < timeoutMs) {
-            const fwReady = firmwareState?.firmwareVersion != null;
+            const fwReady = firmwareState?.firmwareVersion != null || firmwareState?.isSupported === false;
             const samplesUnsupported = deviceSamplesState.isSupported === false && drmState.isSet === null && drmState.ids === null;
             const samplesReady = deviceSamplesState.isSupported === true && drmState.ids != null && drmState.storageUsed != null && drmState.storageTotal != null;
             if (fwReady && (samplesUnsupported || samplesReady)) return true;
@@ -60,7 +60,7 @@
         let view = DeviceUtilityView.Playground;
         if (deviceSamplesState.isSupported && v === DeviceUtilityView.SampleManager) view = DeviceUtilityView.SampleManager;
         else if (v === DeviceUtilityView.Playground) view = DeviceUtilityView.Playground;
-        else if (v === DeviceUtilityView.DeviceUpdate) view = DeviceUtilityView.DeviceUpdate;
+        else if (firmwareState.isSupported !== false && v === DeviceUtilityView.DeviceUpdate) view = DeviceUtilityView.DeviceUpdate;
         else if (dev.enabled && v === DeviceUtilityView.DeviceTester) view = DeviceUtilityView.DeviceTester;
 
         return view;
@@ -156,6 +156,14 @@
                         <span class="info-value">{deviceState.btConnTimeout == null ? 'unset' : `${deviceState.btConnTimeout} (${btConnTimeoutMs} ms)`}</span>
                     </div>
                     <div class="info-row">
+                        <span class="info-label">MTU RX</span>
+                        <span class="info-value">{deviceState.btMtuRx ?? 'unset'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">MTU TX</span>
+                        <span class="info-value">{deviceState.btMtuTx ?? 'unset'}</span>
+                    </div>
+                    <div class="info-row">
                         <span class="info-label">Manufacturer</span>
                         <span class="info-value">{disState.manufacturerName ?? 'unset'}</span>
                     </div>
@@ -187,11 +195,17 @@
             >
                 Playground
             </a>
-            <span class={`tab-with-badge ${upgradeAvailable && !isUpdateTabActive ? 'blink-update' : ''}`}>
-              <a href="#device-update" class={currentView === DeviceUtilityView.DeviceUpdate ? 'active' : ''}>
+            <span class={`tab-with-badge ${upgradeAvailable && !isUpdateTabActive && firmwareState.isSupported ? 'blink-update' : ''}`}>
+              <a
+                  href="#device-update"
+                  class={currentView === DeviceUtilityView.DeviceUpdate ? 'active' : ''}
+                  class:disabled={firmwareState.isSupported === false}
+                  onclick={e => firmwareState.isSupported === false && e.preventDefault()}
+                  title={firmwareState.isSupported === false ? "This device does not support firmware updates" : ""}
+              >
                   Device Update
               </a>
-              {#if upgradeAvailable}
+              {#if upgradeAvailable && firmwareState.isSupported}
                   <span class="alert-dot" title={upgradeAvailable ? 'Upgrade available' : 'Downgrade available'}>!</span>
               {/if}
             </span>
@@ -364,7 +378,7 @@
     .info-wrap:focus-within .info-tooltip { display: block; }
     .info-row { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
     .info-label { text-transform: uppercase; letter-spacing: 0.06em; color: #9ca3af; font-size: 10px; }
-    .info-value { font-variant-numeric: tabular-nums; }
+    .info-value { font-variant-numeric: tabular-nums; text-align: right; }
 
     .battery {
         display: inline-flex;
