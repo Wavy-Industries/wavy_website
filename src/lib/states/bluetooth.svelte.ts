@@ -36,4 +36,14 @@ export const bluetoothStateSetConnectionLoss = () => {
 
 export const bluetoothStateSetConnectionReestablished = () => {
   bluetoothState.connectionState = 'connected';
+  bluetoothState.deviceName = bluetoothManager.name || 'unknown device name';
+}
+
+/** Check if device is connected. Shows alert and returns false if not connected. */
+export function requireDeviceConnection(): boolean {
+  if (bluetoothState.connectionState !== 'connected') {
+    alert('Device not connected. Please reconnect first.');
+    return false;
+  }
+  return true;
 }

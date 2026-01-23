@@ -2,6 +2,8 @@
     import { bluetoothManager, bluetoothState } from '~/lib/states/bluetooth.svelte';
     import { batteryState } from '~/features/device-utility/states/bas.svelte';
     import { disState } from '~/features/device-utility/states/dis.svelte';
+    import { updaterState } from '~/lib/states/updater.svelte';
+    import { BT_DEVICE_FILTERS } from '~/lib/config/device';
     import ConnectionStatus from '~/features/device-utility/components/ConnectionStatus.svelte';
     import DeviceUpdate from '~/features/device-utility/views/DeviceUpdate.svelte';
     import DeviceSampleManager from '~/features/device-utility/views/DeviceSampleManager.svelte';
@@ -116,6 +118,26 @@
         if (raw == null) return null;
         return raw * 10;
     });
+    const isConnectionLoss = $derived(bluetoothState.connectionState === 'connectionLoss');
+    const isUpdating = $derived(updaterState.stage !== 'idle' && updaterState.stage !== 'failed');
+
+    // Delay before showing reconnect button (give auto-reconnect a chance)
+    let reconnectDelayPassed = $state(false);
+    let reconnectDelayTimer = null;
+    $effect(() => {
+        if (isConnectionLoss) {
+            reconnectDelayPassed = false;
+            reconnectDelayTimer = setTimeout(() => {
+                reconnectDelayPassed = true;
+            }, 15000);
+        } else {
+            reconnectDelayPassed = false;
+            if (reconnectDelayTimer) {
+                clearTimeout(reconnectDelayTimer);
+                reconnectDelayTimer = null;
+            }
+        }
+    });
 
 </script>
 
@@ -128,7 +150,18 @@
                 <i class="bi-bluetooth-disconnect"></i>
                 exit
             </button>
-            <span>{bluetoothState.deviceName}</span>
+            {#if isConnectionLoss && reconnectDelayPassed}
+                <button
+                    class="reconnect-btn"
+                    onclick={() => bluetoothManager.reconnectDialogue(BT_DEVICE_FILTERS)}
+                    disabled={isUpdating}
+                    title={isUpdating ? "Complete the firmware update first" : "Connect to device"}
+                >
+                    <i class="bi-bluetooth"></i>
+                    connect
+                </button>
+            {/if}
+            <span>{bluetoothState.deviceName ?? 'No device'}</span>
             <ConnectionStatus />
             <span>v{firmwareState?.firmwareVersion?.versionString ?? '?.?.?'}</span>
             <span class="battery" title={batteryPercent === null ? 'Battery level unavailable' : `Battery ${batteryPercent}%`}>
@@ -291,6 +324,21 @@
         align-items: center;
         gap: 20px;
     }
+
+    .reconnect-btn {
+        background-color: #0082FC;
+        color: #fff;
+        border: 1px solid #005ECB;
+        border-radius: var(--du-radius, 4px);
+        padding: 6px 10px;
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+    }
+    .reconnect-btn:hover { background-color: #006ed4; }
+    .reconnect-btn:disabled { background: #9ca3af; border-color: #9ca3af; cursor: not-allowed; }
 
     /* Keep badge tight and centered with the tab text */
     .tab-with-badge { display: inline-flex; align-items: center; gap: 3px; }

@@ -133,8 +133,17 @@ export class BluetoothManager {
                 await new Promise(r => setTimeout(r, delay));
             }
         }
-        // Failed after attempts
-        await this._handleDisconnected();
+        // Failed after attempts - stay in connectionLoss if that was the state (user can manually reconnect)
+        if (this.state.type !== 'connectionLoss') {
+            await this._handleDisconnected();
+        }
+    }
+
+    /** Enter connectionLoss state without a device (for browsing dashboard without connecting) */
+    public enterWithoutDevice(): void {
+        if (this.state.type !== 'disconnected') return;
+        this.state = { type: 'connectionLoss' };
+        this.onConnectionLoss?.();
     }
 
     public disconnect(): void {

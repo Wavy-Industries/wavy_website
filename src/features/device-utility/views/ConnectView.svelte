@@ -39,7 +39,7 @@
   </script>
   
   <div class="main-content">
-    {#if bluetoothState.connectionState !== 'connected'}
+    {#if bluetoothState.connectionState === 'disconnected' || bluetoothState.connectionState === 'connecting' || bluetoothState.connectionState === 'selectingDevice'}
       <img src={MonkeyProgramImg.src} alt="Monkey programmer" id="programmer-monkey" />
       <div style="display:flex; align-items: center; flex-direction: column;">
         <h1>device utility</h1>
@@ -61,10 +61,14 @@
             <i class="bi-bluetooth"></i> Click to connect
           {/if}
         </button>
-  
+
         <p class="note" style="max-width: 400px; text-align: center;">
-          If you are having problems finding your device, make sure it is not already connected to anything else. <!-- <a href={routes.monkeyConnect}>read more</a>> -->
+          If you are having problems finding your device, make sure it is not already connected to anything else.
         </p>
+
+        <!-- <button class="enter-without-btn" onclick={() => bluetoothManager.enterWithoutDevice()}>
+          or enter without connecting
+        </button> -->
       {/if}
     {:else}
       <ConnectedView />
@@ -84,4 +88,14 @@
       gap: 8px;
     }
     .connect-btn:disabled { opacity: .7; cursor: not-allowed; }
+    .enter-without-btn {
+      background: none;
+      border: none;
+      color: #666;
+      font-size: 13px;
+      text-decoration: underline;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .enter-without-btn:hover { color: #333; }
   </style>
