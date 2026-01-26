@@ -7,7 +7,8 @@ import Footer from '~/layouts/Footer.astro';
 import LinkButton from '~/components/LinkButton.astro';
 
 // images
-import midiConnectImg from '~/assets/midi_connect/screenshot 2.png';
+import midiConnectMacImg from '~/assets/midi_connect/screenshot-mac.png';
+import midiConnectWinImg from '~/assets/midi_connect/screenshot-win.png';
 
 
 // const ratings = [
@@ -25,22 +26,25 @@ import midiConnectImg from '~/assets/midi_connect/screenshot 2.png';
 		<Header textColor="white" />
 		<section class="hero">
 			<div class="hero-inner">
-				<h1>MIDI Connect for macOS</h1>
-				<p class="tagline">🛑✋ STOP menu-diving each time you want to connect to a Bluetooth MIDI device on macOS</p>
+				<h1>MIDI Connect</h1>
+				<p class="tagline">🛑✋ STOP menu-diving each time you want to connect to a Bluetooth MIDI device on macOS or Windows</p>
 				<div class="hero-actions">
-					<LinkButton href={routes.midiConnectAppStore} type="highlight">Download on App Store</LinkButton>
+					<LinkButton href={routes.midiConnectAppStore} type="highlight">Download for macOS</LinkButton>
+					<LinkButton href={routes.midiConnectWindowsInstaller} type="default" download>Download for Windows (experimental)</LinkButton>
 				</div>
 			</div>
 		</section>
 
-		<div class="hero-image hero-image--full">
-			<img src={midiConnectImg.src} alt="MIDI connect view" />
+		<div class="hero-image hero-image--side-by-side">
+			<img class="hero-image__mac" src={midiConnectMacImg.src} alt="MIDI Connect for macOS" />
+			<img class="hero-image__win" src={midiConnectWinImg.src} alt="MIDI Connect for Windows" />
 		</div>
 
 		<section class="intro">
 			<div class="container">
 				<div class="intro-content">
-					<p>We developed this simple macOS app to make it super easy for you to manage your Bluetooth MIDI devices. And it's not just for Wavy devices, it's for any Bluetooth MIDI device.</p>
+					<p>We developed this simple macOS and Windows app to make it super easy for you to manage your Bluetooth MIDI devices. And it's not just for Wavy devices, it's for any Bluetooth MIDI device.</p>
+					<p><a href="https://github.com/Wavy-Industries/MIDI-Connect-windows">The Windows version of MIDI Connect is open source.</a></p>
 				</div>
 			</div>
 		</section>
@@ -108,16 +112,21 @@ h1 {
 	padding: 50px 10%;
 }
 
-.hero-image--full {
-	padding: 0;
-	display: block;
+.hero-image--side-by-side {
+	padding: 24px 6%;
+	display: flex;
+	gap: 24px;
+	align-items: center;
+	justify-content: center;
 }
 
-.hero-image--full img {
+.hero-image__mac,
+.hero-image__win {
 	width: 100%;
 	height: auto;
 	object-fit: contain;
 	object-position: center;
+	max-width: 50%;
 }
 
 .intro {
@@ -163,6 +172,16 @@ h1 {
 
 	.intro {
 		padding: 32px 0;
+	}
+
+	.hero-image--side-by-side {
+		flex-direction: column;
+		padding: 16px 6%;
+	}
+
+	.hero-image__mac,
+	.hero-image__win {
+		max-width: 100%;
 	}
 }
 

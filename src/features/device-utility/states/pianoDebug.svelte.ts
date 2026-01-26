@@ -6,7 +6,7 @@
 
 import { Log } from '~/lib/utils/Log';
 
-const log = new Log('piano_debug', Log.LEVEL_DEBUG);
+const log = new Log('piano_debug', Log.LEVEL_INFO);
 
 // Visibility state
 let isVisible = $state(false);

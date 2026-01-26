@@ -10,18 +10,11 @@ import {routes} from '~/routes';
 import DeviceUpdateCheck from '~/features/getting-started/DeviceUpdateCheck.svelte';
 
 import monkeyOverviewImg from '~/assets/resources/monkey_manual/monkey_2d_overview.svg';
-import midiConnectImg from '~/assets/resources/mac-connect/midi_connect.png';
 import macConnect from '~/assets/resources/mac-connect/1-search.png';
 import macConnect2Img from '~/assets/resources/mac-connect/2-open_midi_studio.png';
 import macConnect3Img from '~/assets/resources/mac-connect/3-open_bluetooth.png';
 import macConnect3AltImg from '~/assets/resources/mac-connect/3-alt_open_bluetooth.png';
 import macConnect4Img from '~/assets/resources/mac-connect/4-connect.png';
-import windowsConnect0Img from '~/assets/resources/windows/0-advanced_discovery.jpeg';
-import windowsConnect1Img from '~/assets/resources/windows/1-connect_pre.png';
-import windowsConnect2Img from '~/assets/resources/windows/2-pairing.png';
-import windowsConnect3Img from '~/assets/resources/windows/2.1-pairing.png';
-import windowsConnect4Img from '~/assets/resources/windows/4-port_create.png';
-import windowsConnect5Img from '~/assets/resources/windows/5-select.png';
 import abletonSettingsImg from '~/assets/resources/ableton/ableton_settings.png';
 import abletonChannelImg from '~/assets/resources/ableton/ableton_channel.png';
 import abletonArmImg from '~/assets/resources/ableton/ableton_arm.png';
@@ -58,22 +51,23 @@ MON**KEY** supports a variety of hosts and works great in many types of setups. 
 
 You can experiment directly on our website in the *device utility*, which includes a basic playground.
 
+<LinkButton href={routes.deviceUtilityPlayground} target="_blank">Open playground</LinkButton>
+
 ### Connecting to mobile apps
 On Android and iOS/iPadOS, connect MON**KEY** directly within the music apps.
 
-### Connecting to desktop operating systems
+### Connecting to Windows and macOS
+
+We have developed _MIDI Connect_ for macOS and Windows to make Bluetooth MIDI connections simpler. It's not limited to Wavy devices.
+
+<LinkButton target="_blank" href={routes.midiConnect}>Download MIDI Connect</LinkButton>
+
+#### Manual connection
 
 <Accordion title="macOS">
   <NoteInfo>Bluetooth MIDI devices will not appear in system Bluetooth settings. Instead, macOS has its own MIDI utility.</NoteInfo>
 
-  We have developed _MIDI Connect_, which simplifies connections on macOS. It's not limited to Wavy devices. This is the easiest way to manage your Bluetooth MIDI devices. If you prefer not to install anything, please skip to the instructions below.
-
-  <LinkButton target="_blank" href={routes.midiConnectAppStore}>MIDI Connect on App Store</LinkButton>
-  <br />
-  <br />
-  <img src={midiConnectImg.src} alt="MIDI Connect preview" />
-
-  If you do not want to download this app, please follow the instructions below.
+  If you do not want to use MIDI Connect, follow the manual steps below.
 
   **Step 1.** Open _Audio MIDI Setup_.
 
@@ -94,39 +88,6 @@ On Android and iOS/iPadOS, connect MON**KEY** directly within the music apps.
   **Step 4.** Find your device in the list and connect.
 
   <img alt="Connect to Monkey" src={macConnect4Img.src} />
-</Accordion>
-
-<Accordion title="Windows">
-  Windows currently does not have the best support for MIDI over Bluetooth. The steps below might look a bit complicated, but once the initial setup is done, it shouldn't be difficult thereafter.
-
-  You will need the following programs installed:
-
-  1. **loopMIDI:** [https://www.tobias-erichsen.de/software/loopmidi.html](https://www.tobias-erichsen.de/software/loopmidi.html)
-  2. **MIDIBerry:** [https://apps.microsoft.com/detail/9n39720h2m05](https://apps.microsoft.com/detail/9n39720h2m05)
-
-  Then follow these steps to start using MON**KEY**:
-
-  **Step 0.** Windows 11 users must first enable _Advanced device discovery_ in Bluetooth settings.
-
-  <img alt="Windows advanced Bluetooth" src={windowsConnect0Img.src} />
-
-  **Step 1.** Pair MON**KEY** in Windows settings. You only need to do this if MON**KEY** isn't already paired with your computer.
-
-  <img alt="Windows connect" src={windowsConnect1Img.src} />
-  <img alt="Windows pairing" src={windowsConnect2Img.src} />
-  <img alt="Windows paired" src={windowsConnect3Img.src} />
-
-  **Step 2.** Configure a MIDI port using loopMIDI and name it "my MIDI port."
-
-  <img alt="Port create" src={windowsConnect4Img.src} />
-
-  **Step 3.** Open MIDIBerry, select WAVY MON**KEY** as the input device, and the MIDI port you created as the output.
-
-  You're done! Test it by pressing keys on MON**KEY** and check whether the notes are received in MIDIBerry's _Input Monitor_.
-
-  <img alt="MIDIBerry input" src={windowsConnect5Img.src} />
-
-  Be aware that you need to keep MIDIBerry open to maintain the connection. You might not see any notes received even though everything looks connected. In that case, try disconnecting and reconnecting MON**KEY** in the Windows settings. Also, make sure it's set up exactly as described above.
 </Accordion>
 
 ### Configure desktop DAW

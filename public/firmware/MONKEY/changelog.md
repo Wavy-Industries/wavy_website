@@ -1,3 +1,6 @@
+# 1.2.94[23. Jan 2026] -dev
+- Fix PAT octave offset
+
 # 1.2.93[23. Jan 2026] -dev
 - Bluetooth MTU over device state
 

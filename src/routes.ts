@@ -12,11 +12,13 @@ export const routes = {
     'blog': '/blog',
     'support': '/resources/support',
     'deviceUtility': '/resources/device-utility',
+    'deviceUtilityPlayground': '/resources/device-utility#playground',
     'faq': '/resources/faq',
     'downloads': '/resources/downloads',
     'termsAndConditions': '/resources/terms-and-conditions',
     'wavyDiscord': 'https://discord.gg/4HQHERUW5K',
     'newsletter': 'http://eepurl.com/i8hSXE',
     'midiConnectAppStore': 'https://apps.apple.com/no/app/midi-toolbar/id6476070288?mt=12',
+    'midiConnectWindowsInstaller': '/assets/MIDI-Connect/MIDI_Connect_Setup_0.1.0.exe',
     'wavyIndstagram': 'https://www.instagram.com/wavyindustries_/',
 }
