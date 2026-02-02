@@ -31,6 +31,10 @@ export const callbacksSet = () => {
     };
 
     bluetoothManager.onConnect = () => {
+        // Update Svelte state first to stay in sync with internal state
+        bluetoothStateSetConnected();
+        updaterNotifyConnected(); // Notify updater of connection (for manual reconnect flow)
+
         // Reset services and state
         midiService.reset();
         deviceStateService.reset();
@@ -43,8 +47,6 @@ export const callbacksSet = () => {
         initPlaygroundSynthPersistence();
         void refreshChangelog();
         setLocalSamplesMode(SampleMode.DRM);
-        bluetoothStateSetConnected();
-        updaterNotifyConnected(); // Notify updater of connection (for manual reconnect flow)
 
         // Initialize Bluetooth modules and device data
         (async () => {
@@ -92,6 +94,10 @@ export const callbacksSet = () => {
     };
 
     bluetoothManager.onConnectionReestablished = () => {
+        // Update Svelte state first to stay in sync with internal state
+        bluetoothStateSetConnectionReestablished();
+        updaterNotifyConnectionReestablished();
+
         // Reset services and state
         midiService.reset();
         deviceStateService.reset();
@@ -103,8 +109,6 @@ export const callbacksSet = () => {
 
         initPlaygroundSynthPersistence();
         void refreshChangelog();
-        updaterNotifyConnectionReestablished();
-        bluetoothStateSetConnectionReestablished();
 
         // Initialize Bluetooth modules and device data
         (async () => {
@@ -156,22 +160,26 @@ export const callbacksSet = () => {
     };
 
     bluetoothManager.onDisconnect = () => {
+        // Update Svelte state first to stay in sync with internal state
+        bluetoothStateSetDisconnected();
+
         invalidateDeviceSamplesState();
         resetDisState();
         resetDeviceState();
         resetFirmwareState();
         resetBatteryState();
-        bluetoothStateSetDisconnected();
         soundBackend.allNotesOff();
     };
 
     bluetoothManager.onConnectionLoss = () => {
+        // Update Svelte state first to stay in sync with internal state
+        bluetoothStateSetConnectionLoss();
+
         invalidateDeviceSamplesState();
         resetDisState();
         resetDeviceState();
         resetFirmwareState();
         resetBatteryState();
-        bluetoothStateSetConnectionLoss();
         soundBackend.allNotesOff();
     };
 
