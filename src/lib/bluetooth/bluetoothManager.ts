@@ -152,12 +152,13 @@ export class BluetoothManager {
         this.device?.gatt?.disconnect();
     }
 
-    /** Prompt user to select device during connection loss (manual reconnect). Stays in connectionLoss until connected. */
+    /** Prompt user to select device during connection loss or disconnected state (manual reconnect). */
     public async reconnectDialogue(filters?: BluetoothLEScanFilter[]): Promise<void> {
-        if (this.state.type !== 'connectionLoss') {
-            console.warn('reconnectDialogue only works during connection loss');
+        if (this.state.type !== 'connectionLoss' && this.state.type !== 'disconnected') {
+            console.warn('reconnectDialogue only works when not connected');
             return;
         }
+        const wasConnectionLoss = this.state.type === 'connectionLoss';
         this._resetCharacteristicCache();
         try {
             this.device = await this._requestDevice(filters);
@@ -165,9 +166,14 @@ export class BluetoothManager {
             await this.device.gatt!.connect();
             // Only transition to connected after successful connection
             this.state = { type: 'connected' };
-            this.onConnectionReestablished?.();
+            // Call appropriate callback based on previous state
+            if (wasConnectionLoss) {
+                this.onConnectionReestablished?.();
+            } else {
+                this.onConnect?.();
+            }
         } catch (error: any) {
-            // Stay in connectionLoss state on any error - user can retry
+            // Stay in current state on any error - user can retry
             if (error.name === 'NotFoundError') {
                 this.onDeviceSelectionCancel?.();
             } else {

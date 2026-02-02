@@ -162,6 +162,7 @@ export const callbacksSet = () => {
         resetFirmwareState();
         resetBatteryState();
         bluetoothStateSetDisconnected();
+        soundBackend.allNotesOff();
     };
 
     bluetoothManager.onConnectionLoss = () => {
@@ -171,6 +172,7 @@ export const callbacksSet = () => {
         resetFirmwareState();
         resetBatteryState();
         bluetoothStateSetConnectionLoss();
+        soundBackend.allNotesOff();
     };
 
     /* MIDI event router */

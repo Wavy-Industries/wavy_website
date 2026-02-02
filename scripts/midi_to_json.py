@@ -113,7 +113,7 @@ def main(pack_type, pack_name):
         "loops": loops
     }
 
-    out_dir = Path(f"public/samples/MONKEY/{pack_type}")
+    out_dir = Path(f"public/assets/MONKEY/{pack_type}")
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"W-{pack_name}.json"
 
