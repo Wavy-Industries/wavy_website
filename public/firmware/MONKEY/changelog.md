@@ -1,3 +1,9 @@
+# 1.3.0[2. Feb 2026]
+- PAT effect now lets you upload your own loops through our website device utility 
+- Support for selection of MIDI channel 11-16 by long pressing 1 during selection.
+- real-time device state monitoring
+- Minor improvements
+
 # 1.2.94[23. Jan 2026] -dev
 - Fix PAT octave offset
 
