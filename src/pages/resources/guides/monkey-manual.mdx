@@ -17,6 +17,7 @@ import channelGif from '~/assets/resources/monkey_manual/gifs/channel.gif';
 import holdGif from '~/assets/resources/monkey_manual/gifs/hold.gif';
 import effectSelectGif from '~/assets/resources/monkey_manual/gifs/effect-select.gif';
 import effectPresetGif from '~/assets/resources/monkey_manual/gifs/effect-preset.gif';
+import midiPlayerSectionsImg from '~/assets/monkey/monkey_midi_player_overview.png'
 
 # MON**KEY** Manual
 MONKEY is an ultra-portable and versatile 2-octave Bluetooth MIDI keyboard.
@@ -95,12 +96,12 @@ Toggle note hold using the HOLD function. Notice the light tower LED blinking on
 <GIFDemo src={holdGif.src} alt="Hold toggle demo" label="hold demo" text="Toggling hold first on, then off." />
 
 ## MIDI effects
-MONKEY has in total 6 MIDI effects each with 10 presets. Similarly to HOLD, the effects are toggled on and off. Only one effect might be enabled at once. 
+MONKEY has in total 6 MIDI effects each with 10 presets or banks. Similarly to HOLD, the effects are toggled on and off. Only one effect might be enabled at once. 
 
 - If you enable a new effect and a previous effect was enabled, this new effect will be enabled and the previous disabled.
-- If you press on the effect which is already enabled, it will disable and no effects will be enabled. 
+- If you press on an effect which is already enabled, it will disable it. 
 
-Once an effect is enabled, you can change its preset. This is simply done by directly pressing the numbered keys while in SHIFT mode.
+Once an effect is enabled, you can change its preset/bank. This is simply done by directly pressing the numbered keys together with SHIFT.
 
 <GIFDemo src={effectSelectGif.src} alt="effect select demo" label="effect select demo" text="1 - Enabling ARP effect. 2 - Disabling ARP effect. 3 - Enabling STTR effect." />
 
@@ -118,11 +119,14 @@ Stutter effect. Plays the notes which are pressed in a rhythmic pattern. The pre
 ### ECHO
 The echo effect will repeat the notes you play in a feedback loop. The behavior of each preset is varied and unconventional by design. Some presets have an infinite feedback loop where the note is not removed from the loop until the velocity of the key reaches 0.
 
-### PAT
-Pattern effect. Pre-made note patterns. Preset changes the swing.
+### PAT and DRM
+<img src={midiPlayerSectionsImg.src} alt="MONKEY PAT and DRM overview" />
 
-### DRM
-Drum effect. The bottom keys are drum loops and the upper keys are drum modifiers. Manage and edit your drum loops through our device utility page.
+The PAT and DRM effect are user programmable. Both let you upload arbitrary MIDI. However DRM is speficically targetted towards drum loops. It will send on MIDI channel 10 when enabled.
+
+Instead of presets, these effects have in total 10 banks of MIDI looops. Each bank can hold 15 MIDI loops which in total yields 150 MIDI loops for both PAT and DRM.
+
+You can customise the loops through our device utility page on our website.
 
 ## Loop recorder
 The loop recorder is your playground to combine recordings from multiple instruments into an idea. Currently, the loop recorder is fixed with a length of 16 beats. The loop recorder uses the following keys:
