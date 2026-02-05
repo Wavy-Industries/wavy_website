@@ -16,7 +16,7 @@ import { updaterNotifyConnectionReestablished, updaterNotifyIsSupported, updater
 import { initPlaygroundSynthPersistence, midiControlOnCC, midiControlOnNoteOff, midiControlOnNoteOn } from './states/playground.svelte';
 import { windowState, DeviceUtilityView } from './states/window.svelte';
 import { deviceState, setDeviceStateFromSnapshot, resetDeviceState } from './states/deviceState.svelte';
-import { setTempo } from './states/tempo.svelte';
+
 import { initializeBatteryState, resetBatteryState } from './states/bas.svelte';
 import { refreshDisState, resetDisState } from './states/dis.svelte';
 import { pianoDebugNoteOn, pianoDebugNoteOff } from './states/pianoDebug.svelte';
@@ -27,22 +27,12 @@ const log = new Log('eventRouter', Log.LEVEL_INFO);
 export const callbacksSet = () => {
     deviceStateService.onStateUpdate = (state) => {
         setDeviceStateFromSnapshot(state);
-        if (state.bpm !== null) setTempo(state.bpm);
     };
 
     bluetoothManager.onConnect = () => {
         // Update Svelte state first to stay in sync with internal state
         bluetoothStateSetConnected();
         updaterNotifyConnected(); // Notify updater of connection (for manual reconnect flow)
-
-        // Reset services and state
-        midiService.reset();
-        deviceStateService.reset();
-        smpService.reset();
-        resetDisState();
-        resetDeviceState();
-        resetFirmwareState();
-        resetBatteryState();
 
         initPlaygroundSynthPersistence();
         void refreshChangelog();
@@ -97,15 +87,6 @@ export const callbacksSet = () => {
         // Update Svelte state first to stay in sync with internal state
         bluetoothStateSetConnectionReestablished();
         updaterNotifyConnectionReestablished();
-
-        // Reset services and state
-        midiService.reset();
-        deviceStateService.reset();
-        smpService.reset();
-        resetDisState();
-        resetDeviceState();
-        resetFirmwareState();
-        resetBatteryState();
 
         initPlaygroundSynthPersistence();
         void refreshChangelog();
@@ -163,6 +144,12 @@ export const callbacksSet = () => {
         // Update Svelte state first to stay in sync with internal state
         bluetoothStateSetDisconnected();
 
+        // Reset Bluetooth services
+        midiService.reset();
+        deviceStateService.reset();
+        smpService.reset();
+
+        // Reset UI state
         invalidateDeviceSamplesState();
         resetDisState();
         resetDeviceState();
@@ -175,6 +162,12 @@ export const callbacksSet = () => {
         // Update Svelte state first to stay in sync with internal state
         bluetoothStateSetConnectionLoss();
 
+        // Reset Bluetooth services
+        midiService.reset();
+        deviceStateService.reset();
+        smpService.reset();
+
+        // Reset UI state
         invalidateDeviceSamplesState();
         resetDisState();
         resetDeviceState();

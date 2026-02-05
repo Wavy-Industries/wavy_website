@@ -2,143 +2,88 @@
     import { bluetoothManager, bluetoothState } from '~/lib/states/bluetooth.svelte';
     import { batteryState } from '~/features/device-utility/states/bas.svelte';
     import { disState } from '~/features/device-utility/states/dis.svelte';
-    import { updaterState } from '~/lib/states/updater.svelte';
     import { BT_DEVICE_FILTERS } from '~/lib/config/device';
     import ConnectionStatus from '~/features/device-utility/components/ConnectionStatus.svelte';
     import DeviceUpdate from '~/features/device-utility/views/DeviceUpdate.svelte';
     import DeviceSampleManager from '~/features/device-utility/views/DeviceSampleManager.svelte';
     import DeviceTester from '~/features/device-utility/views/DeviceTester.svelte';
     import { firmwareState } from '~/lib/states/firmware.svelte';
-    import { firmwareRhsIsNewer } from '~/lib/bluetooth/smp/FirmwareManager';
     import { dev } from '~/features/device-utility/states/devmode.svelte';
     import { onMount } from 'svelte';
     import { fade } from 'svelte/transition';
     import { deviceSamplesState } from '~/lib/states/samples.svelte';
     import { SampleMode } from '~/lib/types/sampleMode';
     import { initDrumKits } from '~/features/device-utility/states/drumKits.svelte';
-    import {  windowStateInit, windowState, DeviceUtilityView } from '~/features/device-utility/states/window.svelte';
+    import {  windowStateInit, windowState, DeviceUtilityView, setHash } from '~/features/device-utility/states/window.svelte';
     import { deviceState } from '~/features/device-utility/states/deviceState.svelte';
     import { getOperatingSystem } from '~/lib/utils/operating_system';
 
-    const _showIosAudioNote = () => {
-        if (getOperatingSystem() !== 'iOS') return;
-        window.alert('Note for iOS: if you hear no sound, check that the hardware silent switch is off. Web audio can be muted by silent mode.');
-    };
-
     onMount(async () => {
-        _showIosAudioNote();
+
+        /* IOS only */
+        if (getOperatingSystem() === 'iOS') {
+            window.alert('Note for iOS: if you hear no sound, check that the hardware silent switch is off. Web audio can be muted by silent mode.');
+        }
+
         windowStateInit();
         initDrumKits();
-
-        isLoading = true;
-        await waitForInitialData();
-        isLoading = false;
     });
 
-    // Loading overlay while fetching initial device info
-    let isLoading = $state(false);
-
-    async function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-    const drmState = $derived(deviceSamplesState.modes[SampleMode.DRM]);
-
-    async function waitForInitialData(timeoutMs = 1500) {
-        const start = Date.now();
-        // Ready when firmware resolved (supported or not) AND (samples unsupported OR basic sample info fetched)
-        while (Date.now() - start < timeoutMs) {
-            const fwReady = firmwareState?.firmwareVersion != null || firmwareState?.isSupported === false;
-            const samplesUnsupported = deviceSamplesState.isSupported === false && drmState.isSet === null && drmState.ids === null;
-            const samplesReady = deviceSamplesState.isSupported === true && drmState.ids != null && drmState.storageUsed != null && drmState.storageTotal != null;
-            if (fwReady && (samplesUnsupported || samplesReady)) return true;
-            await wait(100);
+    /* loading logic */
+    let isLoading = $state(true);
+    $effect(() => {
+        if (!isLoading) return; // already done, ignore future changes
+        
+        const drmState = deviceSamplesState.modes[SampleMode.DRM];
+        const fwReady = firmwareState?.firmwareVersion != null || firmwareState?.isSupported === false;
+        const samplesUnsupported = deviceSamplesState.isSupported === false && drmState.isSet === null && drmState.ids === null;
+        const samplesReady = deviceSamplesState.isSupported === true && drmState.ids != null && drmState.storageUsed != null && drmState.storageTotal != null;
+        
+        if (fwReady && (samplesUnsupported || samplesReady)) {
+            isLoading = false;
         }
-        return false; // timeout
-    }
-
-    const currentView = $derived.by(() => {
-        const hash = windowState.hash;
-        const v = (hash || '').replace('#', '').trim();
-
-        let view = DeviceUtilityView.Playground;
-        if (deviceSamplesState.isSupported && v === DeviceUtilityView.SampleManager) view = DeviceUtilityView.SampleManager;
-        else if (v === DeviceUtilityView.Playground) view = DeviceUtilityView.Playground;
-        else if (firmwareState.isSupported !== false && v === DeviceUtilityView.DeviceUpdate) view = DeviceUtilityView.DeviceUpdate;
-        else if (dev.enabled && v === DeviceUtilityView.DeviceTester) view = DeviceUtilityView.DeviceTester;
-
-        return view;
+    });
+    
+    /* prompt user if an update is available */
+    $effect(() => {
+        if (firmwareState.upgradeAvailable && windowState.hash !== DeviceUtilityView.DeviceUpdate) {
+            const showUpdatePage = confirm("An update if available. Would you like to update your device?")
+            if (showUpdatePage) setHash(DeviceUtilityView.DeviceUpdate)
+        }
     })
 
-    // Indicators for upgrade/downgrade availability
-    const upgradeAvailable = $derived.by(() => {
-        const fw = firmwareState?.firmwareVersion;
-        const rel = firmwareState?.changelog?.release;
-        if (!fw || !rel) return false;
-        return firmwareRhsIsNewer(fw, rel);
+    const currentView = $derived.by(() => {
+        const urlHash = (windowState.hash || '').replace('#', '').trim();
+        
+        // Access all reactive dependencies upfront
+        const samplesSupported = deviceSamplesState.isSupported;
+        const firmwareSupported = firmwareState.isSupported;
+        const devEnabled = dev.enabled;
+        
+        switch (urlHash) {
+            case DeviceUtilityView.Playground:
+                return DeviceUtilityView.Playground;
+            case DeviceUtilityView.SampleManager:
+                if (samplesSupported) return DeviceUtilityView.SampleManager;
+                break;
+            case DeviceUtilityView.DeviceUpdate:
+                if (firmwareSupported !== false) return DeviceUtilityView.DeviceUpdate;
+                break;
+            case DeviceUtilityView.DeviceTester:
+                if (devEnabled) return DeviceUtilityView.DeviceTester;
+                break;
+        }
+        
+        return DeviceUtilityView.Playground;
     });
-    const downgradeAvailable = $derived.by(() => {
-        const fw = firmwareState?.firmwareVersion;
-        const rel = firmwareState?.changelog?.release;
-        if (!fw || !rel) return false;
-        // fw > rel → downgrade available
-        return firmwareRhsIsNewer(rel, fw);
-    });
-    const needsUpdateAttention = $derived(upgradeAvailable || downgradeAvailable);
-    const isUpdateTabActive = $derived(currentView === DeviceUtilityView.DeviceUpdate);
-    const batteryPercent = $derived.by(() => {
-        const level = batteryState.level;
-        if (level === null || typeof level !== 'number' || Number.isNaN(level)) return null;
-        return Math.max(0, Math.min(100, Math.round(level)));
-    });
+
     const batteryFillColor = $derived.by(() => {
-        const level = batteryPercent;
+        const level = batteryState.level;
         if (level === null) return '#d1d5db';
         if (level <= 15) return '#ef4444';
         if (level <= 35) return '#f59e0b';
         return '#22c55e';
     });
-    const powerStateLabels = {
-        0: 'IDLE',
-        1: 'LOW',
-        2: 'HIGH',
-        3: 'DATA_TRANSFER',
-    };
-    const powerStateLabel = $derived.by(() => {
-        const state = deviceState.powerState;
-        if (state === null || state === undefined) return 'unset';
-        return powerStateLabels[state] ?? `unknown(${state})`;
-    });
-    const isPowerIdle = $derived(deviceState.powerState === 0);
-    const btConnIntervalMs = $derived.by(() => {
-        const raw = deviceState.btConnInterval;
-        if (raw == null) return null;
-        return raw * 1.25;
-    });
-    const btConnTimeoutMs = $derived.by(() => {
-        const raw = deviceState.btConnTimeout;
-        if (raw == null) return null;
-        return raw * 10;
-    });
-    const isConnectionLoss = $derived(bluetoothState.connectionState === 'connectionLoss');
-    const isUpdating = $derived(updaterState.stage !== 'idle' && updaterState.stage !== 'failed');
-
-    // Delay before showing reconnect button (give auto-reconnect a chance)
-    let reconnectDelayPassed = $state(false);
-    let reconnectDelayTimer = null;
-    $effect(() => {
-        if (isConnectionLoss) {
-            reconnectDelayPassed = false;
-            reconnectDelayTimer = setTimeout(() => {
-                reconnectDelayPassed = true;
-            }, 15000);
-        } else {
-            reconnectDelayPassed = false;
-            if (reconnectDelayTimer) {
-                clearTimeout(reconnectDelayTimer);
-                reconnectDelayTimer = null;
-            }
-        }
-    });
-
 </script>
 
 <div>
@@ -150,12 +95,10 @@
                 <i class="bi-bluetooth-disconnect"></i>
                 exit
             </button>
-            {#if isConnectionLoss && reconnectDelayPassed}
+            {#if bluetoothState.connectionState !== 'connected' && deviceState.updateInProgress === false}
                 <button
-                    class="reconnect-btn"
+                    class="connect-btn"
                     onclick={() => bluetoothManager.reconnectDialogue(BT_DEVICE_FILTERS)}
-                    disabled={isUpdating}
-                    title={isUpdating ? "Complete the firmware update first" : "Connect to device"}
                 >
                     <i class="bi-bluetooth"></i>
                     connect
@@ -164,57 +107,57 @@
             <span>{bluetoothState.deviceName ?? 'No device'}</span>
             <ConnectionStatus />
             <span>v{firmwareState?.firmwareVersion?.versionString ?? '?.?.?'}</span>
-            <span class="battery" title={batteryPercent === null ? 'Battery level unavailable' : `Battery ${batteryPercent}%`}>
+            <span class="battery" title={batteryState.level === null ? 'Battery level unavailable' : `Battery ${batteryState.level}%`}>
                 <span class="battery-glyph" aria-hidden="true">
                     <span class="battery-body">
-                        <span class="battery-fill" style={`width: ${batteryPercent ?? 0}%; background-color: ${batteryFillColor};`}></span>
+                        <span class="battery-fill" style={`width: ${batteryState.level ?? 0}%; background-color: ${batteryFillColor};`}></span>
                     </span>
                     <span class="battery-cap"></span>
                 </span>
-                <span class="battery-text">{batteryPercent ?? '??'}%</span>
+                <span class="battery-text">{batteryState.level ?? '??'}%</span>
             </span>
             <span class="info-wrap">
                 <button class="info-icon" type="button" aria-label="Device connection info">i</button>
                 <div class="info-tooltip" role="tooltip">
                     <div class="info-row">
                         <span class="info-label">Power</span>
-                        <span class="info-value">{powerStateLabel}</span>
+                        <span class="info-value">{deviceState.powerState}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">BT interval</span>
-                        <span class="info-value">{deviceState.btConnInterval == null ? 'unset' : `${deviceState.btConnInterval} (${btConnIntervalMs?.toFixed(2)} ms)`}</span>
+                        <span class="info-value">{deviceState.btConnInterval == null ? 'unavailable' : `${deviceState.btConnInterval} (${deviceState.btConnIntervalMs?.toFixed(2)} ms)`}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">BT timeout</span>
-                        <span class="info-value">{deviceState.btConnTimeout == null ? 'unset' : `${deviceState.btConnTimeout} (${btConnTimeoutMs} ms)`}</span>
+                        <span class="info-value">{deviceState.btConnTimeout == null ? 'unavailable' : `${deviceState.btConnTimeout} (${deviceState.btConnTimeoutMs} ms)`}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">MTU RX</span>
-                        <span class="info-value">{deviceState.btMtuRx ?? 'unset'}</span>
+                        <span class="info-value">{deviceState.btMtuRx ?? 'unavailable'}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">MTU TX</span>
-                        <span class="info-value">{deviceState.btMtuTx ?? 'unset'}</span>
+                        <span class="info-value">{deviceState.btMtuTx ?? 'unavailable'}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Manufacturer</span>
-                        <span class="info-value">{disState.manufacturerName ?? 'unset'}</span>
+                        <span class="info-value">{disState.manufacturerName ?? 'unavailable'}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Model</span>
-                        <span class="info-value">{disState.modelNumber ?? 'unset'}</span>
+                        <span class="info-value">{disState.modelNumber ?? 'unavailable'}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">HW rev</span>
-                        <span class="info-value">{disState.hardwareRevision ?? 'unset'}</span>
+                        <span class="info-value">{disState.hardwareRevision ?? 'unavailable'}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">FW rev</span>
-                        <span class="info-value">{disState.firmwareRevision ?? 'unset'}</span>
+                        <span class="info-value">{disState.firmwareRevision ?? 'unavailable'}</span>
                     </div>
                 </div>
             </span>
-            {#if isPowerIdle}
+            {#if deviceState.powerState == 'idle'}
                 <span class="idle-indicator" title="Power state: IDLE" aria-label="Power idle">🌙</span>
             {/if}
             {#if dev.enabled}
@@ -228,7 +171,7 @@
             >
                 Playground
             </a>
-            <span class={`tab-with-badge ${upgradeAvailable && !isUpdateTabActive && firmwareState.isSupported ? 'blink-update' : ''}`}>
+            <span class={`tab-with-badge ${firmwareState.upgradeAvailable && currentView !== DeviceUtilityView.DeviceUpdate && firmwareState.isSupported ? 'blink-update' : ''}`}>
               <a
                   href="#device-update"
                   class={currentView === DeviceUtilityView.DeviceUpdate ? 'active' : ''}
@@ -238,13 +181,13 @@
               >
                   Device Update
               </a>
-              {#if upgradeAvailable && firmwareState.isSupported}
-                  <span class="alert-dot" title={upgradeAvailable ? 'Upgrade available' : 'Downgrade available'}>!</span>
+              {#if firmwareState.upgradeAvailable && firmwareState.isSupported}
+                  <span class="alert-dot" title={firmwareState.upgradeAvailable ? 'Upgrade available' : 'Downgrade available'}>!</span>
               {/if}
             </span>
             <a 
                 href="#pack-editor" 
-                class={`blink ${currentView === DeviceUtilityView.SampleManager ? 'active' : ''}`}
+                class={`${currentView === DeviceUtilityView.SampleManager ? 'active' : ''}`}
                 class:disabled={!deviceSamplesState.isSupported}
                 onclick={e => deviceSamplesState.isSupported == false && e.preventDefault()}
                 title={!deviceSamplesState.isSupported ? "firmware version 1.2.0 or greater is required" : ""}
@@ -268,25 +211,29 @@
           <div class="spinner"></div>
           <div>Fetching device info…</div>
       </div>
-    {:else if currentView === DeviceUtilityView.DeviceUpdate}
-    <div in:fade={{ duration: 200 }}>
-        <DeviceUpdate />
-    </div>
-    {:else if currentView === DeviceUtilityView.SampleManager}
-        <div in:fade={{ duration: 200 }}>
-            <DeviceSampleManager />
-        </div>
-    {:else if currentView === DeviceUtilityView.DeviceTester}
-        <div in:fade={{ duration: 200 }}>
-            <DeviceTester />
-        </div>
-    {:else if currentView === DeviceUtilityView.Playground}
-        <div in:fade={{ duration: 200 }}>
-            {#await import('~/features/device-utility/views/Playground.svelte') then Mod}
-              {@const Comp = Mod.default}
-              <Comp />
-            {/await}
-        </div>
+    {:else}
+      <div class="content-container">
+          {#if currentView === DeviceUtilityView.DeviceUpdate}
+              <div in:fade={{ duration: 200 }}>
+                  <DeviceUpdate />
+              </div>
+          {:else if currentView === DeviceUtilityView.SampleManager}
+              <div in:fade={{ duration: 200 }}>
+                  <DeviceSampleManager />
+              </div>
+          {:else if currentView === DeviceUtilityView.DeviceTester}
+              <div in:fade={{ duration: 200 }}>
+                  <DeviceTester />
+              </div>
+          {:else if currentView === DeviceUtilityView.Playground}
+              <div in:fade={{ duration: 200 }}>
+                  {#await import('~/features/device-utility/views/Playground.svelte') then Mod}
+                    {@const Comp = Mod.default}
+                    <Comp />
+                  {/await}
+              </div>
+          {/if}
+      </div>
     {/if}
 </div>
 
@@ -325,7 +272,7 @@
         gap: 20px;
     }
 
-    .reconnect-btn {
+    .connect-btn {
         background-color: #0082FC;
         color: #fff;
         border: 1px solid #005ECB;
@@ -337,8 +284,7 @@
         gap: 6px;
         cursor: pointer;
     }
-    .reconnect-btn:hover { background-color: #006ed4; }
-    .reconnect-btn:disabled { background: #9ca3af; border-color: #9ca3af; cursor: not-allowed; }
+    .connect-btn:hover { background-color: #006ed4; }
 
     /* Keep badge tight and centered with the tab text */
     .tab-with-badge { display: inline-flex; align-items: center; gap: 3px; }
@@ -354,6 +300,8 @@
         text-transform: uppercase;
         letter-spacing: .04em;
         font-size: 12px;
+        min-width: 100px;
+        text-align: center;
     }
     nav a.active {
         border-bottom-color: #2f313a;
@@ -504,6 +452,20 @@
         animation: spin 1s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    .content-container {
+        width: 1100px;
+        max-width: 100%;
+        margin: 0 auto;
+        padding: 0;
+        box-sizing: border-box;
+        min-height: 60vh;
+    }
+
+    /* Ensure all child content fills the fixed width */
+    .content-container > div {
+        width: 100%;
+    }
 
     @media (max-width: 860px) {
         nav { padding: 12px 14px; }

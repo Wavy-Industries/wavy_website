@@ -1,18 +1,61 @@
 import { smpService, bluetoothManager } from '~/lib/states/bluetooth.svelte';
 import { FirmwareManager, FirmwareVersion } from '~/lib/bluetooth/smp/FirmwareManager';
 import { Changelog, parseChangelog } from '~/lib/parsers/changelog_parser';
+import { firmwareRhsIsNewer } from '~/lib/bluetooth/smp/FirmwareManager';
 
 import { Log } from '~/lib/utils/Log';
 const LOG_LEVEL = Log.LEVEL_INFO
 const log = new Log("firmware-state", LOG_LEVEL);
 
-export const firmwareManager = new FirmwareManager(smpService);
+// Lazy initialization to avoid circular dependency
+let _firmwareManager: FirmwareManager | null = null;
+function getFirmwareManager(): FirmwareManager {
+  if (!_firmwareManager) {
+    _firmwareManager = new FirmwareManager(smpService);
+  }
+  return _firmwareManager;
+}
+
+// Keep firmwareManager export for backward compatibility
+export const firmwareManager = {
+  getFirmwareVersion: () => getFirmwareManager().getFirmwareVersion(),
+  uploadImage: (image: ArrayBuffer, onProgress?: (percent: number) => void) => 
+    getFirmwareManager().uploadImage(image, onProgress),
+};
 
 export const firmwareState = $state({
     firmwareVersion: null as (FirmwareVersion | null),
     changelog: null as (Changelog | null),
     isSupported: null as (boolean | null),
+    get upgradeAvailable() {
+        const fw = this.firmwareVersion;
+        const rel = this.changelog?.release;
+        if (!fw || !rel) return false;
+        return firmwareRhsIsNewer(fw, rel);
+    },
+    
+    get downgradeAvailable() {
+        const fw = this.firmwareVersion;
+        const rel = this.changelog?.release;
+        if (!fw || !rel) return false;
+        return firmwareRhsIsNewer(rel, fw);
+    }
 })
+
+// Indicators for upgrade/downgrade availability
+// export const upgradeAvailable = $derived.by(() => {
+//     const fw = firmwareState?.firmwareVersion;
+//     const rel = firmwareState?.changelog?.release;
+//     if (!fw || !rel) return false;
+//     return firmwareRhsIsNewer(fw, rel);
+// });
+// export const downgradeAvailable = $derived.by(() => {
+//     const fw = firmwareState?.firmwareVersion;
+//     const rel = firmwareState?.changelog?.release;
+//     if (!fw || !rel) return false;
+//     // fw > rel → downgrade available
+//     return firmwareRhsIsNewer(rel, fw);
+// });
 
 export async function refreshChangelog() {
     try {
@@ -28,7 +71,7 @@ export async function refreshChangelog() {
 }
 
 export const refreshDeviceFirmwareVersion = async () => {
-    const fw = await firmwareManager.getFirmwareVersion();
+    const fw = await getFirmwareManager().getFirmwareVersion();
     if (fw) {
         firmwareState.isSupported = true;
         firmwareState.firmwareVersion = fw;
@@ -42,6 +85,4 @@ export const refreshDeviceFirmwareVersion = async () => {
 export function resetFirmwareState() {
     firmwareState.firmwareVersion = null;
     firmwareState.isSupported = null;
-    // Note: changelog is not reset as it's fetched from the server, not the device
 }
-

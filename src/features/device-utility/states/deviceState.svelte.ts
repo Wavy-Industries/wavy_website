@@ -1,5 +1,12 @@
 import type { DeviceStateSnapshot } from '~/lib/bluetooth/DeviceStateService';
 
+const POWER_STATE_MAP = {
+  0: 'idle',
+  1: 'low power',
+  2: 'high power',
+  3: 'data transfer'
+}
+
 export const deviceState = $state({
   isAvailable: null as (boolean | null),
   octave: 0, // Current octave offset from device
@@ -13,12 +20,23 @@ export const deviceState = $state({
   effectPreset: null as number | null,
   hold: null as boolean | null,
   undoSession: null as number | null,
-  powerState: null as number | null,
+  powerState: null as 'idle' | 'low power' | 'high power' | 'data transfer' | null,
   btConnInterval: null as number | null,
   btConnLatency: null as number | null,
   btConnTimeout: null as number | null,
   btMtuRx: null as number | null,
   btMtuTx: null as number | null,
+  
+  get btConnIntervalMs() {
+    const raw = deviceState.btConnInterval;
+    if (raw == null) return null;
+    return raw * 1.25;
+  },
+  get btConnTimeoutMs() {
+    const raw = deviceState.btConnTimeout;
+    if (raw == null) return null;
+    return raw * 10;
+    }
 });
 
 export function resetDeviceState() {
@@ -63,7 +81,7 @@ export function setDeviceStateFromSnapshot(state: DeviceStateSnapshot) {
   if (state.effectPreset !== null) deviceState.effectPreset = state.effectPreset;
   if (state.hold !== null) deviceState.hold = state.hold;
   if (state.undoSession !== null) deviceState.undoSession = state.undoSession;
-  if (state.powerState !== null) deviceState.powerState = state.powerState;
+  if (state.powerState !== null) deviceState.powerState = POWER_STATE_MAP[state.powerState];
   if (state.btConnInterval !== null) deviceState.btConnInterval = state.btConnInterval;
   if (state.btConnLatency !== null) deviceState.btConnLatency = state.btConnLatency;
   if (state.btConnTimeout !== null) deviceState.btConnTimeout = state.btConnTimeout;

@@ -75,7 +75,7 @@
               {#if updateState === 'up-to-date'}
                 <div class="status-card ok">
                   <h2>Your device is up to date!</h2>
-                  <span class="tagline">Your device is running the newest firmware. To get notifications when new firmware versions are available, add your email at the bottom of this page.</span>
+                  <span class="tagline">Your device is running the selected firmware. To get notifications when new firmware versions are available, add your email at the bottom of this page.</span>
                 </div>
               {:else if updateState === 'upgrade'}
                 <div class="status-card upgrade">
@@ -85,7 +85,7 @@
               {:else if updateState === 'downgrade'}
                 <div class="status-card downgrade">
                   <h2>Downgrade available</h2>
-                  <span class="tagline">Your device running a beta firmware. Downgrade to stable release</span>
+                  <span class="tagline">Downgrade to the selected version</span>
                 </div>
               {:else}
                 <div class="status-card neutral">

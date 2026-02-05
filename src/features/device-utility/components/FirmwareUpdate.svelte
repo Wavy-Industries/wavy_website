@@ -1,9 +1,13 @@
 <script>
     import { deviceSampleTransferState } from "~/lib/states/samples.svelte";
-    import { updaterTriggerReconnect } from "~/lib/states/updater.svelte";
+    import { bluetoothManager } from "~/lib/states/bluetooth.svelte";
+    import { BT_DEVICE_FILTERS } from '~/lib/config/device';
 
-    const { stage, uploadProgress, sampleUploadProgress } = $props();
-    const hasSampleProgress = $derived(typeof sampleUploadProgress === 'number');
+    const { stage, uploadProgress } = $props();
+    
+    const reconnectManual = async () => {
+        await bluetoothManager.reconnectDialogue(BT_DEVICE_FILTERS);
+    }
 </script>
 
 <div class="update-stages">
@@ -41,7 +45,7 @@
     <div class="stage active">
         <span class="stage-info reconnect-info">
             Failed to auto connect. Please reconnect manually:
-            <button class="reconnect-btn" onclick={() => updaterTriggerReconnect()}>Reconnect</button>
+            <button class="reconnect-btn" onclick={() => reconnectManual()}>Reconnect</button>
         </span>
     </div>
     {/if}

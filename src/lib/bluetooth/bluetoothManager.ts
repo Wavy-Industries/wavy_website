@@ -158,14 +158,30 @@ export class BluetoothManager {
             console.warn('reconnectDialogue only works during connection loss');
             return;
         }
-        this._resetCharacteristicCache();
         try {
-            this.device = await this._requestDevice(filters);
+            const newDevice = await this._requestDevice(filters);
+            // If auto-reconnect succeeded while user was selecting, do a proper disconnect first
+            if ((this.state as ConnectionState).type === 'connected' && this.device?.gatt?.connected) {
+                log.info('Auto-reconnect succeeded while selecting device, disconnecting to use new selection');
+                this.state = { type: 'disconnecting' };
+                this.device.gatt.disconnect();
+                // Wait for disconnect to complete - onDisconnect will fire and clean up
+                await new Promise<void>(resolve => {
+                    const originalOnDisconnect = this.onDisconnect;
+                    this.onDisconnect = () => {
+                        originalOnDisconnect?.();
+                        this.onDisconnect = originalOnDisconnect;
+                        resolve();
+                    };
+                });
+            }
+            this.device = newDevice;
             this.device.addEventListener('gattserverdisconnected', this._handleDisconnection.bind(this));
+            this.state = { type: 'connecting' };
+            this.onConnecting?.();
             await this.device.gatt!.connect();
-            // Only transition to connected after successful connection
             this.state = { type: 'connected' };
-            this.onConnectionReestablished?.();
+            this.onConnect?.();
         } catch (error: any) {
             // Stay in connectionLoss state on any error - user can retry
             if (error.name === 'NotFoundError') {
@@ -173,6 +189,7 @@ export class BluetoothManager {
             } else {
                 console.error('Reconnection error:', error);
             }
+            this.state = { type: 'connectionLoss' };
         }
     }
 

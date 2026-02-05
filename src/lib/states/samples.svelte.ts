@@ -9,7 +9,25 @@ import { fetchServerPack } from '~/lib/services/samplePackFetcher';
 
 const log = new Log("device-samples", Log.LEVEL_INFO);
 
-export const sampleManager = new SampleManager(smpService);
+// Lazy initialization to avoid circular dependency
+let _sampleManager: SampleManager | null = null;
+function getSampleManager(): SampleManager {
+  if (!_sampleManager) {
+    _sampleManager = new SampleManager(smpService);
+  }
+  return _sampleManager;
+}
+
+// Keep sampleManager export for backward compatibility
+export const sampleManager = {
+  setMode: (mode: SampleMode) => getSampleManager().setMode(mode),
+  getMode: () => getSampleManager().getMode(),
+  isSet: () => getSampleManager().isSet(),
+  getSpaceUsed: () => getSampleManager().getSpaceUsed(),
+  getIDs: () => getSampleManager().getIDs(),
+  downloadSamples: (onProgress?: (val: number) => void) => getSampleManager().downloadSamples(onProgress),
+  uploadSamples: (samples: DeviceSamples, onProgress?: (val: number) => void) => getSampleManager().uploadSamples(samples, onProgress),
+};
 
 type ModeState = {
   ids: string[] | null;
@@ -83,7 +101,7 @@ export const setSampleMode = async (mode: SampleMode): Promise<boolean> => {
   if (deviceSampleTransferState.mode.type === 'transferring') return false;
   deviceSampleTransferState.mode = { type: 'transferring', mode };
   try {
-    await sampleManager.setMode(mode);
+    await getSampleManager().setMode(mode);
     deviceSampleTransferState.mode = { type: 'idle' };
     return true;
   } catch (error) {
@@ -104,7 +122,7 @@ export const ensureModeLoaded = async (mode: SampleMode): Promise<boolean> => {
 
 const detectModeSupport = async (): Promise<boolean> => {
   try {
-    await sampleManager.getMode();
+    await getSampleManager().getMode();
     deviceSamplesState.modeSupported = true;
     return true;
   } catch {
@@ -131,20 +149,20 @@ export const checkDeviceSampleSupport = async (mode: SampleMode = deviceSamplesS
   }
   const modeState = getModeState(mode);
   try {
-    const isSet = await sampleManager.isSet();
+    const isSet = await getSampleManager().isSet();
     deviceSamplesState.isSupported = true;
     modeState.isSet = isSet;
     log.info(`Device supports samples, isSet = ${isSet}`);
     if (isSet === true) {
       log.debug('Getting space used');
-      const spaceUsed = await sampleManager.getSpaceUsed();
+      const spaceUsed = await getSampleManager().getSpaceUsed();
       modeState.storageTotal = spaceUsed.tot;
       modeState.storageUsed = spaceUsed.usd;
       modeState.packsStorageUsed = spaceUsed.packs;
       log.debug(`Space used: ${JSON.stringify(spaceUsed)}`);
       log.debug(`Storage total: ${modeState.storageTotal}`);
       log.debug('Getting IDs');
-      let ids = await sampleManager.getIDs();
+      let ids = await getSampleManager().getIDs();
       ids = ids.map(id => id ? id[0] + "-" + id.slice(1) : null);
       ids.push(ids.shift() || null);
       modeState.ids = ids;
@@ -166,7 +184,7 @@ export const downloadDeviceSamples = async (mode: SampleMode = deviceSamplesStat
   if (modeState.isSet !== true) { log.error('Device samples not set, aborting download.'); deviceSampleTransferState.download = { type: 'error', message: 'Device samples not set' }; return null; }
   log.debug('Downloading samples from device...');
   deviceSampleTransferState.download = { type: 'transferring', progress: null };
-  const samples = await sampleManager.downloadSamples((val) => { deviceSampleTransferState.download = { type: 'transferring', progress: val }; })
+  const samples = await getSampleManager().downloadSamples((val) => { deviceSampleTransferState.download = { type: 'transferring', progress: val }; })
   deviceSampleTransferState.download = { type: 'idle' };
   if (samples == null) { log.error('Failed to download samples from device'); deviceSampleTransferState.download = { type: 'error', message: 'Failed to download samples from device' }; return null; }
   modeState.deviceSamples = samples;
@@ -182,12 +200,12 @@ export const uplaodDeviceSamples = async (newSamples: DeviceSamples, mode: Sampl
   if (!modeReady && mode !== SampleMode.DRM) { return false; }
   const modeState = getModeState(mode);
   deviceSampleTransferState.upload = { type: 'transferring', progress: null };
-  const success = await sampleManager.uploadSamples(newSamples, (val) => { deviceSampleTransferState.upload = { type: 'transferring', progress: val }; });
+  const success = await getSampleManager().uploadSamples(newSamples, (val) => { deviceSampleTransferState.upload = { type: 'transferring', progress: val }; });
   if (!success) { log.error('Failed to upload samples to device'); deviceSampleTransferState.upload = { type: 'error', message: 'Failed to upload samples to device' }; return false; }
   deviceSampleTransferState.upload = { type: 'idle' };
 
   deviceSampleTransferState.supportCheck = {type: 'transferring', progress: null};
-  const isSet = await sampleManager.isSet();
+  const isSet = await getSampleManager().isSet();
   modeState.isSet = isSet;
   deviceSampleTransferState.supportCheck = {type: 'idle'};
   log.debug(`Device samples are set: ${isSet}`);

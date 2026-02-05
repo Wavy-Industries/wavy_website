@@ -1,16 +1,21 @@
 import { firmwareManager } from "~/lib/states/firmware.svelte";
 import { deviceSamplesState, waitForUploadToFinish } from "~/lib/states/samples.svelte";
 import { Log } from "~/lib/utils/Log";
-import { bluetoothManager } from "~/lib/states/bluetooth.svelte";
-import { BT_DEVICE_FILTERS } from "~/lib/config/device";
 
 const RECONNECT_TIMEOUT_MS = 30000; // 30 second timeout for auto-reconnect
 
 const log = new Log("updater", Log.LEVEL_INFO);
 
 export const updaterState = $state({
-    stage: 'idle' as 'idle' | 'fetching' | 'uploading' | 'applying' | 'reconnect_required' | 'verifying' | 'done' | 'failed',
+    stage: 'idle' as 'idle' | 'fetching' | 'uploading' | 'applying' | 'reconnect_manual' | 'verifying' | 'done' | 'failed',
     uploadProgress: null as number | null,
+    get updateInProgress() {
+        return updaterState.stage === 'fetching' 
+            || updaterState.stage === 'uploading'
+            || updaterState.stage === 'applying'
+            || updaterState.stage === 'reconnect_manual'
+            || updaterState.stage === 'verifying';
+    }
 });
 
 let deviceReconnectedResolve: (() => void) | null = null
@@ -31,12 +36,6 @@ export function updaterNotifyConnectionReestablished() {
 export function updaterNotifyConnected() {
     deviceReconnectedResolve?.();
     deviceReconnectedResolve = null;
-}
-
-/** Called from UI when user clicks reconnect button during reconnect_required stage */
-export async function updaterTriggerReconnect() {
-    if (updaterState.stage !== 'reconnect_required') return;
-    await bluetoothManager.reconnectDialogue(BT_DEVICE_FILTERS);
 }
 
 export async function deviceUpdate(firmwareVersion: string) {
@@ -64,7 +63,7 @@ export async function deviceUpdate(firmwareVersion: string) {
         const uiTimeoutId = setTimeout(() => {
             if (updaterState.stage === 'applying') {
                 log.warning('Auto-reconnect taking too long, showing manual reconnect button');
-                updaterState.stage = 'reconnect_required';
+                updaterState.stage = 'reconnect_manual';
             }
         }, RECONNECT_TIMEOUT_MS);
 
