@@ -123,7 +123,7 @@
     .update-buttons:disabled { background: #f3f4f6; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; }
     .toggle-wrap { display: inline-flex; align-items: center; gap: 6px; }
     .toggle-wrap .label { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #111827; }
-    .select-wrap { display: flex; flex-direction: column; gap: 4px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #111827; }
+    .select-wrap { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #111827; }
     .select-wrap .label { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #111827; }
     .select-wrap select {
         min-width: 160px;
