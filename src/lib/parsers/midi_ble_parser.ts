@@ -73,15 +73,45 @@ export function parse_raw_to_midi_ble(data: Uint8Array): MIDIEvent[] {
   const events: MIDIEvent[] = [];
   let offset = 0;
 
-  // NAIVE IMPLEMENTATION, knowing the MONKEY format
-  // we assume a simple format. 2 bytes for timestamp. 1 byte for command and 2 for data
   while (offset < data.length) {
-    const slice = data.slice(offset, offset+5)
-    const timestamp = (slice[0] & 0b00111111) << 7 & (slice[1] & 0b01111111)
-    const command = slice[2] & 0b11110000
-    const channel = slice[2] & 0b00001111
-    const d1 = slice[3]
-    const d2 = slice[4]
+
+    // find and skip timestamp bytes
+    let consecutiveStatusBits = 0
+    let j = offset
+    while (j < data.length && (data[j] & 0x80) == 0x80) {
+      consecutiveStatusBits++;
+      j++;
+    }
+  
+    // Handle based on count:
+    // - 1 consecutive: keep it (MIDI status)
+    // - 2 consecutive: remove first (1 timestamp)
+    // - 3 consecutive: remove first 2 (2 timestamps)
+    // - more => error
+    let slice_start, timestamp
+    switch (consecutiveStatusBits) {
+      case 1:
+        timestamp = 0
+        slice_start = offset
+        break
+      case 2:
+        timestamp = data[offset] & 0b01111111
+        slice_start = offset + 1
+        break
+      case 3:
+        timestamp = (data[offset] & 0b00111111) << 7 & (data[offset+1] & 0b01111111)
+        slice_start = offset + 2
+        break
+      default:
+        console.error("error parsing ble midi events", data, consecutiveStatusBits)
+        return []
+    }
+
+    const slice = data.slice(slice_start, slice_start+3)
+    const command = slice[0] & 0b11110000
+    const channel = slice[0] & 0b00001111
+    const d1 = slice[1]
+    const d2 = slice[2]
 
     switch (command) {
       case STATUS_NOTE_OFF:
@@ -95,7 +125,7 @@ export function parse_raw_to_midi_ble(data: Uint8Array): MIDIEvent[] {
         break
     }
 
-    offset += 5;
+    offset = slice_start + 3;
   }
 
   return events;

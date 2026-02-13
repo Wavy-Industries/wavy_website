@@ -1,3 +1,6 @@
+# 1.3.2[4. Feb 2026]
+- Fix MIDI parsing
+
 # 1.3.1[4. Feb 2026]
 - Minor behaviour improvements to PAT
 

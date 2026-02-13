@@ -45,9 +45,11 @@
     });
     
     /* prompt user if an update is available */
+    let updatePrompted = false;
     $effect(() => {
-        if (firmwareState.upgradeAvailable && windowState.hash !== DeviceUtilityView.DeviceUpdate) {
-            const showUpdatePage = confirm("An update if available. Would you like to update your device?")
+        if (firmwareState.upgradeAvailable && windowState.hash !== DeviceUtilityView.DeviceUpdate && !updatePrompted) {
+            updatePrompted = true;
+            const showUpdatePage = confirm("An update is available. Would you like to update your device?")
             if (showUpdatePage) setHash(DeviceUtilityView.DeviceUpdate)
         }
     })
