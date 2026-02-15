@@ -5,8 +5,7 @@ import Layout from '~/layouts/Layout.astro';
 import Header from '~/layouts/Header.astro';
 import Footer from '~/layouts/Footer.astro';
 import LinkButton from '~/components/LinkButton.astro';
-import TagContainer from '~/components/TagContainer.astro';
-import Tag from '~/components/Tag.astro';
+import MonkeyTabBar from '~/components/MonkeyTabBar.astro';
 // import TopBannerAlert from '~/components/TopBannerAlert.astro';
 
 import monkeyDarkImg from '~/assets/monkey/monkey_dark_crop.png';
@@ -29,15 +28,12 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 	<main>
 		<!-- <TopBannerAlert>BLACK FRIDAY sale: 15% off with code <b>BLACKFRIDAY2025</b></TopBannerAlert> -->
 		<Header textColor='white' />
+		<MonkeyTabBar active="monkey" variant="dark" />
 		<section class="hero">
 			<div class="hero-inner">
 				<h1>MON<span style="font-weight: 400;" >KEY</span></h1>
 				<p class="tagline">An ultra-portable wireless music making device</p>
 				<div class="hero-actions">
-					<TagContainer>
-						<Tag href={routes.monkeyGettingStarted}>Getting started</Tag>
-						<Tag href={routes.monkeyManual}>Manual</Tag>
-					</TagContainer>
 					<LinkButton id="monkey-buy-button" class="monkey-buy-button" href={routes.monkeyPurchase} type="highlight" data-cta="hero">
 						<span class="monkey-buy-label">
 							<span>Buy now</span>

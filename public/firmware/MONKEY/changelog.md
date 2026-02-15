@@ -120,5 +120,5 @@ This release branch introduced the CC Touch modulation surface
 - Looper now starts from the beginning each time it starts playing
 - Fix: not all notes are released on device reset
 
-# 0.0.11
+# 0.0.11 -obsolete
 - Test firmware

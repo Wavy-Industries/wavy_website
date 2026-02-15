@@ -1,0 +1,164 @@
+---
+import '~/styles/global.css';
+import Layout from '~/layouts/Layout.astro';
+import Header from '~/layouts/Header.astro';
+import Footer from '~/layouts/Footer.astro';
+import MonkeyTabBar from '~/components/MonkeyTabBar.astro';
+import { parseChangelog } from '~/lib/parsers/changelog_parser';
+import fs from 'node:fs';
+
+const markdown = fs.readFileSync('public/firmware/MONKEY/changelog.md', 'utf-8');
+const changelog = parseChangelog(markdown);
+const versions = changelog.versions.filter(v => !v.isObsolete && !v.isDev);
+---
+
+<Layout title="MONKEY Changelog - Wavy Industries">
+    <main>
+        <Header />
+        <MonkeyTabBar active="changelog" />
+        <section class="changelog-page">
+            <article>
+                <h1>Changelog</h1>
+                <p>Firmware update history for MON<b>KEY</b>.</p>
+
+                <div class="version-list">
+                    {versions.map((v, i) => (
+                        <div class:list={['version-entry', { 'version-entry--latest': i === 0 }]}>
+                            <div class="version-header">
+                                <span class="version-number">{v.version.versionString}</span>
+                                {v.date && <span class="version-date">{v.date}</span>}
+                                {i === 0 && <span class="version-latest">Latest</span>}
+                            </div>
+                            {v.highlight && <div class="version-highlight">{v.highlight}</div>}
+                            {v.summary && <p class="version-summary">{v.summary}</p>}
+                            <ul>
+                                {v.changes.map(change => (
+                                    <li>{change}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
+            </article>
+        </section>
+        <Footer />
+    </main>
+</Layout>
+
+<style>
+main {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+}
+
+.changelog-page {
+    width: 100%;
+    padding: 0 24px;
+    flex-grow: 1;
+}
+
+.changelog-page article {
+    margin: 0 auto;
+    max-width: 800px;
+    width: 100%;
+    padding: 40px 0 80px;
+}
+
+h1 {
+    font-size: 36px;
+    font-weight: 300;
+    margin: 0 0 8px 0;
+    color: #111;
+}
+
+.changelog-page > article > p {
+    font-size: 16px;
+    line-height: 1.7;
+    color: #555;
+    margin: 0 0 32px 0;
+}
+
+.version-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.version-entry {
+    padding: 24px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.version-entry:first-child {
+    padding-top: 0;
+}
+
+.version-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.version-number {
+    font-size: 18px;
+    font-weight: 600;
+    color: #111;
+    font-variant-numeric: tabular-nums;
+}
+
+.version-date {
+    font-size: 13px;
+    color: #999;
+}
+
+.version-latest {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--accent-color-bg-light);
+    color: var(--accent-color);
+}
+
+.version-highlight {
+    font-size: 15px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.version-summary {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #555;
+    margin: 0 0 8px 0;
+}
+
+.version-entry ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.version-entry li {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #444;
+}
+
+@media (max-width: 768px) {
+    .changelog-page {
+        padding: 0 16px;
+    }
+
+    .changelog-page article {
+        padding: 28px 0 60px;
+    }
+
+    h1 {
+        font-size: 28px;
+    }
+}
+</style>

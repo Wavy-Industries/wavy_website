@@ -1,0 +1,201 @@
+---
+import '../styles/global.css';
+import Layout from './Layout.astro';
+import Header from './Header.astro';
+import Footer from './Footer.astro';
+import MonkeyTabBar from '~/components/MonkeyTabBar.astro';
+
+const { frontmatter } = Astro.props;
+---
+
+<Layout title={frontmatter.title}>
+    <main>
+        <Header />
+        <MonkeyTabBar active={frontmatter.activeTab} />
+        <section class="monkey-docs">
+            <article>
+                <slot />
+            </article>
+        </section>
+        <Footer />
+    </main>
+</Layout>
+
+<style is:global>
+.monkey-docs {
+    width: 100%;
+    padding: 0 24px;
+    background: #fff;
+    flex-grow: 1;
+}
+
+.monkey-docs article {
+    margin: 0 auto;
+    max-width: 800px;
+    width: 100%;
+    padding: 40px 0 80px;
+}
+
+/* Headings */
+.monkey-docs h1 {
+    font-size: 36px;
+    font-weight: 300;
+    margin: 0 0 8px 0;
+    line-height: 1.2;
+    color: #111;
+}
+
+.monkey-docs h2 {
+    font-size: 24px;
+    font-weight: 500;
+    margin: 48px 0 16px 0;
+    padding-top: 24px;
+    border-top: 1px solid #eee;
+    color: #111;
+    line-height: 1.3;
+}
+
+.monkey-docs h3 {
+    font-size: 18px;
+    font-weight: 500;
+    margin: 32px 0 12px 0;
+    color: #222;
+    line-height: 1.4;
+}
+
+.monkey-docs h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 24px 0 8px 0;
+    color: #333;
+}
+
+/* Paragraphs */
+.monkey-docs p {
+    font-size: 16px;
+    line-height: 1.7;
+    color: #333;
+    margin: 0 0 16px 0;
+}
+
+/* Links */
+.monkey-docs a {
+    color: var(--accent-color);
+    text-decoration: none;
+}
+
+.monkey-docs a:hover {
+    text-decoration: underline;
+}
+
+/* Images */
+.monkey-docs img {
+    display: block;
+    margin: 20px auto;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+}
+
+/* Blockquotes */
+.monkey-docs blockquote {
+    margin: 20px 0;
+    padding: 12px 20px;
+    border-left: 3px solid var(--accent-color);
+    background: #f9fafb;
+    color: #444;
+    font-style: italic;
+}
+
+.monkey-docs blockquote p {
+    margin: 0;
+}
+
+/* Lists */
+.monkey-docs ul,
+.monkey-docs ol {
+    padding-left: 24px;
+    margin: 0 0 16px 0;
+}
+
+.monkey-docs li {
+    font-size: 16px;
+    line-height: 1.7;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+/* Code */
+.monkey-docs code {
+    font-size: 14px;
+    background: #f4f4f5;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #111;
+}
+
+.monkey-docs pre {
+    background: #f4f4f5;
+    padding: 16px 20px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 16px 0;
+}
+
+.monkey-docs pre code {
+    background: none;
+    padding: 0;
+}
+
+/* Strong in headings */
+.monkey-docs h1 strong,
+.monkey-docs h1 b {
+    font-weight: 500;
+}
+
+/* Centered embeds */
+.monkey-docs .blog-embed {
+    display: block;
+    margin: 16px auto;
+}
+.monkey-docs .blog-embed img {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    height: auto;
+}
+.monkey-docs .blog-embed iframe {
+    display: block;
+    margin: 0 auto;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 0;
+}
+
+/* Horizontal rules */
+.monkey-docs hr {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 40px 0;
+}
+
+@media (max-width: 768px) {
+    .monkey-docs {
+        padding: 0 16px;
+    }
+
+    .monkey-docs article {
+        padding: 28px 0 60px;
+    }
+
+    .monkey-docs h1 {
+        font-size: 28px;
+    }
+
+    .monkey-docs h2 {
+        font-size: 20px;
+        margin-top: 36px;
+    }
+}
+</style>

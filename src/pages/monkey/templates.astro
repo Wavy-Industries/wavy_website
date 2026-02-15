@@ -1,0 +1,208 @@
+---
+import '~/styles/global.css';
+import Layout from '~/layouts/Layout.astro';
+import Header from '~/layouts/Header.astro';
+import Footer from '~/layouts/Footer.astro';
+import MonkeyTabBar from '~/components/MonkeyTabBar.astro';
+---
+
+<Layout title="MONKEY Templates - Wavy Industries">
+    <main>
+        <Header />
+        <MonkeyTabBar active="templates" />
+        <section class="templates-page">
+            <article>
+                <h1>Templates</h1>
+                <p>Ready-made project templates to get you creating music with MON<b>KEY</b> right away.</p>
+
+                <div class="card-grid">
+                    <div class="template-card">
+                        <div class="card-header">
+                            <h3>Nano Studio 2</h3>
+                            <div class="platform-tags">
+                                <span class="platform-tag">iOS</span>
+                                <span class="platform-tag">iPadOS</span>
+                                <span class="platform-tag">macOS</span>
+                            </div>
+                        </div>
+                        <p>Pre-configured project template with instruments assigned to MIDI channels, ready to play with MON<b>KEY</b>.</p>
+                        <div class="card-actions">
+                            <a href="/assets/files/Nano_Studio_2.prj.zip" download class="download-button">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M8 11L3.5 6.5L4.55 5.4L7.25 8.1V1H8.75V8.1L11.45 5.4L12.5 6.5L8 11ZM2 15C1.6 15 1.25 14.85 0.95 14.55C0.65 14.25 0.5 13.9 0.5 13.5V10.5H2V13.5H14V10.5H15.5V13.5C15.5 13.9 15.35 14.25 15.05 14.55C14.75 14.85 14.4 15 14 15H2Z" fill="currentColor"/>
+                                </svg>
+                                Download template
+                            </a>
+                            <a href="/blog/2026-01-14_nano-studio-2-template" class="guide-link">Installation guide</a>
+                        </div>
+                    </div>
+                    <div class="template-card">
+                        <div class="card-header">
+                            <h3>Ableton Live</h3>
+                            <div class="platform-tags">
+                                <span class="platform-tag">macOS</span>
+                                <span class="platform-tag">Windows</span>
+                            </div>
+                        </div>
+                        <p>Ableton Live project with instruments assigned to MIDI channels 1–10, ready to play with MON<b>KEY</b>.</p>
+                        <div class="card-actions">
+                            <a href="/assets/files/MONKEY template.als" download class="download-button">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M8 11L3.5 6.5L4.55 5.4L7.25 8.1V1H8.75V8.1L11.45 5.4L12.5 6.5L8 11ZM2 15C1.6 15 1.25 14.85 0.95 14.55C0.65 14.25 0.5 13.9 0.5 13.5V10.5H2V13.5H14V10.5H15.5V13.5C15.5 13.9 15.35 14.25 15.05 14.55C14.75 14.85 14.4 15 14 15H2Z" fill="currentColor"/>
+                                </svg>
+                                Download template
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="templates-note">More templates coming soon. Have a template to share? Let us know on <a href="https://discord.gg/4HQHERUW5K">Discord</a>.</p>
+            </article>
+        </section>
+        <Footer />
+    </main>
+</Layout>
+
+<style>
+main {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+}
+
+.templates-page {
+    width: 100%;
+    padding: 0 24px;
+    flex-grow: 1;
+}
+
+.templates-page article {
+    margin: 0 auto;
+    max-width: 800px;
+    width: 100%;
+    padding: 40px 0 80px;
+}
+
+h1 {
+    font-size: 36px;
+    font-weight: 300;
+    margin: 0 0 8px 0;
+    color: #111;
+}
+
+.templates-page > article > p {
+    font-size: 16px;
+    line-height: 1.7;
+    color: #555;
+    margin: 0 0 32px 0;
+}
+
+.card-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.template-card {
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 24px;
+    background: #fafafa;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.card-header h3 {
+    font-size: 18px;
+    font-weight: 500;
+    margin: 0;
+    color: #111;
+}
+
+.platform-tags {
+    display: flex;
+    gap: 6px;
+}
+
+.platform-tag {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--accent-color-bg-light);
+    color: var(--accent-color);
+}
+
+.template-card p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #444;
+    margin: 0 0 16px 0;
+}
+
+.card-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.download-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--accent-color);
+    color: #fff;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    font-style: normal;
+    text-decoration: none;
+    transition: opacity 0.15s;
+}
+
+.download-button:hover {
+    opacity: 0.9;
+    text-decoration: none;
+}
+
+.guide-link {
+    font-size: 14px;
+    color: var(--accent-color);
+    font-style: normal;
+}
+
+.templates-note {
+    margin-top: 40px;
+    font-size: 14px;
+    color: #888;
+}
+
+.templates-note a {
+    color: var(--accent-color);
+    font-style: normal;
+}
+
+@media (max-width: 768px) {
+    .templates-page {
+        padding: 0 16px;
+    }
+
+    .templates-page article {
+        padding: 28px 0 60px;
+    }
+
+    h1 {
+        font-size: 28px;
+    }
+}
+</style>

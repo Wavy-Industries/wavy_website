@@ -1,0 +1,113 @@
+---
+import { routes } from '~/routes';
+
+interface Props {
+    active: 'monkey' | 'getting-started' | 'manual' | 'templates' | 'faq' | 'changelog' | 'support' | 'device-utility';
+    variant?: 'light' | 'dark';
+}
+
+const { active, variant = 'light' } = Astro.props;
+
+const tabs = [
+    { label: 'MONKEY', href: routes.monkey, id: 'monkey' },
+    { label: 'Getting Started', href: routes.monkeyGettingStarted, id: 'getting-started' },
+    { label: 'Manual', href: routes.monkeyManual, id: 'manual' },
+    { label: 'Templates', href: routes.monkeyTemplates, id: 'templates' },
+    { label: 'FAQ', href: routes.monkeyFaq, id: 'faq' },
+    { label: 'Changelog', href: routes.monkeyChangelog, id: 'changelog' },
+    { label: 'Support', href: routes.monkeySupport, id: 'support' },
+    { label: 'Device Utility', href: routes.deviceUtility, id: 'device-utility', external: true },
+];
+---
+
+<nav class:list={['monkey-tab-bar', { 'monkey-tab-bar--dark': variant === 'dark' }]}>
+    {tabs.map(tab => (
+        <a href={tab.href} class:list={['monkey-tab', { 'monkey-tab--active': tab.id === active }]}>
+            {tab.label}{tab.external && <span class="monkey-tab-external">&#8599;</span>}
+        </a>
+    ))}
+</nav>
+
+<style>
+.monkey-tab-bar {
+    width: 100%;
+    display: flex;
+    height: 40px;
+    gap: 24px;
+    padding: 0 20px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #fff;
+}
+
+.monkey-tab-bar--dark {
+    background: transparent;
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.monkey-tab {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 100%;
+    font-size: 13px;
+    font-weight: 500;
+    font-style: normal;
+    color: #666;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+}
+
+.monkey-tab:hover {
+    color: #111;
+    text-decoration: none;
+    border-bottom-color: #ddd;
+}
+
+.monkey-tab--active {
+    color: #111;
+    border-bottom-color: var(--accent-color);
+}
+
+.monkey-tab--active:hover {
+    border-bottom-color: var(--accent-color);
+}
+
+.monkey-tab-external {
+    font-size: 10px;
+    opacity: 0.5;
+}
+
+/* Dark variant */
+.monkey-tab-bar--dark .monkey-tab {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.monkey-tab-bar--dark .monkey-tab:hover {
+    color: rgba(255, 255, 255, 0.7);
+    border-bottom-color: rgba(255, 255, 255, 0.15);
+}
+
+.monkey-tab-bar--dark .monkey-tab--active {
+    color: rgba(255, 255, 255, 0.9);
+    border-bottom-color: #fff;
+}
+
+.monkey-tab-bar--dark .monkey-tab--active:hover {
+    border-bottom-color: #fff;
+}
+
+@media (max-width: 768px) {
+    .monkey-tab-bar {
+        padding: 0 16px;
+        gap: 16px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .monkey-tab {
+        font-size: 12px;
+        white-space: nowrap;
+    }
+}
+</style>
