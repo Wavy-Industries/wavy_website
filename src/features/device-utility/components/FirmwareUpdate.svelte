@@ -14,7 +14,7 @@
     <div class="stage" class:active={stage === 'fetching'}>
         {#if stage === 'fetching'}
             <div class="spinner"></div>
-        {:else if ['uploading', 'applying', 'reconnect_required', 'verifying', 'done'].includes(stage)}
+        {:else if ['uploading', 'applying', 'reconnect_manual', 'verifying', 'done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
         Preparing firmware
@@ -22,7 +22,7 @@
     <div class="stage" class:active={stage === 'uploading'}>
         {#if stage === 'uploading'}
             <div class="spinner"></div>
-        {:else if ['applying', 'reconnect_required', 'verifying', 'done'].includes(stage)}
+        {:else if ['applying', 'reconnect_manual', 'verifying', 'done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
         Uploading firmware
@@ -30,10 +30,10 @@
             <span class="stage-info">{#if uploadProgress === null}preparing device{:else}Progress {uploadProgress}%{/if}</span>
         {/if}
     </div>
-    <div class="stage" class:active={stage === 'applying' || stage === 'reconnect_required'}>
+    <div class="stage" class:active={stage === 'applying' || stage === 'reconnect_manual'}>
         {#if stage === 'applying'}
             <div class="spinner"></div>
-        {:else if ['reconnect_required', 'verifying', 'done'].includes(stage)}
+        {:else if ['reconnect_manual', 'verifying', 'done'].includes(stage)}
             <div class="checkmark">✓</div>
         {/if}
         Applying update
@@ -41,7 +41,7 @@
             <span class="stage-info">Waiting on device</span>
         {/if}
     </div>
-    {#if stage === 'reconnect_required'}
+    {#if stage === 'reconnect_manual'}
     <div class="stage active">
         <span class="stage-info reconnect-info">
             Failed to auto connect. Please reconnect manually:

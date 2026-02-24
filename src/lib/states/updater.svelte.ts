@@ -1,5 +1,8 @@
+import { bluetoothManager } from "~/lib/states/bluetooth.svelte";
 import { firmwareManager } from "~/lib/states/firmware.svelte";
 import { deviceSamplesState, waitForUploadToFinish } from "~/lib/states/samples.svelte";
+import { deviceSupports } from "~/lib/config/deviceProfiles";
+import { DeviceUtilityView } from "~/features/device-utility/states/window.svelte";
 import { Log } from "~/lib/utils/Log";
 
 const RECONNECT_TIMEOUT_MS = 30000; // 30 second timeout for auto-reconnect
@@ -43,7 +46,7 @@ export async function deviceUpdate(firmwareVersion: string) {
         updaterState.stage = 'fetching';
         log.debug(`Starting firmware update to ${firmwareVersion}`);
 
-        const image = await fetch(`/firmware/MONKEY/app_update_${firmwareVersion}.bin`).then(res => res.arrayBuffer());
+        const image = await fetch(`/firmware/${bluetoothManager.getDeviceName()}/app_update_${firmwareVersion}.bin`).then(res => res.arrayBuffer());
         
         updaterState.uploadProgress = null
         updaterState.stage = 'uploading';
@@ -78,10 +81,12 @@ export async function deviceUpdate(firmwareVersion: string) {
             throw new Error(`Update failed: Device firmware version is ${newFirmware?.versionString} but expected ${firmwareVersion}`);
         }
 
-        await isSupportedPromise;
-        if (deviceSamplesState.isSupported === true) {
-            log.debug('Waiting for sample sync to finish...');
-            await waitForUploadToFinish();
+        if (deviceSupports(bluetoothManager.getDeviceName(), DeviceUtilityView.SampleManager)) {
+            await isSupportedPromise;
+            if (deviceSamplesState.isSupported === true) {
+                log.debug('Waiting for sample sync to finish...');
+                await waitForUploadToFinish();
+            }
         }
         
         updaterState.stage = 'done';

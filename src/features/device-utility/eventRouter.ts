@@ -21,6 +21,7 @@ import { initializeBatteryState, resetBatteryState } from './states/bas.svelte';
 import { refreshDisState, resetDisState } from './states/dis.svelte';
 import { pianoDebugNoteOn, pianoDebugNoteOff } from './states/pianoDebug.svelte';
 import { Log } from '~/lib/utils/Log';
+import { deviceSupports } from '~/lib/config/deviceProfiles';
 
 const log = new Log('eventRouter', Log.LEVEL_INFO);
 
@@ -71,10 +72,12 @@ export const callbacksSet = () => {
                 log.error('Failed to refresh firmware version:', e);
             }
 
-            try {
-                await initialiseDeviceSamples();
-            } catch (e) {
-                log.error('Failed to initialize device samples:', e);
+            if (deviceSupports(bluetoothManager.getDeviceName(), DeviceUtilityView.SampleManager)) {
+                try {
+                    await initialiseDeviceSamples();
+                } catch (e) {
+                    log.error('Failed to initialize device samples:', e);
+                }
             }
 
             updaterNotifyIsSupported();
@@ -124,10 +127,12 @@ export const callbacksSet = () => {
                 log.error('Failed to refresh firmware version:', e);
             }
 
-            try {
-                await initialiseDeviceSamples();
-            } catch (e) {
-                log.error('Failed to initialize device samples:', e);
+            if (deviceSupports(bluetoothManager.getDeviceName(), DeviceUtilityView.SampleManager)) {
+                try {
+                    await initialiseDeviceSamples();
+                } catch (e) {
+                    log.error('Failed to initialize device samples:', e);
+                }
             }
 
             updaterNotifyIsSupported();

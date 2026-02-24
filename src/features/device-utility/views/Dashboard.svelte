@@ -17,6 +17,7 @@
     import {  windowStateInit, windowState, DeviceUtilityView, setHash } from '~/features/device-utility/states/window.svelte';
     import { deviceState } from '~/features/device-utility/states/deviceState.svelte';
     import { getOperatingSystem } from '~/lib/utils/operating_system';
+    import { deviceSupports } from '~/lib/config/deviceProfiles';
 
     onMount(async () => {
 
@@ -31,14 +32,22 @@
 
     /* loading logic */
     let isLoading = $state(true);
+    const deviceName = $derived(bluetoothManager.getDeviceName());
     $effect(() => {
         if (!isLoading) return; // already done, ignore future changes
-        
-        const drmState = deviceSamplesState.modes[SampleMode.DRM];
+
         const fwReady = firmwareState?.firmwareVersion != null || firmwareState?.isSupported === false;
+
+        // If device doesn't support SampleManager, skip waiting for samples state
+        if (!deviceSupports(deviceName, DeviceUtilityView.SampleManager)) {
+            if (fwReady) isLoading = false;
+            return;
+        }
+
+        const drmState = deviceSamplesState.modes[SampleMode.DRM];
         const samplesUnsupported = deviceSamplesState.isSupported === false && drmState.isSet === null && drmState.ids === null;
         const samplesReady = deviceSamplesState.isSupported === true && drmState.ids != null && drmState.storageUsed != null && drmState.storageTotal != null;
-        
+
         if (fwReady && (samplesUnsupported || samplesReady)) {
             isLoading = false;
         }
@@ -167,12 +176,15 @@
             {/if}
         </div>
         <div class="nav-tabs">
-            <a 
-                href="#playground" 
+            {#if deviceSupports(deviceName, DeviceUtilityView.Playground)}
+            <a
+                href="#playground"
                 class={currentView === DeviceUtilityView.Playground ? 'active' : ''}
             >
                 Playground
             </a>
+            {/if}
+            {#if deviceSupports(deviceName, DeviceUtilityView.DeviceUpdate)}
             <span class={`tab-with-badge ${firmwareState.upgradeAvailable && currentView !== DeviceUtilityView.DeviceUpdate && firmwareState.isSupported ? 'blink-update' : ''}`}>
               <a
                   href="#device-update"
@@ -187,8 +199,10 @@
                   <span class="alert-dot" title={firmwareState.upgradeAvailable ? 'Upgrade available' : 'Downgrade available'}>!</span>
               {/if}
             </span>
-            <a 
-                href="#pack-editor" 
+            {/if}
+            {#if deviceSupports(deviceName, DeviceUtilityView.SampleManager)}
+            <a
+                href="#pack-editor"
                 class={`${currentView === DeviceUtilityView.SampleManager ? 'active' : ''}`}
                 class:disabled={!deviceSamplesState.isSupported}
                 onclick={e => deviceSamplesState.isSupported == false && e.preventDefault()}
@@ -196,9 +210,10 @@
             >
                 Pack Editor
             </a>
+            {/if}
             {#if dev.enabled}
-                <a 
-                    href="#device-tester" 
+                <a
+                    href="#device-tester"
                     class={currentView === DeviceUtilityView.DeviceTester ? 'active' : ''}
                 >
                     Device Tester
