@@ -11,7 +11,13 @@ const profiles: Record<string, DeviceProfile> = {
             DeviceUtilityView.DeviceUpdate,
             DeviceUtilityView.SampleManager,
         ],
-    }
+    },
+    BRIDGE: {
+        views: [
+            DeviceUtilityView.Playground,
+            DeviceUtilityView.DeviceUpdate,
+        ],
+    },
 };
 
 const fallbackProfile: DeviceProfile = {
