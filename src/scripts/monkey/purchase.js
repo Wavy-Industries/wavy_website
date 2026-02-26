@@ -105,7 +105,7 @@ function setStockStatus(availableForSale, quantityAvailable) {
     showNotify = true;
   }
 
-  shippingStatusEl.textContent = 'Status: ' + label;
+  shippingStatusEl.textContent = label;
   shippingStatusEl.classList.add(className);
   if (shippingLeadtimeEl) {
     shippingLeadtimeEl.textContent = '';

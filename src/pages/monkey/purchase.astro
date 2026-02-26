@@ -24,7 +24,7 @@ import { routes } from '~/routes';
       <p>
         Price: <b id="product-price">Loading price…</b> <span id="VAT">Checking VAT…</span> <small id="price-meta" class="price-meta"></small><br/>
         <small id="region-label" class="region-label"></small><br/>
-        <i class="shipping-info">Depending on your country, import taxes may apply. We collect duties for you in the EU, so you will not have to pay additionally upon delivery.</i>
+        <!-- <i class="shipping-info">We collect VAT for some regions. Depending on your country, import taxes may apply.</i> -->
       </p>
       <!-- <p style="color: orange;" class="shipping-info" >New orders ship early January 2026 ☃️.</p> -->
       <div id="shipping-status"></div>
@@ -50,6 +50,11 @@ import { routes } from '~/routes';
         <span id="tax-amount" class="quantity-total">Calculating…</span>
       </div>
     </div>
+     <hr />
+     <div class="content shipping-note">
+       <svg class="shipping-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+       <span>All orders ship worldwide via <b>FedEx Express International</b>.</span>
+     </div>
     </div>
     <center>
       <div id="buy-now-wrapper">
@@ -217,8 +222,10 @@ input {
 /* add stock status classes with light background colors */
 #shipping-status {
   padding: 5px;
-  margin-top: 10px;
-  font-style: italic;
+  /* margin-top: 10px; */
+  font-size: 12px;
+  border-radius: 2px;
+  /* font-style: italic; */
   display: inline-block;
 }
 
@@ -242,6 +249,23 @@ input {
 .unknown-stock {
   background-color: #eee;
 }
+.shipping-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  color: #555;
+  line-height: 1.5;
+}
+
+.shipping-icon {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  color: #555;
+  margin-top: 1px;
+}
+
 .hidden {
   display: none;
 }
