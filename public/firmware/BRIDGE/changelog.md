@@ -1,3 +1,9 @@
+# 0.1.4
+- many improvements
+
+# 0.1.3
+- bug fixes
+
 # 0.1.2
 - proper peripheral name display
 

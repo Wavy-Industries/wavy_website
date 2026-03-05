@@ -18,7 +18,7 @@ import { windowState, DeviceUtilityView } from './states/window.svelte';
 import { deviceState, setDeviceStateFromSnapshot, resetDeviceState } from './states/deviceState.svelte';
 
 import { initializeBatteryState, resetBatteryState } from './states/bas.svelte';
-import { refreshDisState, resetDisState } from './states/dis.svelte';
+import { refreshDisState, resetDisState, disState, loadingStatus } from './states/dis.svelte';
 import { pianoDebugNoteOn, pianoDebugNoteOff } from './states/pianoDebug.svelte';
 import { Log } from '~/lib/utils/Log';
 import { deviceSupports } from '~/lib/config/deviceProfiles';
@@ -36,11 +36,22 @@ export const callbacksSet = () => {
         updaterNotifyConnected(); // Notify updater of connection (for manual reconnect flow)
 
         initPlaygroundSynthPersistence();
-        void refreshChangelog();
         setLocalSamplesMode(SampleMode.DRM);
 
         // Initialize Bluetooth modules and device data
         (async () => {
+            loadingStatus.message = 'Reading device information…';
+            try {
+                await refreshDisState();
+            } catch (e) {
+                log.error('Failed to read device information:', e);
+                loadingStatus.error = 'Failed to read device information. Please reconnect.';
+                return;
+            }
+
+            void refreshChangelog();
+
+            loadingStatus.message = 'Initializing services…';
             try {
                 const available = await deviceStateService.initialize();
                 deviceState.isAvailable = available;
@@ -60,19 +71,15 @@ export const callbacksSet = () => {
                 log.error('Failed to initialize MIDI service:', e);
             }
 
-            try {
-                await refreshDisState();
-            } catch (e) {
-                log.error('Failed to refresh DIS state:', e);
-            }
-
+            loadingStatus.message = 'Loading firmware info…';
             try {
                 await refreshDeviceFirmwareVersion();
             } catch (e) {
                 log.error('Failed to refresh firmware version:', e);
             }
 
-            if (deviceSupports(bluetoothManager.getDeviceName(), DeviceUtilityView.SampleManager)) {
+            if (deviceSupports(disState.modelNumber, DeviceUtilityView.SampleManager)) {
+                loadingStatus.message = 'Loading samples…';
                 try {
                     await initialiseDeviceSamples();
                 } catch (e) {
@@ -81,6 +88,7 @@ export const callbacksSet = () => {
             }
 
             updaterNotifyIsSupported();
+            loadingStatus.message = '';
         })().catch((e) => {
             log.error('Error during connection initialization:', e);
         });
@@ -92,10 +100,21 @@ export const callbacksSet = () => {
         updaterNotifyConnectionReestablished();
 
         initPlaygroundSynthPersistence();
-        void refreshChangelog();
 
         // Initialize Bluetooth modules and device data
         (async () => {
+            loadingStatus.message = 'Reading device information…';
+            try {
+                await refreshDisState();
+            } catch (e) {
+                log.error('Failed to read device information:', e);
+                loadingStatus.error = 'Failed to read device information. Please reconnect.';
+                return;
+            }
+
+            void refreshChangelog();
+
+            loadingStatus.message = 'Initializing services…';
             try {
                 const available = await deviceStateService.initialize();
                 deviceState.isAvailable = available;
@@ -115,19 +134,15 @@ export const callbacksSet = () => {
                 log.error('Failed to initialize MIDI service:', e);
             }
 
-            try {
-                await refreshDisState();
-            } catch (e) {
-                log.error('Failed to refresh DIS state:', e);
-            }
-
+            loadingStatus.message = 'Loading firmware info…';
             try {
                 await refreshDeviceFirmwareVersion();
             } catch (e) {
                 log.error('Failed to refresh firmware version:', e);
             }
 
-            if (deviceSupports(bluetoothManager.getDeviceName(), DeviceUtilityView.SampleManager)) {
+            if (deviceSupports(disState.modelNumber, DeviceUtilityView.SampleManager)) {
+                loadingStatus.message = 'Loading samples…';
                 try {
                     await initialiseDeviceSamples();
                 } catch (e) {
@@ -136,6 +151,7 @@ export const callbacksSet = () => {
             }
 
             updaterNotifyIsSupported();
+            loadingStatus.message = '';
         })().catch((e) => {
             log.error('Error during connection reestablishment:', e);
         });

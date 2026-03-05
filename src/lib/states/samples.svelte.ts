@@ -1,6 +1,7 @@
 /* Shared device samples state/API for use across features */
 import { DeviceSamples, SamplePack } from '~/lib/parsers/device_storage_parser';
-import { smpService, bluetoothManager } from '~/lib/states/bluetooth.svelte';
+import { smpService } from '~/lib/states/bluetooth.svelte';
+import { disState } from '~/features/device-utility/states/dis.svelte';
 import { SampleManager } from '~/lib/bluetooth/smp/SampleManager';
 import { canonicalize } from '~/lib/utils/canonicalize';
 import { Log } from '~/lib/utils/Log';
@@ -222,7 +223,7 @@ export const uplaodDeviceSamples = async (newSamples: DeviceSamples, mode: Sampl
 
 export const fetchDefaultPackIds = async (mode: SampleMode): Promise<string[]> => {
   try {
-    const res = await fetch(`/assets/${bluetoothManager.getDeviceName()}/${sampleModeLabel(mode)}/default.json`);
+    const res = await fetch(`/assets/${disState.modelNumber}/${sampleModeLabel(mode)}/default.json`);
     if (!res.ok) {
       log.error(`Failed to fetch default pack IDs for ${sampleModeLabel(mode)}`);
       return [];
