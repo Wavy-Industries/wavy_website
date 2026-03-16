@@ -36,6 +36,12 @@
     $effect(() => {
         if (!isLoading) return; // already done, ignore future changes
 
+        // Entered without a device — skip loading, go straight to dashboard
+        if (bluetoothState.connectionState === 'connectionLoss' && !bluetoothManager.connectedDevice) {
+            isLoading = false;
+            return;
+        }
+
         // Wait for DIS model number before proceeding
         if (deviceName == null) return;
 
@@ -303,7 +309,7 @@
     }
     .nav-inner {
         display: flex;
-        flex-direction: row;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         width: 100%;
@@ -316,9 +322,9 @@
     .nav-status,
     .nav-tabs {
         display: flex;
-        flex-direction: row;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 20px;
+        gap: 10px 20px;
     }
 
     .device-name {
@@ -531,11 +537,6 @@
     }
 
     @media (max-width: 860px) {
-        nav { padding: 12px 14px; }
-        .nav-inner { flex-direction: column; align-items: stretch; gap: 10px; }
-        .nav-status,
-        .nav-tabs { flex-wrap: wrap; justify-content: flex-start; gap: 10px; }
-        nav a { font-size: 11px; padding: 6px 8px; }
         .info-tooltip { left: 0; right: auto; }
     }
 </style>

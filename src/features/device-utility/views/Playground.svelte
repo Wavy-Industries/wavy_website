@@ -752,9 +752,8 @@
   .pane { display: flex; flex-direction: column; gap: 8px; }
   .pane-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .list { display: flex; flex-direction: column; gap: 6px; }
-  .row { display: grid; grid-template-columns: 360px 1fr; align-items: start; gap: 8px; padding: 10px; border: 1px solid #2f313a; border-radius: var(--du-radius); background: #fcfcfd; box-shadow: none; }
+  .row { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 8px; padding: 10px; border: 1px solid #2f313a; border-radius: var(--du-radius); background: #fcfcfd; box-shadow: none; }
   .row.device-selected { border-color: #f59e0b; background: #fff8e1; }
-  @media (max-width: 860px) { .row { grid-template-columns: 1fr; } }
   .track-cell { display: flex; flex-direction: column; gap: 8px; }
   .track-controls { display: flex; align-items: center; gap: 8px; }
   .drum-kit-row { display: flex; align-items: center; gap: 8px; }
@@ -763,7 +762,7 @@
   .drum-kit-status { font-size: 11px; color: #6b7280; }
   .drum-kit-status.error { color: #b91c1c; }
   .label { font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--du-text); text-align:left; }
-  .btn-chan { background:#fff; padding:6px 8px; cursor:pointer; border:1px solid black; display:flex; align-items:center; gap:6px; width: 100%; justify-content: flex-start; flex: 1; }
+  .btn-chan { background:#fff; padding:6px 8px; cursor:pointer; border:1px solid black; display:flex; align-items:center; gap:6px; width: 200px; justify-content: flex-start; flex: none; }
   .btn-chan.device-selected { box-shadow: inset 0 0 0 2px #f59e0b; border-color: #b45309; }
   .btn-chan:hover { background:#f9fafb; }
   .btn-chan.disabled { opacity: 0.6; cursor: default; }
@@ -809,19 +808,4 @@
   
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index: 1000; padding: 20px; }
 .modal-panel { max-width: 98vw; max-height: 92vh; overflow: auto; padding: 4px; background:#fff; border-radius:10px; }
-
-  @media (max-width: 900px) {
-    .content { padding: 12px; max-width: 100%; }
-    .toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
-    .toolbar .right { flex-wrap: wrap; justify-content: flex-start; }
-    .status { gap: 8px; }
-    .detail-block.detail-wide { min-width: 0; }
-    .state-details { gap: 8px 10px; }
-    .row { grid-template-columns: 1fr; }
-    .fx-control { grid-template-columns: 1fr 120px 40px; }
-  }
-
-  @media (max-width: 600px) {
-    .mini-table th, .mini-table td { font-size: 9px; min-width: 16px; }
-  }
 </style>

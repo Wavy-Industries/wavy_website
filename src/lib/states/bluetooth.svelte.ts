@@ -32,6 +32,9 @@ export const bluetoothStateSetDisconnected = () => {
 
 export const bluetoothStateSetConnectionLoss = () => {
   bluetoothState.connectionState = 'connectionLoss';
+  if (!bluetoothManager.connectedDevice) {
+    bluetoothState.deviceName = 'No device';
+  }
 }
 
 export const bluetoothStateSetConnectionReestablished = () => {
