@@ -5,8 +5,22 @@ var API_BASE = import.meta.env.MODE === 'development'
 var TRACKING_URL = API_BASE + '/api/tracking/event';
 
 export const TRACKING_EVENT_TYPES = {
+  // Funnel
   page_view: 'page_view',
+  // Commerce — cart lifecycle
+  cart_add: 'cart_add',
+  cart_update: 'cart_update',
+  cart_remove: 'cart_remove',
+  cart_clear: 'cart_clear',
+  // Commerce — checkout
+  checkout_start: 'checkout_start',
+  checkout_success: 'checkout_success',
+  checkout_cancel: 'checkout_cancel',
+  // Engagement
   download: 'download',
+  newsletter_subscribe: 'newsletter_subscribe',
+  notify_subscribe: 'notify_subscribe',
+  feedback_submit: 'feedback_submit',
 }
 
 export function getVisitorId() {

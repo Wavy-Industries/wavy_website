@@ -131,6 +131,8 @@ const {
 </style>
 
 <script>
+    import { track, TRACKING_EVENT_TYPES } from '~/lib/api/tracking.js';
+
     const API_BASE = import.meta.env.MODE === 'development'
         ? 'http://localhost:8000'
         : 'https://server.wavyindustries.com';
@@ -167,6 +169,12 @@ const {
                     body: JSON.stringify(body),
                 });
                 if (!res.ok) throw new Error('signup failed');
+                try {
+                    track(TRACKING_EVENT_TYPES.newsletter_subscribe, {
+                        source: 'inline',
+                        ...(tag ? { tag } : {}),
+                    });
+                } catch {}
                 form.hidden = true;
                 status.textContent = SUCCESS_FIRST;
                 status.dataset.state = 'success';

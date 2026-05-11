@@ -89,7 +89,7 @@ import midiConnectWinImg from '~/assets/midi_connect/screenshot-win.png';
 	}
 
 	macTrigger?.addEventListener('click', () => {
-		track(TRACKING_EVENT_TYPES.download, { product_id: 'midi-connect', platform: 'macos' });
+		track(TRACKING_EVENT_TYPES.download, { kind: 'app', name: 'midi-connect', platform: 'macos' });
 	});
 
 	trigger?.addEventListener('click', (e) => {
@@ -103,7 +103,7 @@ import midiConnectWinImg from '~/assets/midi_connect/screenshot-win.png';
 	continueBtn?.addEventListener('click', () => {
 		acknowledged = true;
 		closeModal();
-		track(TRACKING_EVENT_TYPES.download, { product_id: 'midi-connect', platform: 'windows' });
+		track(TRACKING_EVENT_TYPES.download, { kind: 'app', name: 'midi-connect', platform: 'windows' });
 		trigger?.click();
 	});
 

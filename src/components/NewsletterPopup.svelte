@@ -1,5 +1,6 @@
 <script>
     import { newsletterUI, closeNewsletter } from '~/lib/state/newsletter.svelte';
+    import { track, TRACKING_EVENT_TYPES } from '~/lib/api/tracking.js';
 
     const API_BASE = import.meta.env.MODE === 'development'
         ? 'http://localhost:8000'
@@ -24,6 +25,7 @@
                 body: JSON.stringify({ email: trimmed }),
             });
             if (!res.ok) throw new Error('signup failed');
+            try { track(TRACKING_EVENT_TYPES.newsletter_subscribe, { source: 'header' }); } catch {}
             status = 'success';
             successFinal = false;
             setTimeout(() => {

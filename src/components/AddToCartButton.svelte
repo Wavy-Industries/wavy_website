@@ -1,12 +1,10 @@
 <script>
     import { cartAdd } from '~/lib/state/cart.svelte';
-    import { track } from '~/lib/api/tracking.js';
 
     let { sku, name, cta = 'hero', priceClass = 'monkey-price' } = $props();
 
     function handleClick() {
-        cartAdd(sku, name, 1);
-        track('click', { button: 'add_to_cart', sku, cta });
+        cartAdd(sku, name, 1, cta);
     }
 </script>
 

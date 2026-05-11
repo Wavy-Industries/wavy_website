@@ -1,7 +1,7 @@
 import { getCountryCode } from '~/lib/api/geo.js';
 import { fetchProduct, createCheckout, DOMAIN, TOKEN } from '~/lib/api/shopify.js';
 import { formatShopifyPrice, formatTaxAmount, resolveTaxSettings, resolveDisplayGrossAndTax } from '~/lib/utils/shopify-util.js';
-import { track, getVisitorId, getRef } from '~/lib/api/tracking.js';
+import { track, TRACKING_EVENT_TYPES, getVisitorId, getRef } from '~/lib/api/tracking.js';
 import { cart, cartInit, cartUpdate, cartRemove } from '~/lib/state/cart.svelte';
 import { PRODUCTS, getProduct, isPreorder } from '~/lib/config/products';
 
@@ -360,11 +360,21 @@ function handleBuy() {
     }
     var qty = clampQty(item.qty);
     lineItems.push({ variantId: info.variantId, quantity: qty });
-    trackItems.push({ sku: item.sku, qty: qty, price: info.unitGross, currency: currencyCode });
+    var product = getProduct(item.sku);
+    trackItems.push({
+      code: product ? product.productCode : item.sku,
+      qty: qty,
+      unit_price: info.unitGross,
+      currency: currencyCode,
+    });
     totalAmount += info.unitGross * qty;
   }
 
-  track('checkout_start', { items: trackItems, total: totalAmount });
+  track(TRACKING_EVENT_TYPES.checkout_start, {
+    items: trackItems,
+    subtotal: totalAmount,
+    currency: currencyCode,
+  });
 
   setButtonState(true);
   if (loadingEl) loadingEl.classList.remove('hidden');

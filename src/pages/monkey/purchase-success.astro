@@ -397,6 +397,8 @@ import monkeyImg from "~/assets/monkey/packaging/Monkey with packaging.jpg";
 </style>
 
 <script>
+  import { track, TRACKING_EVENT_TYPES } from "~/lib/api/tracking.js";
+
   const apiUrl =
     import.meta.env.MODE === "development"
       ? "http://localhost:8000"
@@ -406,6 +408,10 @@ import monkeyImg from "~/assets/monkey/packaging/Monkey with packaging.jpg";
   const sessionId = urlParams.get("session_id");
 
   let orderId = null;
+
+  try {
+    track(TRACKING_EVENT_TYPES.checkout_success);
+  } catch {}
 
   function showThankYou() {
     const formDiv = document.querySelector(".content form")?.parentElement;
@@ -528,6 +534,7 @@ import monkeyImg from "~/assets/monkey/packaging/Monkey with packaging.jpg";
     })
       .then((res) => {
         if (res.ok) {
+          try { track(TRACKING_EVENT_TYPES.feedback_submit, { form: "post-purchase-monkey" }); } catch {}
           showThankYou();
         } else {
           console.error("Failed to submit form");

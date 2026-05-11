@@ -66,6 +66,13 @@ import NewsletterPopup from '../components/NewsletterPopup.svelte';
 <header class={textColor == 'white' ? 'text-white' : 'text-black'} {...(hide ? { hide: true } : {})}>
     <div class="logo">
         <a href={routes.home}><img src={textColor == 'white' ? logoWhiteImg.src : logoImg.src} /></a>
+        <svg class="flag" width="16" height="12" viewBox="0 0 22 16" xmlns="http://www.w3.org/2000/svg" aria-label="Made in Norway" role="img">
+            <rect width="22" height="16" fill="#BA0C2F"/>
+            <rect x="6" width="4" height="16" fill="#fff"/>
+            <rect y="6" width="22" height="4" fill="#fff"/>
+            <rect x="7" width="2" height="16" fill="#00205B"/>
+            <rect y="7" width="22" height="2" fill="#00205B"/>
+        </svg>
     </div>
 
     <nav class="island">
@@ -173,6 +180,12 @@ import NewsletterPopup from '../components/NewsletterPopup.svelte';
         display: block;
     }
 
+    .logo .flag {
+        display: block;
+        margin-top: 4px;
+        opacity: 0.85;
+    }
+
     .side {
         grid-column: 3;
         display: flex;
@@ -190,8 +203,8 @@ import NewsletterPopup from '../components/NewsletterPopup.svelte';
         list-style: none;
         padding: 0;
         margin: 0;
-        font-size: 15px;
-        font-weight: 400;
+        font-size: 14px;
+        font-weight: 300;
         line-height: 1.4;
         display: flex;
         flex-direction: column;
@@ -228,7 +241,7 @@ import NewsletterPopup from '../components/NewsletterPopup.svelte';
         display: flex;
         gap: 28px;
         align-items: baseline;
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 400;
     }
 

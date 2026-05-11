@@ -2,6 +2,13 @@
 import { routes } from '~/routes';
 ---
 
-<script define:vars={{routes}}>
-	window.location.href = routes.monkeyPurchase;
+<script define:vars={{ cartUrl: routes.cart }}>
+	import('~/lib/api/tracking.js')
+		.then(({ track, TRACKING_EVENT_TYPES }) => {
+			try { track(TRACKING_EVENT_TYPES.checkout_cancel); } catch {}
+		})
+		.catch(() => {})
+		.finally(() => {
+			window.location.href = cartUrl;
+		});
 </script>

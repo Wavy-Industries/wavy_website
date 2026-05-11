@@ -1,9 +1,14 @@
-import { track } from '~/lib/api/tracking.js';
+import { track, TRACKING_EVENT_TYPES } from '~/lib/api/tracking.js';
+import { getProduct } from '~/lib/config/products';
 
 export interface CartItem {
     sku: string;
     name: string;
     qty: number;
+}
+
+function productCodeFor(sku: string): string {
+    return getProduct(sku)?.productCode ?? sku;
 }
 
 const STORAGE_KEY = 'wavy_cart_v1';
@@ -47,7 +52,7 @@ function clampQty(q: number): number {
 
 function emit(event: string, payload?: Record<string, unknown>) {
     try {
-        track(event, { ...payload, count: cartCount() });
+        track(event, { ...payload, cart_size: cartCount() });
     } catch {}
 }
 
@@ -57,7 +62,7 @@ export function cartInit() {
     cart.items = load();
 }
 
-export function cartAdd(sku: string, name: string, qty = 1) {
+export function cartAdd(sku: string, name: string, qty = 1, cta?: string) {
     const existing = cart.items.find((i) => i.sku === sku);
     if (existing) {
         existing.qty = clampQty(existing.qty + qty);
@@ -65,7 +70,11 @@ export function cartAdd(sku: string, name: string, qty = 1) {
         cart.items.push({ sku, name, qty: clampQty(qty) });
     }
     persist();
-    emit('cart_add', { sku, qty });
+    emit(TRACKING_EVENT_TYPES.cart_add, {
+        code: productCodeFor(sku),
+        qty,
+        ...(cta ? { cta } : {}),
+    });
     cart.popupReason = 'add';
     cart.popupOpen = true;
 }
@@ -77,9 +86,14 @@ export function cartUpdate(sku: string, qty: number) {
         cartRemove(sku);
         return;
     }
+    const previousQty = item.qty;
     item.qty = clampQty(qty);
     persist();
-    emit('cart_update', { sku, qty: item.qty });
+    emit(TRACKING_EVENT_TYPES.cart_update, {
+        code: productCodeFor(sku),
+        qty: item.qty,
+        qty_delta: item.qty - previousQty,
+    });
 }
 
 export function cartRemove(sku: string) {
@@ -87,14 +101,17 @@ export function cartRemove(sku: string) {
     if (idx < 0) return;
     const removed = cart.items.splice(idx, 1)[0];
     persist();
-    emit('cart_remove', { sku: removed.sku });
+    emit(TRACKING_EVENT_TYPES.cart_remove, {
+        code: productCodeFor(sku),
+        qty_removed: removed.qty,
+    });
 }
 
 export function cartClear() {
     if (cart.items.length === 0) return;
     cart.items = [];
     persist();
-    emit('cart_clear');
+    emit(TRACKING_EVENT_TYPES.cart_clear);
 }
 
 export function cartCount(): number {

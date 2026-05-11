@@ -146,3 +146,14 @@ input[type="text"], input[type="email"], input[type="password"] {
     setTimeout(loadMailchimpScript, 100);
   });
 </script>
+
+<script>
+  import { track, TRACKING_EVENT_TYPES } from "~/lib/api/tracking.js";
+
+  const form = document.getElementById("mc-embedded-subscribe-form");
+  form?.addEventListener("submit", () => {
+    try {
+      track(TRACKING_EVENT_TYPES.notify_subscribe, { code: "WIMKY001" });
+    } catch {}
+  });
+</script>
