@@ -3,7 +3,6 @@ import '~/styles/global.css';
 import Layout from '~/layouts/Layout.astro';
 import Header from '~/layouts/Header.astro';
 import Footer from '~/layouts/Footer.astro';
-import MonkeyTabBar from '~/components/MonkeyTabBar.astro';
 import { parseChangelog } from '~/lib/parsers/changelog_parser';
 import fs from 'node:fs';
 
@@ -15,7 +14,6 @@ const versions = changelog.versions.filter(v => !v.isObsolete && !v.isDev);
 <Layout title="MONKEY Changelog - Wavy Industries">
     <main>
         <Header />
-        <MonkeyTabBar active="changelog" />
         <section class="changelog-page">
             <article>
                 <h1>Changelog</h1>

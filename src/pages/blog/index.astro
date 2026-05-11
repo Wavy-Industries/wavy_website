@@ -6,7 +6,6 @@ import Footer from "../../layouts/Footer.astro";
 import { getCollection } from 'astro:content';
 
 function parseDateFromId(id) {
-  // Supports YYYY.MM.DD_name, YYYY-MM-DD_name, or YYYYMMDD_name
   const m = /^(\d{4})([.\-]?)(\d{2})\2(\d{2})/.exec(id);
   if (!m) return null;
   const [, y, , mth, d] = m;
@@ -15,86 +14,256 @@ function parseDateFromId(id) {
 }
 
 const postsRaw = await getCollection('blog');
-const posts = postsRaw
-  .map(p => {
-    const fallbackDate = parseDateFromId(p.id) || new Date(0);
-    const date = p.data.date ?? fallbackDate;
-    return {
-      id: p.id,
-      slug: String(p.slug),
-      title: p.data.title,
-      description: p.data.description,
-      author: p.data.author,
-      date,
-    };
-  })
-  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+const posts = await Promise.all(
+  postsRaw
+    .map(p => {
+      const fallbackDate = parseDateFromId(p.id) || new Date(0);
+      const date = p.data.date ?? fallbackDate;
+      return { post: p, date };
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .map(async ({ post, date }) => {
+      const { Content } = await post.render();
+      return {
+        slug: String(post.slug),
+        title: post.data.title,
+        author: post.data.author,
+        date,
+        Content,
+      };
+    })
+);
 ---
 
 <Layout title="Blog" description="Updates and articles from Wavy Industries.">
   <main>
     <Header />
-    <section class="blog-list">
-      <div class="container">
-        <h1>Blog</h1>
-        <ul class="posts">
-          {posts.map((post) => (
-            <li class="post">
-              <a href={`/blog/${post.slug}`} class="title">{post.title}</a>
+    <div class="blog-shell">
+      <section class="blog-page">
+        <aside class="toc">
+          <ul>
+            {posts.map(p => (
+              <li>
+                <a href={`#${p.slug}`} data-slug={p.slug}>
+                  <span class="toc-title">{p.title}</span>
+                  <span class="toc-date-wrap">
+                    <span class="toc-date">{new Date(p.date).toLocaleDateString()}</span>
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </aside>
+        <div class="blog-main markdown-content">
+          <h1>Blog</h1>
+          {posts.map(p => (
+            <article id={p.slug} class="post">
+              <h2>{p.title}</h2>
               <div class="meta">
-                <span>{new Date(post.date).toLocaleDateString()}</span>
+                <time datetime={p.date.toISOString()}>{new Date(p.date).toLocaleDateString()}</time>
                 <span>•</span>
-                <span>{post.author}</span>
+                <span>{p.author}</span>
               </div>
-              <p class="desc">{post.description}</p>
-            </li>
+              <p.Content />
+            </article>
           ))}
-        </ul>
-      </div>
-    </section>
+        </div>
+      </section>
+    </div>
     <Footer />
   </main>
 </Layout>
 
-<style>
-  main {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-  .blog-list { flex: 1; }
-  .blog-list {
+<style is:global>
+  .blog-shell {
+    container-type: inline-size;
+    flex: 1;
     width: 100%;
-    padding: 0 20px;
   }
-  .container {
+
+  .blog-page {
+    width: 100%;
+    padding: 0 clamp(20px, 3vw, 24px);
+    display: grid;
+    grid-template-columns: 220px minmax(0, 800px);
+    gap: 48px;
+    max-width: 1140px;
     margin: 0 auto;
-    max-width: 900px;
-    width: 100%;
-    min-height: 60vh;
+    box-sizing: border-box;
   }
-  h1 { margin-top: 0; }
-  .posts {
+
+  .blog-page .toc {
+    position: sticky;
+    top: 32px;
+    align-self: start;
+    padding-top: 8px;
+  }
+
+  .blog-page .toc ul {
     list-style: none;
     padding: 0;
-    margin: 20px 0 60px;
+    margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 8px;
   }
-  .post { margin: 0; }
-  .title {
+
+  .blog-page .toc a {
+    display: block;
+    font-size: 13px;
+    line-height: 1.4;
     font-style: normal;
-    font-weight: 600;
+    text-decoration: none;
+    color: inherit;
+    opacity: 0.5;
+  }
+
+  .blog-page .toc a:hover {
+    opacity: 0.8;
+    text-decoration: none;
+  }
+
+  .blog-page .toc a.active {
+    opacity: 1;
+  }
+
+  .blog-page .toc a.active .toc-title {
     text-decoration: underline;
   }
-  .meta {
+
+  .blog-page .toc-date-wrap {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 180ms ease, opacity 180ms ease, margin-top 180ms ease;
+    margin-top: 0;
+  }
+
+  .blog-page .toc-date-wrap > .toc-date {
+    overflow: hidden;
+    font-size: 11px;
+    opacity: 0.7;
+  }
+
+  .blog-page .toc a.active .toc-date-wrap {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    margin-top: 2px;
+  }
+
+  .blog-page .blog-main {
+    min-width: 0;
+    padding-bottom: 80px;
+  }
+
+  .blog-page h1 {
+    margin: 0 0 clamp(24px, 4vw, 32px);
+    font-weight: 300;
+    font-size: clamp(48px, 8vw, 64px);
+  }
+
+  .blog-page .post {
+    padding: 32px 0;
+    border-top: 1px solid #eee;
+  }
+
+  .blog-page .post:first-of-type {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  .blog-page .post h2 {
+    margin: 0 0 4px;
+    font-weight: 600;
+    font-size: clamp(26px, 4vw, 32px);
+    line-height: 1.2;
+    scroll-margin-top: 24px;
+  }
+
+  .blog-page .post .meta {
     color: #666;
     font-size: 14px;
+    margin-bottom: 20px;
     display: flex;
     gap: 8px;
     align-items: center;
-    margin: 6px 0;
   }
-  .desc { margin: 6px 0 0; }
+
+  .blog-page .post img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 16px auto;
+  }
+
+  .blog-page .post .blog-embed {
+    display: block;
+    margin: 16px auto;
+    max-width: 100%;
+  }
+
+  .blog-page .post .blog-embed img {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .blog-page .post .blog-embed iframe {
+    display: block;
+    margin: 0 auto;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 0;
+  }
+
+  .blog-page .post a {
+    text-decoration: underline;
+  }
+
+  .blog-page .post blockquote {
+    background-color: #f5f5f5;
+    font-style: italic;
+    margin-left: 0;
+    padding: 12px 16px;
+  }
+
+  @container (max-width: 760px) {
+    .blog-page {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+
+    .blog-page .toc {
+      display: none;
+    }
+  }
 </style>
+
+<script>
+  const links = document.querySelectorAll<HTMLAnchorElement>('.toc a[data-slug]');
+  const map = new Map<string, HTMLAnchorElement>();
+  links.forEach(a => map.set(a.dataset.slug!, a));
+
+  function setActive(slug: string) {
+    links.forEach(a => a.classList.toggle('active', a.dataset.slug === slug));
+  }
+
+  const posts = Array.from(document.querySelectorAll<HTMLElement>('.post[id]'));
+  if (posts.length) {
+    setActive(posts[0].id);
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => (a.target as HTMLElement).offsetTop - (b.target as HTMLElement).offsetTop);
+        if (visible.length) {
+          setActive(visible[0].target.id);
+        }
+      },
+      { rootMargin: '-20% 0px -60% 0px', threshold: 0 }
+    );
+    posts.forEach(p => observer.observe(p));
+  }
+</script>

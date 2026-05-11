@@ -1,6 +1,6 @@
 import { defineConfig } from 'astro/config';
-import obsidianEmbeds from './scripts/remark/obsidianEmbeds.js';
-import firstParagraphIntro from './scripts/remark/firstParagraphIntro.js';
+import obsidianEmbeds from './tools/remark/obsidianEmbeds.js';
+import firstParagraphIntro from './tools/remark/firstParagraphIntro.js';
 
 import mdx from '@astrojs/mdx';
 

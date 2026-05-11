@@ -1,0 +1,184 @@
+---
+import '~/styles/global.css';
+import Layout from '~/layouts/Layout.astro';
+import Header from '~/layouts/Header.astro';
+import Footer from '~/layouts/Footer.astro';
+import NewsletterSignup from '~/components/NewsletterSignup.astro';
+import AddToCartButton from '~/components/AddToCartButton.svelte';
+
+import bridgeRender from '~/assets/bridge/bridge_render_2.png';
+---
+
+<Layout title="Wavy Industries - BRIDGE" description='WAVY BRIDGE. Simple and flexible routing of wireless and wired MIDI devices'>
+	<meta slot="meta" property="og:title" content="WAVY BRIDGE">
+	<meta slot="meta" property="og:description" content="A new device coming from Wavy Industries. Sign up for news.">
+	<main>
+		<Header textColor='white' />
+
+		<section class="hero">
+			<div class="hero-inner">
+				<h1><b>BRIDGE</b></h1>
+				<p class="tagline">Simple and flexible routing of wireless and wired MIDI devices</p>
+				<!-- <div class="hero-actions">
+					<AddToCartButton client:load sku="bridge" name="BRIDGE" cta="hero" priceClass="bridge-price" />
+					<span class="preorder-tag">Pre-order</span>
+				</div> -->
+				<p class="preorder-note">Estimated shipping Q3 2026. <!--Cancel any time before shipment for a full refund.--></p>
+			</div>
+		</section>
+
+		<div class="hero-image">
+			<img src={bridgeRender.src} alt="BRIDGE render" />
+		</div>
+
+		<div class="coming-soon-banner" aria-label="coming soon">
+			<div class="coming-soon-track">
+				<span>coming soon&nbsp;·&nbsp;coming soon&nbsp;·&nbsp;coming soon&nbsp;·&nbsp;coming soon&nbsp;·&nbsp;coming soon&nbsp;·&nbsp;coming soon&nbsp;·&nbsp;</span>
+				<span aria-hidden="true">coming soon&nbsp;·&nbsp;coming soon&nbsp;·&nbsp;coming soon&nbsp;·&nbsp;coming soon&nbsp;·&nbsp;coming soon&nbsp;·&nbsp;coming soon&nbsp;·&nbsp;</span>
+			</div>
+		</div>
+
+		<section>
+			<div class="container">
+				<p>
+					MIDI connections made easy.
+				</p>
+			</div>
+		</section>
+
+		<section class="signup">
+			<p>Sign up to be notified when <b>BRIDGE</b> is available.</p>
+			<NewsletterSignup tag="bridge" label="Join newsletter" />
+		</section>
+
+		<!-- <div>
+			<img width="300px" src={cableMessImg.src} alt="cable mess" />
+		</div> -->
+
+		<Footer variant="dark" />
+	</main>
+</Layout>
+
+<script>
+	import '~/scripts/load-prices.js';
+</script>
+
+<style>
+.container {
+	display: flex;
+	justify-content: center;
+}
+main {
+	background-color: black;
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	color: #f0f0f0;
+}
+
+.hero {
+	width: 100%;
+	padding: clamp(32px, 5vw, 40px) clamp(20px, 3vw, 24px) clamp(24px, 4vw, 32px);
+	color: #f0f0f0;
+}
+
+.hero-inner {
+	max-width: 1200px;
+	margin: 0 auto;
+}
+
+h1 {
+	margin: 0;
+	font-weight: 300;
+	font-size: clamp(48px, 8vw, 64px);
+	line-height: 1.1;
+}
+
+.hero-image {
+	width: 100%;
+	padding: 0;
+	margin: 0;
+}
+
+.hero-image img {
+	display: block;
+	width: 100%;
+	height: auto;
+	margin: 0;
+	/* filter: blur(14px); */
+}
+
+.coming-soon-banner {
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	background-color: rgb(137, 112, 88);
+	color: white;
+	font-size: 14px;
+	font-style: italic;
+	font-weight: 400;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.coming-soon-track {
+	display: inline-flex;
+	width: max-content;
+	animation: coming-soon-scroll 30s linear infinite;
+	padding: 6px 0;
+}
+
+.coming-soon-track span {
+	display: inline-block;
+}
+
+@keyframes coming-soon-scroll {
+	0% { transform: translateX(0); }
+	100% { transform: translateX(-50%); }
+}
+
+.signup {
+	width: 100%;
+	padding: clamp(32px, 5vw, 40px) clamp(20px, 3vw, 24px) clamp(60px, 9vw, 80px);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 16px;
+	color: #d0d0d0;
+	text-align: center;
+}
+
+.signup p {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 300;
+}
+
+.hero-actions {
+	margin-top: 16px;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.preorder-tag {
+	display: inline-block;
+	padding: 4px 10px;
+	background-color: #ffcc00;
+	color: #1a1a1a;
+	font-size: 12px;
+	font-weight: 600;
+	font-style: normal;
+	border-radius: 3px;
+	letter-spacing: 0.3px;
+}
+
+.preorder-note {
+	margin: 8px 0 0;
+	font-size: 12px;
+	font-weight: 300;
+	color: rgba(255, 255, 255, 0.6);
+	font-style: italic;
+}
+</style>

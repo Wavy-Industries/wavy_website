@@ -46,18 +46,6 @@ a:link, a:visited {
     color: inherit; /* Makes the link color inherit from the parent element */
 }
 
-a[disabled] {
-    pointer-events: none; /* Disable clicks */
-    cursor: not-allowed; /* Show a "not-allowed" cursor */
-    color: gray; /* Style as disabled */
-    text-decoration: none;
-}
-
-h1 {
-    font-weight: 300;
-    font-size: 64px;
-}
-
 h3 {
     font-weight: 200;
     font-size: 18px;

@@ -16,6 +16,12 @@ import macConnect2Img from '~/assets/resources/mac-connect/2-open_midi_studio.pn
 import macConnect3Img from '~/assets/resources/mac-connect/3-open_bluetooth.png';
 import macConnect3AltImg from '~/assets/resources/mac-connect/3-alt_open_bluetooth.png';
 import macConnect4Img from '~/assets/resources/mac-connect/4-connect.png';
+import windowsConnect0Img from '~/assets/resources/windows/0-advanced_discovery.jpeg';
+import windowsConnect1Img from '~/assets/resources/windows/1-connect_pre.png';
+import windowsConnect2Img from '~/assets/resources/windows/2-pairing.png';
+import windowsConnect3Img from '~/assets/resources/windows/2.1-pairing.png';
+import windowsConnect4Img from '~/assets/resources/windows/4-port_create.png';
+import windowsConnect5Img from '~/assets/resources/windows/5-select.png';
 import abletonSettingsImg from '~/assets/resources/ableton/ableton_settings.png';
 import abletonChannelImg from '~/assets/resources/ableton/ableton_channel.png';
 import abletonArmImg from '~/assets/resources/ableton/ableton_arm.png';
@@ -27,43 +33,63 @@ import flStudioCh10SelectImg from '~/assets/resources/fl-studio/4-ch10_select.pn
 
 # Getting started with MON**KEY**
 
+So you got your own MON**KEY** and are ready to start using it and all of its features. This guide will walk you through the basics of connecting it up and playing your first notes through the MON**KEY**.
+
+We recommend you to check out the video below by *Filip Lund*, which walks through many of its features and different types of setups.
+
+<iframe class="blog-embed" width="560" height="315" src="https://www.youtube.com/embed/N272QQRSg3M?si=Bqdd-qO3HrHukMEZ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+MON**KEY** is not limited to a single use case. It can be your traveling companion, your keyboard of choice in a space constrained home studio, a creative brainstorming machine, etc. It's up to you to choose how it best suits your needs.
+
+It is designed to be learned in steps. Connect it up and you are immediately able to use it as a MIDI keyboard. You don't have to use any of its more advanced features. The next step is to start playing around with the MIDI effects and changing the octave through the SHIFT key. And finally there is the loop recorder and layering of up to 10 instruments on top of each other. 
+
 <img alt="monkey overview" src={monkeyOverviewImg.src} />
 
-MON**KEY** is always powered on while a battery is in it. It will automatically go to sleep when you are not using it, and tapping any of the keys will instantly wake it up. MON**KEY** is expected to last many months on a single battery with moderate usage.
+MON**KEY** is always powered on. It will automatically go to sleep when you are not using it, and pressing on any of the keys will instantly wake it up. That's one less thing to worry about. MON**KEY** is expected to last many months on a single battery with moderate usage.
 
 You can force the device into sleep by turning on the lock switch, though this is not generally necessary during normal operation. The switch is intentionally inconvenient to discourage overuse. It is useful when traveling, where accidental key presses in a bag or pocket could repeatedly wake the device.
 
-*To get started, make sure a battery is inserted and the lock switch is in the down position.*
+**To get started, make sure a battery is inserted and the lock switch is in its <u>down</u> position.**
 
 Do you need assistance or have questions? Don't hesitate to reach out to us at hello@wavyindustries.com or join our [Discord community](https://discord.gg/4HQHERUW5K).
 
 ## Device updates & tools
-MON**KEY** is updated directly through our website using Bluetooth.
-
+MON**KEY** wirelessly updates directly through a web browser. Our *device utility* page, in addition to updates, lets you configure the drums and patterns which are stored on MON**KEY**.
 <DeviceUpdateCheck client:load />
 
-Through our *device utility*, you can quickly update the device, explore its functionality, and configure it. The **Playground** section in *device utility* is a great place to learn the basics of MON**KEY** and its functionality:
+<a href={routes.deviceUtility} target="_blank">Open device utility</a>
 
-<LinkButton href={routes.deviceUtility} target="_blank">Open device utility</LinkButton>
+## Hooking it up
 
-## Connecting
+MON**KEY** supports a variety of hosts and works great in many types of setups. The connection process varies depending on the device you choose to use it with.
 
-MON**KEY** supports a variety of hosts and works great in many types of setups. The connection process varies depending on the device you use MON**KEY** with. 
+You can experiment right away through our *device utility*, which includes a basic playground requiring a browser which supports Bluetooth).
 
-You can experiment directly on our website in the *device utility*, which includes a basic playground.
+<a href={routes.deviceUtilityPlayground} target="_blank">Open playground</a>
 
-<LinkButton href={routes.deviceUtilityPlayground} target="_blank">Open playground</LinkButton>
+Generally speaking, for mobile apps you connect MON**KEY** straight to the individual apps. Most modern music apps include a setting to connect to Bluetooth MIDI devices. On desktops (macOS, Windows, Linux) you connect MON**KEY** to the operating system. Below we will show you how to connect to your preferred device.
+
+>Many users are sharing their setups and experiences on our Discord community. <a href={routes.wavyDiscord}>Please check it out here.</a>
 
 ### Connecting to mobile apps
-On Android and iOS/iPadOS, connect MON**KEY** directly within the music apps.
+A bunch of great music apps exists both on Android and iOS. Some apps exists on both operating systems and some only on one of them. Our recommendation depends on which of them you have.
+
+For iPhone/iPad users which are new to music creation on these devices, we recommend to start with Garageband. Its the simplest one and will get you started quickly. After creating a new project go to *Settings -> Advanced -> Bluetooth MIDI*.
+
+For Android users we recommend N-Track Studio.
+
+On both operating systems, you can still access our *device utility* playground by using a browser which supports Bluetooth (Bluefy on iOS).
+
+<a href={`${routes.deviceUtility}#playground`} target="_blank">Open playground</a>
 
 ### Connecting to Windows and macOS
 
-We have developed _MIDI Connect_ for macOS and Windows to make Bluetooth MIDI connections simpler. It's not limited to Wavy devices.
+We have developed _MIDI Connect_ for macOS and Windows to make Bluetooth MIDI connections simpler. It's not limited to Wavy devices, you might use it with any Bluetooth MIDI device.
 
-<LinkButton target="_blank" href={routes.midiConnect}>Download MIDI Connect</LinkButton>
+<a target="_blank" href={routes.midiConnect}>Download MIDI Connect</a>
 
 #### Manual connection
+You don't need to use our apps. Please check the guides below for alternative solutions.
 
 <Accordion title="macOS">
   <NoteInfo>Bluetooth MIDI devices will not appear in system Bluetooth settings. Instead, macOS has its own MIDI utility.</NoteInfo>
@@ -91,11 +117,47 @@ We have developed _MIDI Connect_ for macOS and Windows to make Bluetooth MIDI co
   <img alt="Connect to Monkey" src={macConnect4Img.src} />
 </Accordion>
 
+<Accordion title="Windows">
+  >Windows is in the process of rewriting their MIDI stack, resulting in instabilities. Some users have reported issues with both our in-house MIDI Connect app as well as with alternative tools. We suggest you try them out and see which setup works best for you and we hope the situation will stabilize soon.
+
+  You will need the following programs installed:
+
+  1. **loopMIDI:** [https://www.tobias-erichsen.de/software/loopmidi.html](https://www.tobias-erichsen.de/software/loopmidi.html)
+  2. **MIDIBerry:** [https://apps.microsoft.com/detail/9n39720h2m05](https://apps.microsoft.com/detail/9n39720h2m05)
+
+  Then follow these steps to start using MON**KEY**:
+
+  **Step 0.** Windows 11 users must first enable _Advanced device discovery_ in Bluetooth settings.
+
+  <img alt="Windows advanced Bluetooth" src={windowsConnect0Img.src} />
+
+  **Step 1.** Pair MON**KEY** in Windows settings. You only need to do this if MON**KEY** isn't already paired with your computer.
+
+  <img alt="Windows connect" src={windowsConnect1Img.src} />
+  <img alt="Windows pairing" src={windowsConnect2Img.src} />
+  <img alt="Windows paired" src={windowsConnect3Img.src} />
+
+  **Step 2.** Configure a MIDI port using loopMIDI and name it "my MIDI port."
+
+  <img alt="Port create" src={windowsConnect4Img.src} />
+
+  **Step 3.** Open MIDIBerry, select WAVY MON**KEY** as the input device, and the MIDI port you created as the output.
+
+  You're done! Test it by pressing keys on MON**KEY** and check whether the notes are received in MIDIBerry's _Input Monitor_.
+
+  <img alt="MIDIBerry input" src={windowsConnect5Img.src} />
+
+  Be aware that you need to keep MIDIBerry open to maintain the connection. You might not see any notes received even though everything looks connected. In that case, try disconnecting and reconnecting MON**KEY** in the Windows settings. Also, make sure it's set up exactly as described above.
+</Accordion>
+
 ### Configure desktop DAW
 
 We provide guides for some DAWs, though MON**KEY** should work with most of them. In short, assign instruments in your DAW to different MIDI channels, and use MIDI channel 10 for a drum rack.
 
 <Accordion title="Ableton Live">
+We have created a basic template for Ableton to get you up and running quickly. <a href="/monkey/templates">Please check it out here. </a>
+
+If you want to set it up manually, please follow these instructions:<br/>
   **Step 1.** Make sure MON**KEY** is enabled in MIDI Ports settings.
 
   <img alt="Ableton settings" src={abletonSettingsImg.src} />

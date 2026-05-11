@@ -3,19 +3,18 @@ import '~/styles/global.css';
 import Layout from '~/layouts/Layout.astro';
 import Header from '~/layouts/Header.astro';
 import Footer from '~/layouts/Footer.astro';
-import MonkeyTabBar from '~/components/MonkeyTabBar.astro';
 ---
 
 <Layout title="MONKEY Templates - Wavy Industries">
     <main>
         <Header />
-        <MonkeyTabBar active="templates" />
         <section class="templates-page">
             <article>
                 <h1>Templates</h1>
                 <p>Ready-made project templates to get you creating music with MON<b>KEY</b> right away.</p>
 
                 <div class="card-grid">
+                    {/* Nano Studio 2 has been removed from the App Store.
                     <div class="template-card">
                         <div class="card-header">
                             <h3>Nano Studio 2</h3>
@@ -36,6 +35,7 @@ import MonkeyTabBar from '~/components/MonkeyTabBar.astro';
                             <a href="/blog/2026-01-14_nano-studio-2-template" class="guide-link">Installation guide</a>
                         </div>
                     </div>
+                    */}
                     <div class="template-card">
                         <div class="card-header">
                             <h3>Ableton Live</h3>

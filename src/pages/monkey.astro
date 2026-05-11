@@ -5,15 +5,14 @@ import Layout from '~/layouts/Layout.astro';
 import Header from '~/layouts/Header.astro';
 import Footer from '~/layouts/Footer.astro';
 import LinkButton from '~/components/LinkButton.astro';
-import MonkeyTabBar from '~/components/MonkeyTabBar.astro';
+import NewsletterSignup from '~/components/NewsletterSignup.astro';
+import MonkeyReveal from '~/components/MonkeyReveal.astro';
+import AddToCartButton from '~/components/AddToCartButton.svelte';
 // import TopBannerAlert from '~/components/TopBannerAlert.astro';
 
-import monkeyDarkImg from '~/assets/monkey/monkey_dark_crop.png';
-import monkeyRevealVideo from '~/assets/monkey/monkey_front_reveal_LED_compressed.mp4';
-import monkeyRevealPlaceholder from '~/assets/monkey/monkey_reveal_placeholder.png';
-import nyaMonkeyImg from '~/assets/monkey/Nya MONKEY.png';
-import monkeyTable from '~/assets/monkey/DSCF3535_comp.jpg'
-import monkeyPortabilityImg from '~/assets/monkey/DSCF3602_comp.jpg';
+
+import monkeyTable from '~/assets/monkey/DSCF3544_comp.jpg'
+import monkeyPortabilityImg from '~/assets/monkey/monkey_grainy.png';
 import monkeyFunctionsImg from '~/assets/monkey/Monkey functions white.png';
 
 import steinbergProfile from '~/assets/monkey/profiles/floyd_steinberg.jpg';
@@ -28,42 +27,39 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 	<main>
 		<!-- <TopBannerAlert>BLACK FRIDAY sale: 15% off with code <b>BLACKFRIDAY2025</b></TopBannerAlert> -->
 		<Header textColor='white' />
-		<MonkeyTabBar active="monkey" variant="dark" />
 		<section class="hero">
 			<div class="hero-inner">
 				<h1>MON<span style="font-weight: 400;" >KEY</span></h1>
 				<p class="tagline">An ultra-portable wireless music making device</p>
 				<div class="hero-actions">
-					<LinkButton id="monkey-buy-button" class="monkey-buy-button" href={routes.monkeyPurchase} type="highlight" data-cta="hero">
-						<span class="monkey-buy-label">
-							<span>Buy now</span>
-							<span id="monkey-price" class="monkey-price monkey-price--loading"></span>
-						</span>
-					</LinkButton>
+					<AddToCartButton client:load sku="monkey" name="MONKEY" cta="hero" />
 				</div>
 			</div>
 		</section>
 
-		<div class="hero-image hero-image--full">
-			<!-- <video id="monkey-reveal-video" width="100%" autoplay muted playsinline onended="this.pause()">
-				<source src={monkeyRevealVideo} type="video/mp4">
-			</video> -->
-			<img src={monkeyTable.src} alt="Monkey on table">
+		<div class="hero-image">
+			<MonkeyReveal />
 		</div>
 
 		<section class="intro">
 			<div class="container">
 				<div class="intro-content">
 					<p>
-						MON<b>KEY</b> gives you the freedom to create music anywhere. At the kitchen table, in the park, or on long adventures. Through the <b>SHIFT</b> key, its full potential unfolds. Including MIDI effects with a range of creative presets, a drum engine, and a loop recorder capable of playing up to ten instruments at once. With its wireless connection, you can link MON<b>KEY</b> to a compact portable setup, your phone, laptop, or other external gear. All of this is made possible in practice by technological advancements which enables several months of battery life on a single coin cell battery and a reliable ultra-low-latency connection.
+						MON<b>KEY</b> gives you the freedom to create music wherever you want. A fun and inspiring tool for your studio, a casual companion for a sofa jam, or a wireless studio for an afternoon in the park.
 					</p>
-					<p><u>It’s a platform built for creative exploration, playful experimentation, and to give you focus.</u></p>
+					<p>
+						Through the <b>SHIFT</b> key, its full potential unfolds. MIDI effects with a range of creative presets, a drum engine, and a loop recorder which is capable of playing up to ten instruments at once. With its wireless connection, you can link MON<b>KEY</b> to a compact portable setup, your phone, laptop, or other external gear.
+					</p>
+					<p>
+						Dont be fooled by its form factor. MON<b>KEY</b> is powered by next generation technologies, enabling ultra long battery life of several months of battery life while keeping the latency extremely low.
+					</p>
+					<p>It’s a platform built for creative exploration, playful experimentation, and to give you <u>focus</u>.</p>
 				</div>
 		</section>
 
 		<section class="portability">
-			<div class="portability-image">
-				<img src={monkeyPortabilityImg.src} alt="Monkey on the go" />
+			<div class="grainy grainy--reveal">
+				<img src={monkeyTable.src} alt="Monkey reveal placeholder" />
 			</div>
 			<div class="container">
 				<div class="intro-content portability-content">
@@ -166,19 +162,18 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 
 		 <section>
 		<div class="grainy grainy--reveal">
-			<img src={monkeyRevealPlaceholder.src} alt="Monkey reveal placeholder" />
+			<img src={monkeyPortabilityImg.src} alt="Monkey reveal placeholder" />
 		</div>
+			<!-- <div class="portability-image">
+				<img src={monkeyPortabilityImg.src} alt="Monkey on the go" />
+			</div> -->
 		 </section>
 
 		<section class="bottom-cta">
 			<div class="container bottom-cta-inner">
-				<LinkButton href={routes.newsletter}>Join newsletter</LinkButton>
-				<LinkButton class="monkey-buy-button" href={routes.monkeyPurchase} type="highlight" data-cta="bottom">
-					<span class="monkey-buy-label">
-						<span>Buy now</span>
-						<span class="monkey-price monkey-price--loading"></span>
-					</span>
-				</LinkButton>
+				<p>Join our newsletter and stay up to date.</p>
+				<NewsletterSignup tag="monkey" label="Join newsletter" />
+				<AddToCartButton client:load sku="monkey" name="MONKEY" cta="bottom" />
 			</div>
 		</section>
 
@@ -551,9 +546,10 @@ h1 {
 
 .bottom-cta-inner {
 	display: flex;
-	justify-content: center;
-	gap: 12px;
-	flex-wrap: wrap;
+	flex-direction: column;
+	align-items: center;
+	gap: 16px;
+	color: white;
 }
 
 /* Footnotes */
@@ -663,4 +659,6 @@ h1 {
 }
 </style>
 
-<script src="../scripts/monkey/hero-price.js"></script>
+<script>
+	import '~/scripts/load-prices.js';
+</script>

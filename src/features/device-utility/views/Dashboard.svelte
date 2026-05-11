@@ -7,6 +7,7 @@
     import DeviceUpdate from '~/features/device-utility/views/DeviceUpdate.svelte';
     import DeviceSampleManager from '~/features/device-utility/views/DeviceSampleManager.svelte';
     import DeviceTester from '~/features/device-utility/views/DeviceTester.svelte';
+    import LandingView from '~/features/device-utility/views/LandingView.svelte';
     import { firmwareState } from '~/lib/states/firmware.svelte';
     import { dev } from '~/features/device-utility/states/devmode.svelte';
     import { onMount } from 'svelte';
@@ -74,12 +75,17 @@
 
     const currentView = $derived.by(() => {
         const urlHash = (windowState.hash || '').replace('#', '').trim();
-        
+
+        // Show landing page when no tool is selected
+        if (urlHash === '' || urlHash === DeviceUtilityView.Landing) {
+            return DeviceUtilityView.Landing;
+        }
+
         // Access all reactive dependencies upfront
         const samplesSupported = deviceSamplesState.isSupported;
         const firmwareSupported = firmwareState.isSupported;
         const devEnabled = dev.enabled;
-        
+
         switch (urlHash) {
             case DeviceUtilityView.Playground:
                 return DeviceUtilityView.Playground;
@@ -93,7 +99,7 @@
                 if (devEnabled) return DeviceUtilityView.DeviceTester;
                 break;
         }
-        
+
         return DeviceUtilityView.Playground;
     });
 
@@ -268,7 +274,11 @@
       </div>
     {:else}
       <div class="content-container">
-          {#if currentView === DeviceUtilityView.DeviceUpdate}
+          {#if currentView === DeviceUtilityView.Landing}
+              <div in:fade={{ duration: 200 }}>
+                  <LandingView />
+              </div>
+          {:else if currentView === DeviceUtilityView.DeviceUpdate}
               <div in:fade={{ duration: 200 }}>
                   <DeviceUpdate />
               </div>

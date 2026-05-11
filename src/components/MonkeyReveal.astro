@@ -1,0 +1,146 @@
+---
+interface Props {
+    aspectRatio?: number;
+    /** Pixels from the top of the viewport at which the animation starts. While the canvas top is below this, the first frame is held. */
+    topOffset?: number;
+    /** Pixels of scroll over which the full animation plays after the canvas top crosses topOffset. */
+    animationDistance?: number;
+}
+
+const {
+    aspectRatio = 1920 / 570,
+    topOffset = 450,
+    animationDistance = 750,
+} = Astro.props;
+
+// Bundle the frames at build time so Vite hashes them and we get cache-busting URLs.
+const frameModules = import.meta.glob<string>(
+    '~/assets/monkey/reveal/*.webp',
+    { eager: true, query: '?url', import: 'default' }
+);
+const frameUrls = Object.entries(frameModules)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, url]) => url);
+const totalFrames = frameUrls.length;
+---
+
+<div
+    class="reveal"
+    data-top-offset={topOffset}
+    data-animation-distance={animationDistance}
+    style={`--reveal-aspect: ${aspectRatio};`}
+>
+    <canvas class="reveal-canvas"></canvas>
+    <script type="application/json" class="reveal-frames" set:html={JSON.stringify(frameUrls)}></script>
+</div>
+
+<style>
+    .reveal {
+        width: 100%;
+    }
+    .reveal-canvas {
+        display: block;
+        width: 100%;
+        aspect-ratio: var(--reveal-aspect);
+    }
+</style>
+
+<script>
+    function initMonkeyReveal(root: HTMLElement) {
+        const canvas = root.querySelector<HTMLCanvasElement>('.reveal-canvas');
+        const dataNode = root.querySelector<HTMLScriptElement>('script.reveal-frames');
+        if (!canvas || !dataNode || !dataNode.textContent) return;
+
+        const frameUrls: string[] = JSON.parse(dataNode.textContent);
+        const totalFrames = frameUrls.length;
+        if (totalFrames === 0) return;
+
+        const topOffset = parseFloat(root.dataset.topOffset ?? '100');
+        const animationDistance = parseFloat(root.dataset.animationDistance ?? '1000');
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const images: HTMLImageElement[] = new Array(totalFrames);
+        let displayedFrame = -1;
+        let rafId: number | null = null;
+
+        function computeFrame() {
+            const rect = canvas!.getBoundingClientRect();
+            // Distance the canvas top has scrolled past the topOffset line.
+            // <= 0 while the canvas top is still below that line → first frame.
+            const past = topOffset - rect.top;
+            let progress = animationDistance > 0 ? past / animationDistance : 0;
+            progress = Math.max(0, Math.min(1, progress));
+            // Reverse playback: progress 0 → frame totalFrames; progress 1 → frame 1.
+            return totalFrames - Math.round(progress * (totalFrames - 1));
+        }
+
+        function drawFrame(frameNumber: number) {
+            if (frameNumber === displayedFrame) return;
+            const img = images[frameNumber - 1];
+            if (!img || !img.complete || img.naturalWidth === 0) return;
+            ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
+            ctx!.drawImage(img, 0, 0, canvas!.width, canvas!.height);
+            displayedFrame = frameNumber;
+        }
+
+        function resizeCanvas() {
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const cssWidth = canvas!.clientWidth;
+            const cssHeight = canvas!.clientHeight;
+            if (cssWidth === 0 || cssHeight === 0) return;
+            canvas!.width = Math.round(cssWidth * dpr);
+            canvas!.height = Math.round(cssHeight * dpr);
+            displayedFrame = -1;
+            update();
+        }
+
+        function update() {
+            drawFrame(computeFrame());
+        }
+
+        function scheduleUpdate() {
+            if (rafId !== null) return;
+            rafId = requestAnimationFrame(() => {
+                rafId = null;
+                update();
+            });
+        }
+
+        function loadFrame(i: number, priority: boolean) {
+            const img = new Image();
+            img.decoding = 'async';
+            if (priority) {
+                // @ts-ignore – fetchPriority is a valid HTMLImageElement property in modern browsers
+                img.fetchPriority = 'high';
+            }
+            img.src = frameUrls[i - 1];
+            images[i - 1] = img;
+            return img;
+        }
+
+        // 1) Figure out which frame the page is currently at and load THAT one first
+        //    with high priority. Avoids the visible jump when landing on the page
+        //    mid-scroll.
+        resizeCanvas();
+        const initialFrame = computeFrame();
+        const priorityImg = loadFrame(initialFrame, true);
+        const drawWhenReady = () => drawFrame(initialFrame);
+        if (priorityImg.complete) drawWhenReady();
+        else priorityImg.addEventListener('load', drawWhenReady, { once: true });
+
+        // 2) Load the rest of the frames after the priority one is in flight.
+        for (let i = 1; i <= totalFrames; i++) {
+            if (i === initialFrame) continue;
+            loadFrame(i, false);
+        }
+
+        const ro = new ResizeObserver(resizeCanvas);
+        ro.observe(canvas);
+        window.addEventListener('scroll', scheduleUpdate, { passive: true });
+        window.addEventListener('resize', scheduleUpdate);
+    }
+
+    document.querySelectorAll<HTMLElement>('.reveal').forEach(initMonkeyReveal);
+</script>
