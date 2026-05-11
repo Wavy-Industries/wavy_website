@@ -47,28 +47,30 @@
       </div>
       {#if isChecking}
         <div class="spinner">loading</div>
-      {:else if !isBluetoothAvailable}
-        <DeviceBluetoothBrowsers />
       {:else}
-        <button
-          class="connect-btn"
-          disabled={bluetoothState.connectionState === 'connecting'}
-          onclick={handleConnectClick}>
-          <img src={bluetoothImg.src} alt="bluetooth logo" height="15px" />
-          {#if bluetoothState.connectionState === 'connecting'}
-            Connecting...
-          {:else}
-            <i class="bi-bluetooth"></i> Click to connect
-          {/if}
-        </button>
+        {#if !isBluetoothAvailable}
+          <DeviceBluetoothBrowsers />
+        {:else}
+          <button
+            class="connect-btn"
+            disabled={bluetoothState.connectionState === 'connecting'}
+            onclick={handleConnectClick}>
+            <img src={bluetoothImg.src} alt="bluetooth logo" height="15px" />
+            {#if bluetoothState.connectionState === 'connecting'}
+              Connecting...
+            {:else}
+              <i class="bi-bluetooth"></i> Click to connect
+            {/if}
+          </button>
 
-        <p class="note" style="max-width: 400px; text-align: center;">
-          If you are having problems finding your device, make sure it is not already connected to anything else.
-        </p>
+          <p class="note" style="max-width: 400px; text-align: center;">
+            If you are having problems finding your device, make sure it is not already connected to anything else.
+          </p>
+        {/if}
 
-        <!-- <button class="enter-without-btn" onclick={() => bluetoothManager.enterWithoutDevice()}>
+        <button class="enter-without-btn" onclick={() => bluetoothManager.enterWithoutDevice()}>
           or enter without connecting
-        </button> -->
+        </button>
       {/if}
     {:else}
       <ConnectedView />

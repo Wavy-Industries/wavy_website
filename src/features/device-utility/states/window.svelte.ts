@@ -14,6 +14,7 @@ export function setHash(hash: string) {
 }
 
 export const DeviceUtilityView = {
+    Landing: 'landing',
     DeviceUpdate: 'device-update',
     SampleManager: 'pack-editor',
     DeviceTester: 'device-tester',

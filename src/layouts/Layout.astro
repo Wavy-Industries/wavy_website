@@ -1,12 +1,12 @@
 ---
-import MetaPixel from '../components/MetaPixel.astro';
-
 interface Props {
 	title: string;
 	description?: string;
 }
 
 const { title, description = "Wavy Industries Bluetooth MIDI keyboards for music creation." } = Astro.props;
+
+import NoCookiesBanner from '~/components/NoCookiesBanner.astro';
 ---
 
 <!doctype html>
@@ -25,9 +25,13 @@ const { title, description = "Wavy Industries Bluetooth MIDI keyboards for music
 		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap">
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
-		<MetaPixel />
 	</head>
 	<body>
 		<slot />
+		<NoCookiesBanner />
+		<script>
+			import { track, TRACKING_EVENT_TYPES } from '~/lib/api/tracking.js';
+			track(TRACKING_EVENT_TYPES.page_view);
+		</script>
 	</body>
 </html>

@@ -7,7 +7,7 @@
 
 import { SamplePack } from '~/lib/parsers/device_storage_parser';
 import { SampleMode, sampleModeLabel } from '~/lib/types/sampleMode';
-import { bluetoothManager } from '~/lib/states/bluetooth.svelte';
+import { disState } from '~/features/device-utility/states/dis.svelte';
 import { Log } from '~/lib/utils/Log';
 
 const LOG_LEVEL = Log.LEVEL_INFO;
@@ -28,7 +28,7 @@ export const fetchServerPack = async (
     const normalizedId = id.replace(/[\s\0]+$/, '');
 
     try {
-        const url = `/assets/${bluetoothManager.getDeviceName()}/${sampleModeLabel(mode)}/${encodeURIComponent(normalizedId)}.json`;
+        const url = `/assets/${disState.modelNumber}/${sampleModeLabel(mode)}/${encodeURIComponent(normalizedId)}.json`;
         const res = await fetch(url);
 
         if (!res.ok) {

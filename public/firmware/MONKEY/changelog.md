@@ -1,3 +1,6 @@
+# 1.3.91 -dev
+- wip
+
 # 1.3.2[4. Feb 2026]
 - Fix MIDI parsing
 

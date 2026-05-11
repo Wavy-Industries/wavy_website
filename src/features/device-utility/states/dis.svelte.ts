@@ -7,12 +7,19 @@ export const disState = $state({
   firmwareRevision: null as string | null,
 });
 
+export const loadingStatus = $state({
+  message: '',
+  error: null as string | null,
+});
+
 export const resetDisState = () => {
   disService.reset();
   disState.manufacturerName = null;
   disState.modelNumber = null;
   disState.hardwareRevision = null;
   disState.firmwareRevision = null;
+  loadingStatus.message = '';
+  loadingStatus.error = null;
 };
 
 export const refreshDisState = async (): Promise<void> => {
@@ -21,4 +28,8 @@ export const refreshDisState = async (): Promise<void> => {
   disState.modelNumber = info.modelNumber ?? null;
   disState.hardwareRevision = info.hardwareRevision ?? null;
   disState.firmwareRevision = info.firmwareRevision ?? null;
+
+  if (disState.modelNumber == null) {
+    throw new Error('Device did not provide a model number via DIS');
+  }
 };

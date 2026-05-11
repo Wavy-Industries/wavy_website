@@ -1,0 +1,309 @@
+---
+import '~/styles/global.css';
+import Layout from "~/layouts/Layout.astro";
+import logoImg from '~/assets/logo.svg';
+import arrowRightImg from '~/assets/icons/arrow.right.svg';
+import { routes } from '~/routes';
+---
+
+<Layout title="Wavy Industries: Feedback">
+  <div id="loading-state" class="page-loading">
+    <div class="spinner" aria-hidden="true"></div>
+  </div>
+
+  <section id="form-section" class="hidden">
+    <div class="banner"><img src={logoImg.src} /></div>
+    <div class="content">
+      <h3>How has your experience been?</h3>
+      <p class="intro">
+        We'd love to hear your thoughts on your Wavy. The more honest, the better — what we hear from customers shapes how we build the next thing.
+      </p>
+      <form id="feedback-form">
+        <!-- type setup den brukes til -->
+        <label for="arrival_expectation">Did your order arrive to your expectation?</label>
+        <textarea id="arrival_expectation" name="arrival_expectation"></textarea>
+
+        <label for="getting_started">How was it to get started?</label>
+        <textarea id="getting_started" name="getting_started"></textarea>
+
+        <label for="going_so_far">How has it been going so far?</label>
+        <textarea id="going_so_far" name="going_so_far"></textarea>
+
+        <label for="anything_else">Anything else on your mind?</label>
+        <textarea id="anything_else" name="anything_else"></textarea>
+
+        <label class="checkbox-row">
+          <input type="checkbox" id="contact_consent" name="contact_consent" />
+          <span>OK to reach out later about early involvement in future products</span>
+        </label>
+
+        <button type="submit" id="submit-button" class="submit-button">Send feedback</button>
+        <p id="form-error" class="error-message hidden"></p>
+      </form>
+    </div>
+  </section>
+
+  <section id="ineligible-section" class="hidden">
+    <div class="banner"><img src={logoImg.src} /></div>
+    <div class="content">
+      <h3>This form isn't available</h3>
+      <p id="ineligible-reason" class="intro"></p>
+      <p class="intro">
+        If you think this is a mistake, just reply to the email or reach us at
+        <a href="mailto:hello@wavyindustries.com">hello@wavyindustries.com</a>.
+      </p>
+    </div>
+  </section>
+
+  <section id="thanks-section" class="hidden">
+    <div class="banner"><img src={logoImg.src} /></div>
+    <div class="content">
+      <h3>Thank you 🙏</h3>
+      <p class="intro">We really appreciate your feedback.</p>
+    </div>
+    <a href={routes.home} class="back-link">
+      <img height="10px" src={arrowRightImg.src} alt="arrow back" /> Back to website
+    </a>
+  </section>
+</Layout>
+
+<style>
+  section {
+    margin: 20px auto;
+    width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .page-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 60vh;
+    text-align: center;
+    color: #1f1f1f;
+  }
+
+  .spinner {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+    border-top-color: #000000;
+    animation: spin 0.5s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  .banner {
+    background-color: #d5d5d5;
+    padding: 20px;
+  }
+
+  .content {
+    background-color: #F5F5F5;
+    padding: 20px;
+  }
+
+  .content h3 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+  }
+
+  .intro {
+    font-size: 13px;
+    color: #444;
+    line-height: 1.5;
+    margin: 0 0 14px 0;
+  }
+
+  label {
+    display: block;
+    margin: 14px 0 6px 0;
+    font-size: 13px;
+    color: #333;
+  }
+
+  textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    background: #fff;
+    font: inherit;
+    font-size: 13px;
+    resize: vertical;
+    min-height: 80px;
+  }
+
+  textarea:focus {
+    outline: 1px solid #5A88FF;
+    border-color: #5A88FF;
+  }
+
+  .checkbox-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin: 18px 0 4px 0;
+    font-size: 13px;
+    color: #333;
+    cursor: pointer;
+  }
+
+  .checkbox-row input {
+    margin: 3px 0 0 0;
+  }
+
+  .submit-button {
+    background-color: #5A88FF;
+    color: white;
+    width: 100%;
+    border: none;
+    padding: 16px 0;
+    font-weight: bold;
+    font-size: 14px;
+    margin-top: 18px;
+    cursor: pointer;
+  }
+
+  .submit-button:hover {
+    background-color: #4378ff;
+  }
+
+  .submit-button:disabled {
+    background-color: #aaa;
+    cursor: not-allowed;
+  }
+
+  .error-message {
+    color: #b71c1c;
+    font-size: 12px;
+    margin-top: 10px;
+  }
+
+  .back-link {
+    width: 100%;
+    font-weight: 300;
+    text-decoration: underline;
+    text-align: center;
+  }
+
+  .back-link img {
+    filter: invert(100%);
+    transform: rotate(180deg);
+  }
+
+  .hidden {
+    display: none;
+  }
+</style>
+
+<script>
+  const apiUrl =
+    import.meta.env.MODE === "development"
+      ? "http://localhost:8000"
+      : "https://server.wavyindustries.com";
+
+  const FEEDBACK_KIND = "post-delivery";
+  const FORM_VERSION = 1;
+
+  const orderId = new URLSearchParams(window.location.search).get("order");
+
+  // public state transitions
+
+  function showForm() {
+    document.getElementById("loading-state")!.classList.add("hidden");
+    document.getElementById("form-section")!.classList.remove("hidden");
+  }
+
+  function showIneligible(reason: string) {
+    document.getElementById("loading-state")!.classList.add("hidden");
+    document.getElementById("ineligible-reason")!.textContent = reason;
+    document.getElementById("ineligible-section")!.classList.remove("hidden");
+  }
+
+  function showThanks() {
+    document.getElementById("form-section")!.classList.add("hidden");
+    document.getElementById("thanks-section")!.classList.remove("hidden");
+  }
+
+  // module-level helpers
+
+  async function _checkAvailable() {
+    try {
+      const res = await fetch(
+        `${apiUrl}/api/feedback/${FEEDBACK_KIND}/${encodeURIComponent(orderId!)}/available`
+      );
+      const body = await res.json().catch(() => ({}));
+      return { available: !!body.available, reason: body.reason || null };
+    } catch (err) {
+      console.error("availability check failed:", err);
+      return { available: false, reason: "Could not check eligibility." };
+    }
+  }
+
+  async function _submit(payload: object) {
+    const res = await fetch(
+      `${apiUrl}/api/feedback/${FEEDBACK_KIND}/${encodeURIComponent(orderId!)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
+    const body = await res.json().catch(() => ({}));
+    return { ok: res.ok, body, status: res.status };
+  }
+
+  // entry point
+
+  if (!orderId) {
+    showIneligible("Missing order ID in URL.");
+  } else {
+    _checkAvailable().then((result) => {
+      if (result.available) {
+        showForm();
+      } else {
+        showIneligible(result.reason || "This form is not available.");
+      }
+    });
+  }
+
+  const form = document.getElementById("feedback-form") as HTMLFormElement;
+  const submitBtn = document.getElementById("submit-button") as HTMLButtonElement;
+  const errorEl = document.getElementById("form-error") as HTMLElement;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorEl.classList.add("hidden");
+    submitBtn.disabled = true;
+
+    const formData = new FormData(form);
+    const payload = {
+      version: FORM_VERSION,
+      form_json: {
+        arrival_expectation: String(formData.get("arrival_expectation") || "").trim(),
+        getting_started: String(formData.get("getting_started") || "").trim(),
+        going_so_far: String(formData.get("going_so_far") || "").trim(),
+        anything_else: String(formData.get("anything_else") || "").trim(),
+        contact_consent: !!formData.get("contact_consent"),
+      },
+    };
+
+    const result = await _submit(payload);
+    if (result.ok) {
+      showThanks();
+    } else {
+      submitBtn.disabled = false;
+      errorEl.textContent = result.body?.error || "Something went wrong, please try again.";
+      errorEl.classList.remove("hidden");
+    }
+  });
+</script>

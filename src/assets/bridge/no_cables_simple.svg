@@ -1,0 +1,17 @@
+<svg viewBox="0 0 400 320" xmlns="http://www.w3.org/2000/svg">
+  <!-- Three simple cable splines -->
+  <path d="M 20 80 C 130 70, 180 160, 280 140 S 380 110, 395 150"
+        stroke="#ffffff" stroke-width="9" fill="none" stroke-linecap="round"/>
+
+  <path d="M 20 200 C 100 230, 180 170, 260 220 S 360 200, 395 230"
+        stroke="#ffffff" stroke-width="9" fill="none" stroke-linecap="round"/>
+
+  <path d="M 20 140 C 110 180, 180 100, 260 130 S 350 250, 395 200"
+        stroke="#ffffff" stroke-width="9" fill="none" stroke-linecap="round"/>
+
+  <!-- Two red lines forming the cross -->
+  <line x1="55" y1="50" x2="345" y2="270"
+        stroke="#e63946" stroke-width="14" stroke-linecap="round"/>
+  <line x1="345" y1="50" x2="55" y2="270"
+        stroke="#e63946" stroke-width="14" stroke-linecap="round"/>
+</svg>

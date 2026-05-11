@@ -1,0 +1,95 @@
+---
+import '~/styles/global.css';
+import Layout from '~/layouts/Layout.astro';
+import Header from '~/layouts/Header.astro';
+import Footer from '~/layouts/Footer.astro';
+import { routes } from '~/routes';
+---
+
+<Layout title="About — Wavy Industries" description="Wavy Industries is a small Norwegian company designing portable music devices.">
+	<main>
+		<Header />
+		<section class="about">
+			<article>
+				<h1>About</h1>
+				<p class="lede">Forward thinking design is in the center of everything we do.</p>
+				<p>
+					In a world with an ever growing span of possibilities, it becomes harder to keep focus on the essentials. But new technological advancements also open up possibilities which were not previously possible. You will find us balancing these two forces, bringing you new and unique products designed to give you focus and a boost of creative energy.
+				</p>
+				<p>
+					We are based in Trondheim, a city up north in Norway. Our team has a background in engineering, design and entrepreneurship.
+				</p>
+				<h2>Get in touch</h2>
+				<ul class="contact-list">
+					<li><a href={routes.wavyDiscord} target="_blank">Wavy Discord</a> - the fastest place to reach us and the community.</li>
+					<li><a href={routes.support}>Support</a> - help, contact, and direct email.</li>
+					<li><a href={routes.newsletter} target="_blank">Newsletter</a> - stay up to date with new releases and other updates.</li>
+				</ul>
+				<p>Feel free to contact our founder <i>Rein Gundersen Bentdal</i> directly at <a href="mailto:rein@wavyindustries.com">rein@wavyindustries.com</a>.</p>
+				<h2>Company</h2>
+				<p class="company">
+					Wavy Industries AS<br />
+					Org. nr. 935955335<br />
+					Pir II 13A, 7010 Trondheim, Norway
+				</p>
+			</article>
+		</section>
+		<Footer />
+	</main>
+</Layout>
+
+<style>
+	main {
+		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+	}
+	.about {
+		width: 100%;
+		padding: 0 24px;
+		flex-grow: 1;
+	}
+	.about article {
+		margin: 0 auto;
+		max-width: 720px;
+		padding: 40px 0 80px;
+	}
+	h1 {
+		font-size: 36px;
+		font-weight: 300;
+		margin: 0 0 16px;
+		color: #111;
+	}
+	h2 {
+		margin: 32px 0 8px;
+		font-size: 18px;
+		font-weight: 600;
+		color: #111;
+	}
+	p {
+		font-size: 16px;
+		line-height: 1.7;
+		color: #333;
+		margin: 0 0 16px;
+	}
+	.lede {
+		font-size: 18px;
+		color: #111;
+	}
+	.contact-list {
+		list-style: none;
+		padding: 0;
+		margin: 0 0 16px;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.contact-list a {
+		text-decoration: underline;
+		font-style: normal;
+	}
+	.company {
+		font-size: 14px;
+		color: #555;
+	}
+</style>

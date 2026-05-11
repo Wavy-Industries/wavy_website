@@ -4,7 +4,11 @@
 //   DE: { taxesIncluded: true, taxRate: 0.19 },
 // };
 
-// EU + Monaco markets include taxes.
+// Tells display code how Shopify's localized price relates to the customer-facing gross.
+// - taxesIncluded:true  → Shopify already returns gross for that market (most EU markets)
+// - taxesIncluded:false → Shopify returns net; we add taxRate on top for display (NO)
+// - omitted             → no VAT applied to display; "taxes at checkout"
+// Last verified against Shopify market settings: 2026-05-04. Re-check annually.
 export const TAX_CONFIG = {
   AT: { taxesIncluded: true },
   BE: { taxesIncluded: true },

@@ -3,7 +3,6 @@ import '../styles/global.css';
 import Layout from './Layout.astro';
 import Header from './Header.astro';
 import Footer from './Footer.astro';
-import MonkeyTabBar from '~/components/MonkeyTabBar.astro';
 
 const { frontmatter } = Astro.props;
 ---
@@ -11,7 +10,6 @@ const { frontmatter } = Astro.props;
 <Layout title={frontmatter.title}>
     <main>
         <Header />
-        <MonkeyTabBar active={frontmatter.activeTab} />
         <section class="monkey-docs">
             <article>
                 <slot />
@@ -47,7 +45,7 @@ const { frontmatter } = Astro.props;
 
 .monkey-docs h2 {
     font-size: 24px;
-    font-weight: 500;
+    font-weight: 800;
     margin: 48px 0 16px 0;
     padding-top: 24px;
     border-top: 1px solid #eee;

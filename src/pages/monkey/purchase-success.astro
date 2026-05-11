@@ -591,7 +591,7 @@ import monkeyImg from "~/assets/monkey/packaging/Monkey with packaging.jpg";
     console.log("Session ID found:", sessionId);
     const fetchOrderId = (retryCount = 0) => {
       console.log("Fetching order ID, attempt:", retryCount + 1);
-      fetch(`${apiUrl}/api/order/orderIdFromSessionId/${sessionId}`)
+      fetch(`${apiUrl}/api/order/fromExternal/stripe/${sessionId}`)
         .then((response) => {
           if (!response.ok) {
             if (response.status === 404 && retryCount < 5) {

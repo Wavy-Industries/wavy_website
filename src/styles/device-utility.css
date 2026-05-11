@@ -12,7 +12,7 @@
     --du-accent: #B9BDFD; /* requested palette */
     --du-accent-contrast: #111827; /* dark text on light accent */
     --du-highlight: #FFFEAC; /* requested palette */
-    --du-maxw: 1100px;
+    --du-maxw: min(1100px, 100%);
 }
 
 main {
@@ -23,7 +23,7 @@ main {
 body.device-utility-open header {
     display: none;
 }
-section { width: 100%; padding: 0 20px; }
+section { width: 100%; }
 h1 { font-size: 44px; margin: 0; color: var(--du-text); }
 
 .input-small, .input-small {
@@ -107,17 +107,3 @@ body.device-utility-page {
     min-width: 0;
 }
 
-@media (max-width: 900px) {
-    :root { --du-maxw: 100%; }
-    section { padding: 0 12px; }
-    h1 { font-size: 34px; }
-    .main-content { margin: 60px auto; gap: 12px; }
-    .tagline { font-size: 14px; }
-}
-
-@media (max-width: 600px) {
-    h1 { font-size: 28px; }
-    .main-content { margin: 40px auto; }
-    button, input[type="submit"] { padding: 6px 10px; font-size: 12px; }
-    #device-tools-header { gap: 20px; flex-wrap: wrap; }
-}

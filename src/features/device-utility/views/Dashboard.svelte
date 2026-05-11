@@ -1,12 +1,13 @@
 <script>
     import { bluetoothManager, bluetoothState } from '~/lib/states/bluetooth.svelte';
     import { batteryState } from '~/features/device-utility/states/bas.svelte';
-    import { disState } from '~/features/device-utility/states/dis.svelte';
+    import { disState, loadingStatus } from '~/features/device-utility/states/dis.svelte';
     import { BT_DEVICE_FILTERS } from '~/lib/config/device';
     import ConnectionStatus from '~/features/device-utility/components/ConnectionStatus.svelte';
     import DeviceUpdate from '~/features/device-utility/views/DeviceUpdate.svelte';
     import DeviceSampleManager from '~/features/device-utility/views/DeviceSampleManager.svelte';
     import DeviceTester from '~/features/device-utility/views/DeviceTester.svelte';
+    import LandingView from '~/features/device-utility/views/LandingView.svelte';
     import { firmwareState } from '~/lib/states/firmware.svelte';
     import { dev } from '~/features/device-utility/states/devmode.svelte';
     import { onMount } from 'svelte';
@@ -17,7 +18,7 @@
     import {  windowStateInit, windowState, DeviceUtilityView, setHash } from '~/features/device-utility/states/window.svelte';
     import { deviceState } from '~/features/device-utility/states/deviceState.svelte';
     import { getOperatingSystem } from '~/lib/utils/operating_system';
-    import { deviceSupports } from '~/lib/config/deviceProfiles';
+    import { deviceSupports, getDeviceIcon } from '~/lib/config/deviceProfiles';
 
     onMount(async () => {
 
@@ -32,9 +33,18 @@
 
     /* loading logic */
     let isLoading = $state(true);
-    const deviceName = $derived(bluetoothManager.getDeviceName());
+    const deviceName = $derived(disState.modelNumber);
     $effect(() => {
         if (!isLoading) return; // already done, ignore future changes
+
+        // Entered without a device — skip loading, go straight to dashboard
+        if (bluetoothState.connectionState === 'connectionLoss' && !bluetoothManager.connectedDevice) {
+            isLoading = false;
+            return;
+        }
+
+        // Wait for DIS model number before proceeding
+        if (deviceName == null) return;
 
         const fwReady = firmwareState?.firmwareVersion != null || firmwareState?.isSupported === false;
 
@@ -65,12 +75,17 @@
 
     const currentView = $derived.by(() => {
         const urlHash = (windowState.hash || '').replace('#', '').trim();
-        
+
+        // Show landing page when no tool is selected
+        if (urlHash === '' || urlHash === DeviceUtilityView.Landing) {
+            return DeviceUtilityView.Landing;
+        }
+
         // Access all reactive dependencies upfront
         const samplesSupported = deviceSamplesState.isSupported;
         const firmwareSupported = firmwareState.isSupported;
         const devEnabled = dev.enabled;
-        
+
         switch (urlHash) {
             case DeviceUtilityView.Playground:
                 return DeviceUtilityView.Playground;
@@ -84,7 +99,7 @@
                 if (devEnabled) return DeviceUtilityView.DeviceTester;
                 break;
         }
-        
+
         return DeviceUtilityView.Playground;
     });
 
@@ -95,6 +110,8 @@
         if (level <= 35) return '#f59e0b';
         return '#22c55e';
     });
+
+    const deviceIcon = $derived(getDeviceIcon(deviceName));
 </script>
 
 <div>
@@ -115,9 +132,13 @@
                     connect
                 </button>
             {/if}
-            <span>{bluetoothState.deviceName ?? 'No device'}</span>
+            <span class="device-name">
+                {#if deviceIcon}<img src={deviceIcon} alt="" class="device-icon" />{/if}
+                {bluetoothState.deviceName ?? 'No device'}
+            </span>
             <ConnectionStatus />
             <span>v{firmwareState?.firmwareVersion?.versionString ?? '?.?.?'}</span>
+            {#if batteryState.isAvailable}
             <span class="battery" title={batteryState.level === null ? 'Battery level unavailable' : `Battery ${batteryState.level}%`}>
                 <span class="battery-glyph" aria-hidden="true">
                     <span class="battery-body">
@@ -127,45 +148,64 @@
                 </span>
                 <span class="battery-text">{batteryState.level ?? '??'}%</span>
             </span>
+            {/if}
             <span class="info-wrap">
                 <button class="info-icon" type="button" aria-label="Device connection info">i</button>
                 <div class="info-tooltip" role="tooltip">
+                    {#if deviceState.powerState != null}
                     <div class="info-row">
                         <span class="info-label">Power</span>
                         <span class="info-value">{deviceState.powerState}</span>
                     </div>
+                    {/if}
+                    {#if deviceState.btConnInterval != null}
                     <div class="info-row">
                         <span class="info-label">BT interval</span>
-                        <span class="info-value">{deviceState.btConnInterval == null ? 'unavailable' : `${deviceState.btConnInterval} (${deviceState.btConnIntervalMs?.toFixed(2)} ms)`}</span>
+                        <span class="info-value">{deviceState.btConnInterval} ({deviceState.btConnIntervalMs?.toFixed(2)} ms)</span>
                     </div>
+                    {/if}
+                    {#if deviceState.btConnTimeout != null}
                     <div class="info-row">
                         <span class="info-label">BT timeout</span>
-                        <span class="info-value">{deviceState.btConnTimeout == null ? 'unavailable' : `${deviceState.btConnTimeout} (${deviceState.btConnTimeoutMs} ms)`}</span>
+                        <span class="info-value">{deviceState.btConnTimeout} ({deviceState.btConnTimeoutMs} ms)</span>
                     </div>
+                    {/if}
+                    {#if deviceState.btMtuRx != null}
                     <div class="info-row">
                         <span class="info-label">MTU RX</span>
-                        <span class="info-value">{deviceState.btMtuRx ?? 'unavailable'}</span>
+                        <span class="info-value">{deviceState.btMtuRx}</span>
                     </div>
+                    {/if}
+                    {#if deviceState.btMtuTx != null}
                     <div class="info-row">
                         <span class="info-label">MTU TX</span>
-                        <span class="info-value">{deviceState.btMtuTx ?? 'unavailable'}</span>
+                        <span class="info-value">{deviceState.btMtuTx}</span>
                     </div>
+                    {/if}
+                    {#if disState.manufacturerName != null}
                     <div class="info-row">
                         <span class="info-label">Manufacturer</span>
-                        <span class="info-value">{disState.manufacturerName ?? 'unavailable'}</span>
+                        <span class="info-value">{disState.manufacturerName}</span>
                     </div>
+                    {/if}
+                    {#if disState.modelNumber != null}
                     <div class="info-row">
                         <span class="info-label">Model</span>
-                        <span class="info-value">{disState.modelNumber ?? 'unavailable'}</span>
+                        <span class="info-value">{disState.modelNumber}</span>
                     </div>
+                    {/if}
+                    {#if disState.hardwareRevision != null}
                     <div class="info-row">
                         <span class="info-label">HW rev</span>
-                        <span class="info-value">{disState.hardwareRevision ?? 'unavailable'}</span>
+                        <span class="info-value">{disState.hardwareRevision}</span>
                     </div>
+                    {/if}
+                    {#if disState.firmwareRevision != null}
                     <div class="info-row">
                         <span class="info-label">FW rev</span>
-                        <span class="info-value">{disState.firmwareRevision ?? 'unavailable'}</span>
+                        <span class="info-value">{disState.firmwareRevision}</span>
                     </div>
+                    {/if}
                 </div>
             </span>
             {#if deviceState.powerState == 'idle'}
@@ -225,12 +265,20 @@
     {/if}
     {#if isLoading}
       <div class="loading" in:fade={{ duration: 100 }}>
-          <div class="spinner"></div>
-          <div>Fetching device info…</div>
+          {#if loadingStatus.error}
+              <div class="loading-error">{loadingStatus.error}</div>
+          {:else}
+              <div class="spinner"></div>
+              <div>{loadingStatus.message || 'Connecting…'}</div>
+          {/if}
       </div>
     {:else}
       <div class="content-container">
-          {#if currentView === DeviceUtilityView.DeviceUpdate}
+          {#if currentView === DeviceUtilityView.Landing}
+              <div in:fade={{ duration: 200 }}>
+                  <LandingView />
+              </div>
+          {:else if currentView === DeviceUtilityView.DeviceUpdate}
               <div in:fade={{ duration: 200 }}>
                   <DeviceUpdate />
               </div>
@@ -271,7 +319,7 @@
     }
     .nav-inner {
         display: flex;
-        flex-direction: row;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         width: 100%;
@@ -284,9 +332,19 @@
     .nav-status,
     .nav-tabs {
         display: flex;
-        flex-direction: row;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 20px;
+        gap: 10px 20px;
+    }
+
+    .device-name {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .device-icon {
+        width: 20px;
+        height: 20px;
     }
 
     .connect-btn {
@@ -460,6 +518,10 @@
         height: 40vh;
         color: #666;
     }
+    .loading-error {
+        color: #ef4444;
+        font-weight: 500;
+    }
     .spinner {
         width: 24px;
         height: 24px;
@@ -485,11 +547,6 @@
     }
 
     @media (max-width: 860px) {
-        nav { padding: 12px 14px; }
-        .nav-inner { flex-direction: column; align-items: stretch; gap: 10px; }
-        .nav-status,
-        .nav-tabs { flex-wrap: wrap; justify-content: flex-start; gap: 10px; }
-        nav a { font-size: 11px; padding: 6px 8px; }
         .info-tooltip { left: 0; right: auto; }
     }
 </style>

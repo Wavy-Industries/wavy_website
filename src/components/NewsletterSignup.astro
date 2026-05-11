@@ -1,0 +1,186 @@
+---
+interface Props {
+    tag?: string | null;
+    placeholder?: string;
+    label?: string;
+}
+
+const {
+    tag = null,
+    placeholder = 'email@example.com',
+    label = 'Subscribe',
+} = Astro.props;
+---
+
+<div class="newsletter" data-tag={tag ?? ''}>
+    <form class="form" novalidate>
+        <input
+            type="email"
+            name="email"
+            required
+            autocomplete="email"
+            placeholder={placeholder}
+        />
+        <button type="submit">{label}</button>
+    </form>
+    <div class="status" data-state="idle"></div>
+    <p class="error"></p>
+</div>
+
+<style>
+    .newsletter {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .form {
+        display: flex;
+        align-items: stretch;
+        height: 32px;
+        background: white;
+        border: 1px solid #ccc;
+    }
+
+    input {
+        height: 100%;
+        box-sizing: border-box;
+        border: 0;
+        padding: 0 10px;
+        font-size: 14px;
+        font-weight: 400;
+        color: black;
+        background: white;
+        outline: none;
+        width: 220px;
+        font-family: inherit;
+    }
+
+    input::placeholder {
+        color: #999;
+    }
+
+    input:disabled {
+        color: #888;
+        background: #f5f5f5;
+    }
+
+    button {
+        height: 100%;
+        box-sizing: border-box;
+        border: 0;
+        border-left: 1px solid #ccc;
+        background: white;
+        color: black;
+        font-size: 14px;
+        font-weight: 400;
+        padding: 0 10px;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+    button:hover:not(:disabled) {
+        background: #f0f0f0;
+    }
+
+    button:disabled {
+        color: #888;
+        background: #f5f5f5;
+        cursor: default;
+    }
+
+    .status {
+        font-size: 14px;
+        font-style: italic;
+        color: inherit;
+    }
+
+    .status[data-state="idle"] {
+        display: none;
+    }
+
+    .status[data-state="success"] {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 32px;
+        padding: 0 12px;
+        background: white;
+        border: 1px solid #ccc;
+        color: black;
+    }
+
+    .form[hidden] {
+        display: none;
+    }
+
+    .error {
+        margin: 0;
+        font-size: 12px;
+        color: #ff6b6b;
+    }
+
+    .error[hidden] {
+        display: none;
+    }
+
+    @media (max-width: 480px) {
+        input { width: 160px; }
+    }
+</style>
+
+<script>
+    const API_BASE = import.meta.env.MODE === 'development'
+        ? 'http://localhost:8000'
+        : 'https://server.wavyindustries.com';
+
+    const SUCCESS_FIRST = 'wonderful :)';
+    const SUCCESS_SECOND = 'stay tuned..';
+    const SUCCESS_FIRST_MS = 2000;
+
+    function initNewsletter(root: HTMLElement) {
+        const form = root.querySelector<HTMLFormElement>('.form');
+        const status = root.querySelector<HTMLElement>('.status');
+        const error = root.querySelector<HTMLElement>('.error');
+        const input = root.querySelector<HTMLInputElement>('input[type=email]');
+        const button = root.querySelector<HTMLButtonElement>('button[type=submit]');
+        if (!form || !status || !error || !input || !button) return;
+
+        const tag = root.dataset.tag || null;
+        error.hidden = true;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = input.value.trim();
+            if (!email) return;
+            error.hidden = true;
+            error.textContent = '';
+            input.disabled = true;
+            button.disabled = true;
+            try {
+                const body: Record<string, unknown> = { email };
+                if (tag) body.tags = [tag];
+                const res = await fetch(API_BASE + '/api/newsletter/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                if (!res.ok) throw new Error('signup failed');
+                form.hidden = true;
+                status.textContent = SUCCESS_FIRST;
+                status.dataset.state = 'success';
+                setTimeout(() => {
+                    status.textContent = SUCCESS_SECOND;
+                }, SUCCESS_FIRST_MS);
+            } catch {
+                input.disabled = false;
+                button.disabled = false;
+                error.textContent = 'Something went wrong. Try again.';
+                error.hidden = false;
+            }
+        });
+    }
+
+    document.querySelectorAll<HTMLElement>('.newsletter').forEach(initNewsletter);
+</script>

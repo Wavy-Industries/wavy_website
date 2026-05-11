@@ -35,7 +35,7 @@
     callbacksSet()
 </script>
 
-<section style="flex-grow: 2; display: flex; flex-direction: column; align-items: center;">
+<section style="flex-grow: 2; display: flex; flex-direction: column;">
     {#if bluetoothState.connectionState == 'disconnected' || bluetoothState.connectionState == 'connecting'}
         <ConnectView />
     {:else}

@@ -29,8 +29,8 @@ import midiConnectWinImg from '~/assets/midi_connect/screenshot-win.png';
 				<h1>MIDI Connect</h1>
 				<p class="tagline">🛑✋ STOP menu-diving each time you want to connect to a Bluetooth MIDI device on macOS or Windows</p>
 				<div class="hero-actions">
-					<LinkButton href={routes.midiConnectAppStore} type="highlight">Download for macOS</LinkButton>
-					<LinkButton href={routes.midiConnectWindowsInstaller} type="default" download>Download for Windows (experimental)</LinkButton>
+					<LinkButton href={routes.midiConnectAppStore} type="highlight" id="macos-download">Download for macOS</LinkButton>
+					<LinkButton href={routes.midiConnectWindowsInstaller} type="default" download id="windows-download">Download for Windows (experimental)</LinkButton>
 				</div>
 			</div>
 		</section>
@@ -49,8 +49,72 @@ import midiConnectWinImg from '~/assets/midi_connect/screenshot-win.png';
 			</div>
 		</section>
 	</main>
+
+	<div id="windows-disclaimer" class="disclaimer" hidden>
+		<div class="disclaimer-card" role="dialog" aria-modal="true" aria-labelledby="disclaimer-title">
+			<h2 id="disclaimer-title">Heads up</h2>
+			<p>Microsoft is currently reworking the MIDI implementation on Windows. You are likely to experience problems during setup and use.</p>
+			<p>Do you want to continue with the download?</p>
+			<div class="disclaimer-actions">
+				<button type="button" class="disclaimer-btn disclaimer-btn--secondary" id="disclaimer-cancel">Cancel</button>
+				<button type="button" class="disclaimer-btn disclaimer-btn--primary" id="disclaimer-continue">Continue download</button>
+			</div>
+		</div>
+	</div>
+
     <Footer variant="dark" />
 </Layout>
+
+<script>
+	import { track, TRACKING_EVENT_TYPES } from '~/lib/api/tracking.js';
+
+	const trigger = document.getElementById('windows-download') as HTMLAnchorElement | null;
+	const macTrigger = document.getElementById('macos-download') as HTMLAnchorElement | null;
+	const modal = document.getElementById('windows-disclaimer');
+	const cancelBtn = document.getElementById('disclaimer-cancel');
+	const continueBtn = document.getElementById('disclaimer-continue');
+
+	let acknowledged = false;
+
+	function openModal() {
+		if (!modal) return;
+		modal.hidden = false;
+		document.body.style.overflow = 'hidden';
+	}
+
+	function closeModal() {
+		if (!modal) return;
+		modal.hidden = true;
+		document.body.style.overflow = '';
+	}
+
+	macTrigger?.addEventListener('click', () => {
+		track(TRACKING_EVENT_TYPES.download, { product_id: 'midi-connect', platform: 'macos' });
+	});
+
+	trigger?.addEventListener('click', (e) => {
+		if (acknowledged) return;
+		e.preventDefault();
+		openModal();
+	});
+
+	cancelBtn?.addEventListener('click', closeModal);
+
+	continueBtn?.addEventListener('click', () => {
+		acknowledged = true;
+		closeModal();
+		track(TRACKING_EVENT_TYPES.download, { product_id: 'midi-connect', platform: 'windows' });
+		trigger?.click();
+	});
+
+	modal?.addEventListener('click', (e) => {
+		if (e.target === modal) closeModal();
+	});
+
+	document.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape' && modal && !modal.hidden) closeModal();
+	});
+</script>
 
 <style>
 main {
@@ -183,6 +247,80 @@ h1 {
 	.hero-image__win {
 		max-width: 100%;
 	}
+}
+
+.disclaimer {
+	position: fixed;
+	inset: 0;
+	background-color: rgba(0, 0, 0, 0.75);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	z-index: 1000;
+}
+
+.disclaimer[hidden] {
+	display: none;
+}
+
+.disclaimer-card {
+	background-color: #111;
+	color: #f0f0f0;
+	border: 1px solid #2a2a2a;
+	max-width: 480px;
+	width: 100%;
+	padding: 28px;
+}
+
+.disclaimer-card h2 {
+	margin: 0 0 12px 0;
+	font-size: 22px;
+	font-weight: 400;
+}
+
+.disclaimer-card p {
+	font-size: 15px;
+	line-height: 1.5;
+	color: #cfcfcf;
+	margin: 0 0 12px 0;
+	font-weight: 300;
+}
+
+.disclaimer-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 20px;
+	flex-wrap: wrap;
+}
+
+.disclaimer-btn {
+	font-size: 14px;
+	font-weight: 400;
+	padding: 6px 12px;
+	border: 1px solid #ccc;
+	cursor: pointer;
+	font-family: inherit;
+}
+
+.disclaimer-btn--secondary {
+	background-color: transparent;
+	color: #ddd;
+	border-color: #444;
+}
+
+.disclaimer-btn--secondary:hover {
+	background-color: #1c1c1c;
+}
+
+.disclaimer-btn--primary {
+	background-color: white;
+	color: black;
+}
+
+.disclaimer-btn--primary:hover {
+	background-color: #f0f0f0;
 }
 
 </style>
