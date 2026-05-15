@@ -152,8 +152,6 @@ input[type="text"], input[type="email"], input[type="password"] {
 
   const form = document.getElementById("mc-embedded-subscribe-form");
   form?.addEventListener("submit", () => {
-    try {
-      track(TRACKING_EVENT_TYPES.notify_subscribe, { code: "WIMKY001" });
-    } catch {}
+    track(TRACKING_EVENT_TYPES.notify_subscribe, { code: "WIMKY001" });
   });
 </script>

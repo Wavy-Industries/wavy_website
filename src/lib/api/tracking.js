@@ -48,25 +48,29 @@ function captureRef() {
 }
 
 export function track(eventType, metadata) {
-  var ref = captureRef();
-  var merged = metadata || {};
-  if (ref) {
-    merged.ref = ref;
-  }
+  try {
+    var ref = captureRef();
+    var merged = metadata || {};
+    if (ref) {
+      merged.ref = ref;
+    }
 
-  fetch(TRACKING_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      visitor_id: getVisitorId(),
-      event_type: eventType,
-      page_url: window.location.pathname,
-      referrer: !document.referrer ? 'unknown'
-        : document.referrer.includes(window.location.hostname) ? undefined
-        : document.referrer,
-      metadata: Object.keys(merged).length ? merged : undefined,
-    }),
-    credentials: 'omit',
-    keepalive: true,
-  }).catch(function () {});
+    fetch(TRACKING_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        visitor_id: getVisitorId(),
+        event_type: eventType,
+        page_url: window.location.pathname,
+        referrer: !document.referrer ? 'unknown'
+          : document.referrer.includes(window.location.hostname) ? undefined
+          : document.referrer,
+        metadata: Object.keys(merged).length ? merged : undefined,
+      }),
+      credentials: 'omit',
+      keepalive: true,
+    }).catch(function () {});
+  } catch (err) {
+    console.warn('track(' + eventType + ') failed', err);
+  }
 }

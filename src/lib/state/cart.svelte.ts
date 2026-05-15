@@ -51,9 +51,7 @@ function clampQty(q: number): number {
 }
 
 function emit(event: string, payload?: Record<string, unknown>) {
-    try {
-        track(event, { ...payload, cart_size: cartCount() });
-    } catch {}
+    track(event, { ...payload, cart_size: cartCount() });
 }
 
 export function cartInit() {

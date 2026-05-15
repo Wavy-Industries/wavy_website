@@ -8,7 +8,7 @@ import arrowRightImg from "~/assets/icons/arrow.right.svg";
 import monkeyImg from "~/assets/monkey/packaging/Monkey with packaging.jpg";
 ---
 
-<Layout title="Wavy Industries: Purchase complete">
+<Layout title="Purchase complete - Wavy Industries">
   <section>
     <div class="banner"><img src={logoImg.src} /></div>
     <div class="content">
@@ -409,9 +409,7 @@ import monkeyImg from "~/assets/monkey/packaging/Monkey with packaging.jpg";
 
   let orderId = null;
 
-  try {
-    track(TRACKING_EVENT_TYPES.checkout_success);
-  } catch {}
+  track(TRACKING_EVENT_TYPES.checkout_success);
 
   function showThankYou() {
     const formDiv = document.querySelector(".content form")?.parentElement;
@@ -534,7 +532,7 @@ import monkeyImg from "~/assets/monkey/packaging/Monkey with packaging.jpg";
     })
       .then((res) => {
         if (res.ok) {
-          try { track(TRACKING_EVENT_TYPES.feedback_submit, { form: "post-purchase-monkey" }); } catch {}
+          track(TRACKING_EVENT_TYPES.feedback_submit, { form: "post-purchase-monkey" });
           showThankYou();
         } else {
           console.error("Failed to submit form");

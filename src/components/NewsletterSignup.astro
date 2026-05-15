@@ -131,11 +131,7 @@ const {
 </style>
 
 <script>
-    import { track, TRACKING_EVENT_TYPES } from '~/lib/api/tracking.js';
-
-    const API_BASE = import.meta.env.MODE === 'development'
-        ? 'http://localhost:8000'
-        : 'https://server.wavyindustries.com';
+    import { submitNewsletter } from '~/lib/api/newsletter.js';
 
     const SUCCESS_FIRST = 'wonderful :)';
     const SUCCESS_SECOND = 'stay tuned..';
@@ -161,20 +157,7 @@ const {
             input.disabled = true;
             button.disabled = true;
             try {
-                const body: Record<string, unknown> = { email };
-                if (tag) body.tags = [tag];
-                const res = await fetch(API_BASE + '/api/newsletter/subscribe', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body),
-                });
-                if (!res.ok) throw new Error('signup failed');
-                try {
-                    track(TRACKING_EVENT_TYPES.newsletter_subscribe, {
-                        source: 'inline',
-                        ...(tag ? { tag } : {}),
-                    });
-                } catch {}
+                await submitNewsletter({ email, tag, source: 'inline' });
                 form.hidden = true;
                 status.textContent = SUCCESS_FIRST;
                 status.dataset.state = 'success';

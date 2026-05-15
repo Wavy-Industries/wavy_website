@@ -8,8 +8,8 @@ import arrowRightImg from '~/assets/icons/arrow.right.svg';
 import { routes } from '~/routes';
 ---
 
-<Layout title="Wavy Industries: Cart">
-  <main class="checkout-page">
+<Layout title="Cart - Wavy Industries">
+  <main class="cart-page">
     <Header />
     <div id="checkout-loading" class="page-loading">
       <div class="spinner" aria-hidden="true"></div>
@@ -85,6 +85,12 @@ import { routes } from '~/routes';
 
 
 <style is:global>
+/*
+ * Styles are `is:global` because line items are injected at runtime by
+ * `scripts/checkout.js` (no `data-astro-cid-*` on those nodes, so Astro's
+ * scoped CSS can't reach them). Every rule below is prefixed with
+ * `.cart-page` so it only applies to elements inside `<main class="cart-page">`.
+ */
 #preorder-disclosure {
   background-color: #f2f3ec;
   padding: 20px;
@@ -93,14 +99,14 @@ import { routes } from '~/routes';
   margin: 0px;
 }
 
-.checkout-page main {
+.cart-page main {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
 #checkout-section,
-.checkout-page #checkout-empty {
+.cart-page #checkout-empty {
   margin: 24px auto 60px;
   width: 100%;
   max-width: 640px;
@@ -111,7 +117,7 @@ import { routes } from '~/routes';
   box-sizing: border-box;
 }
 
-.checkout-page .page-loading {
+.cart-page .page-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -122,7 +128,7 @@ import { routes } from '~/routes';
   color: #1f1f1f;
 }
 
-.checkout-page .spinner {
+.cart-page .spinner {
   width: 42px;
   height: 42px;
   border-radius: 50%;
@@ -136,7 +142,7 @@ import { routes } from '~/routes';
   to { transform: rotate(360deg); }
 }
 
-.checkout-page .banner {
+.cart-page .banner {
   background-color: #d5d5d5;
   padding: 20px;
   display: flex;
@@ -144,39 +150,39 @@ import { routes } from '~/routes';
   justify-content: center;
 }
 
-.checkout-page .banner img {
+.cart-page .banner img {
   display: block;
   height: 32px;
   width: auto;
 }
 
-.checkout-page .card-stack {
+.cart-page .card-stack {
   display: flex;
   flex-direction: column;
 }
 
-.checkout-page hr {
+.cart-page hr {
   border: 0;
   margin: 0;
   height: 1px;
   background: #d5d5d5;
 }
 
-.checkout-page .content {
+.cart-page .content {
   background-color: #F5F5F5;
   padding: 20px;
 }
 
-.checkout-page #line-items {
+.cart-page #line-items {
   display: flex;
   flex-direction: column;
 }
 
-.checkout-page #line-items > .line-item:not(:first-child) {
+.cart-page #line-items > .line-item:not(:first-child) {
   border-top: 1px solid #d5d5d5;
 }
 
-.checkout-page .line-item {
+.cart-page .line-item {
   background-color: #F5F5F5;
   padding: 14px 20px;
   display: flex;
@@ -185,7 +191,7 @@ import { routes } from '~/routes';
   gap: 12px 16px;
 }
 
-.checkout-page .line-left {
+.cart-page .line-left {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -194,7 +200,7 @@ import { routes } from '~/routes';
   flex-wrap: wrap;
 }
 
-.checkout-page .line-right {
+.cart-page .line-right {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -203,7 +209,7 @@ import { routes } from '~/routes';
   flex-wrap: wrap;
 }
 
-.checkout-page .line-icon {
+.cart-page .line-icon {
   flex: 0 0 auto;
   width: 32px;
   height: 32px;
@@ -211,19 +217,19 @@ import { routes } from '~/routes';
   display: block;
 }
 
-.checkout-page .line-name-wrap {
+.cart-page .line-name-wrap {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.checkout-page .line-name {
+.cart-page .line-name {
   font-weight: 600;
   font-size: 15px;
 }
 
-.checkout-page .preorder-tag {
+.cart-page .preorder-tag {
   display: inline-block;
   padding: 2px 6px;
   background-color: #ffcc00;
@@ -236,7 +242,7 @@ import { routes } from '~/routes';
   white-space: nowrap;
 }
 
-.checkout-page .preorder-note {
+.cart-page .preorder-note {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -249,46 +255,46 @@ import { routes } from '~/routes';
   line-height: 1.5;
 }
 
-.checkout-page .preorder-note .preorder-tag {
+.cart-page .preorder-note .preorder-tag {
   flex: 0 0 auto;
   margin-top: 1px;
 }
 
-.checkout-page .preorder-text {
+.cart-page .preorder-text {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.checkout-page .preorder-text p {
+.cart-page .preorder-text p {
   margin: 0;
 }
 
-.checkout-page .preorder-text b {
+.cart-page .preorder-text b {
   color: #555;
 }
 
-.checkout-page .checkout-title {
+.cart-page .checkout-title {
   margin: 0;
   font-weight: 300;
   font-size: 32px;
 }
 
-.checkout-page .line-price {
+.cart-page .line-price {
   flex: 0 0 auto;
   font-size: 13px;
   color: #555;
   font-variant-numeric: tabular-nums;
 }
 
-.checkout-page .qty-controls {
+.cart-page .qty-controls {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.checkout-page .qty-button {
+.cart-page .qty-button {
   border: 1px solid #ccc;
   background-color: #fff;
   padding: 2px 10px;
@@ -298,23 +304,23 @@ import { routes } from '~/routes';
   font-family: inherit;
 }
 
-.checkout-page .qty-button:hover:not(:disabled) {
+.cart-page .qty-button:hover:not(:disabled) {
   background-color: #f0f0f0;
 }
 
-.checkout-page .qty-button:disabled {
+.cart-page .qty-button:disabled {
   cursor: default;
   opacity: 0.5;
 }
 
-.checkout-page .qty-value {
+.cart-page .qty-value {
   min-width: 1.5ch;
   text-align: center;
   font-variant-numeric: tabular-nums;
   font-size: 14px;
 }
 
-.checkout-page .line-total {
+.cart-page .line-total {
   flex: 0 0 auto;
   min-width: 64px;
   text-align: right;
@@ -323,7 +329,7 @@ import { routes } from '~/routes';
   font-variant-numeric: tabular-nums;
 }
 
-.checkout-page .line-remove {
+.cart-page .line-remove {
   flex: 0 0 auto;
   background: none;
   border: 0;
@@ -336,35 +342,35 @@ import { routes } from '~/routes';
   font-family: inherit;
 }
 
-.checkout-page .line-remove:hover {
+.cart-page .line-remove:hover {
   color: #111;
 }
 
-.checkout-page .totals-card {
+.cart-page .totals-card {
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-size: 14px;
 }
 
-.checkout-page .totals-row {
+.cart-page .totals-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
 }
 
-.checkout-page .info-row {
+.cart-page .info-row {
   font-size: 12px;
   color: #555;
 }
 
-.checkout-page .info-value {
+.cart-page .info-value {
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
-.checkout-page .subtotal-row {
+.cart-page .subtotal-row {
   border-top: 1px solid #d5d5d5;
   margin-top: 8px;
   padding-top: 10px;
@@ -373,26 +379,26 @@ import { routes } from '~/routes';
   color: #111;
 }
 
-.checkout-page .totals-value {
+.cart-page .totals-value {
   font-variant-numeric: tabular-nums;
 }
 
-.checkout-page .region-row {
+.cart-page .region-row {
   margin-bottom: 4px;
 }
 
-.checkout-page .region-label {
+.cart-page .region-label {
   font-size: 11px;
   color: #777;
 }
 
-.checkout-page #buy-now-wrapper {
+.cart-page #buy-now-wrapper {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.checkout-page .terms-check {
+.cart-page .terms-check {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -401,17 +407,17 @@ import { routes } from '~/routes';
   cursor: pointer;
 }
 
-.checkout-page .terms-check input {
+.cart-page .terms-check input {
   margin-top: 2px;
   cursor: pointer;
 }
 
-.checkout-page .terms-check a {
+.cart-page .terms-check a {
   text-decoration: underline;
   font-style: normal;
 }
 
-.checkout-page .trust-strip {
+.cart-page .trust-strip {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -421,18 +427,18 @@ import { routes } from '~/routes';
   font-style: normal;
 }
 
-.checkout-page .trust-strip svg {
+.cart-page .trust-strip svg {
   flex: 0 0 auto;
   color: #555;
 }
 
-.checkout-page .cart-actions {
+.cart-page .cart-actions {
   display: flex;
   align-items: center;
   gap: 16px;
 }
 
-.checkout-page .back-link {
+.cart-page .back-link {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -445,12 +451,12 @@ import { routes } from '~/routes';
   white-space: nowrap;
 }
 
-.checkout-page .back-link img {
+.cart-page .back-link img {
   height: 10px;
   transform: rotate(180deg);
 }
 
-.checkout-page .chechout-button {
+.cart-page .chechout-button {
   background-color: #5A88FF;
   color: white;
   flex: 1 1 auto;
@@ -463,26 +469,26 @@ import { routes } from '~/routes';
   font-family: inherit;
 }
 
-.checkout-page .chechout-button:hover:not(:disabled) {
+.cart-page .chechout-button:hover:not(:disabled) {
   background-color: #4378ff;
 }
 
-.checkout-page .chechout-button:disabled {
+.cart-page .chechout-button:disabled {
   cursor: default;
   opacity: 0.7;
 }
 
-.checkout-page .shipping-info {
+.cart-page .shipping-info {
   font-size: 12px;
   font-style: italic;
 }
 
-.checkout-page .terms {
+.cart-page .terms {
   text-align: center;
   margin: 0;
 }
 
-.checkout-page .empty-state {
+.cart-page .empty-state {
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -491,19 +497,19 @@ import { routes } from '~/routes';
   padding: 40px 20px;
 }
 
-.checkout-page .empty-state h2 {
+.cart-page .empty-state h2 {
   margin: 0;
   font-weight: 300;
   font-size: 28px;
 }
 
-.checkout-page .empty-state p {
+.cart-page .empty-state p {
   margin: 0;
   color: #555;
   font-size: 14px;
 }
 
-.checkout-page .empty-cta {
+.cart-page .empty-cta {
   margin-top: 8px;
   background-color: rgb(8, 76, 207);
   color: white;
@@ -514,12 +520,12 @@ import { routes } from '~/routes';
   font-size: 14px;
 }
 
-.checkout-page .empty-cta:hover {
+.cart-page .empty-cta:hover {
   background-color: blue;
   text-decoration: none;
 }
 
-.checkout-page .hidden {
+.cart-page .hidden {
   display: none !important;
 }
 </style>

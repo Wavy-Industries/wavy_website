@@ -27,10 +27,20 @@
         return clearTimer;
     });
 
+    $effect(() => {
+        if (!cart.popupOpen) return;
+        function onKey(e) {
+            if (e.key === 'Escape') closeCart();
+        }
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    });
+
     let count = $derived(cartCount());
 </script>
 
 {#if cart.popupOpen}
+    <div class="backdrop" role="presentation" onclick={closeCart}></div>
     <div
         class="cart-popup"
         role="dialog"
@@ -73,6 +83,14 @@
 {/if}
 
 <style>
+    .backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        z-index: 99;
+        cursor: pointer;
+    }
+
     .cart-popup {
         position: fixed;
         top: 16px;

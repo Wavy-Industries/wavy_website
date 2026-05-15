@@ -69,13 +69,11 @@ import Footer from '~/layouts/Footer.astro';
     document.querySelectorAll<HTMLAnchorElement>('[data-template]').forEach((a) => {
         a.addEventListener('click', () => {
             const name = a.dataset.template || 'unknown';
-            try {
-                track(TRACKING_EVENT_TYPES.download, {
-                    kind: 'template',
-                    code: 'WIMKY001',
-                    name,
-                });
-            } catch {}
+            track(TRACKING_EVENT_TYPES.download, {
+                kind: 'template',
+                code: 'WIMKY001',
+                name,
+            });
         });
     });
 </script>

@@ -16,6 +16,7 @@ export const routes = {
     'blog': '/blog',
     'support': '/support',
     'about': '/about',
+    'partners': '/partners',
 
     'deviceUtility': '/resources/device-utility',
     'deviceUtilityPlayground': '/resources/device-utility#playground',

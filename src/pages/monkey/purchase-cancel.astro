@@ -5,7 +5,7 @@ import { routes } from '~/routes';
 <script define:vars={{ cartUrl: routes.cart }}>
 	import('~/lib/api/tracking.js')
 		.then(({ track, TRACKING_EVENT_TYPES }) => {
-			try { track(TRACKING_EVENT_TYPES.checkout_cancel); } catch {}
+			track(TRACKING_EVENT_TYPES.checkout_cancel);
 		})
 		.catch(() => {})
 		.finally(() => {

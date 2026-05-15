@@ -1,10 +1,6 @@
 <script>
     import { newsletterUI, closeNewsletter } from '~/lib/state/newsletter.svelte';
-    import { track, TRACKING_EVENT_TYPES } from '~/lib/api/tracking.js';
-
-    const API_BASE = import.meta.env.MODE === 'development'
-        ? 'http://localhost:8000'
-        : 'https://server.wavyindustries.com';
+    import { submitNewsletter } from '~/lib/api/newsletter.js';
 
     let email = $state('');
     let status = $state('idle'); // 'idle' | 'loading' | 'success'
@@ -19,13 +15,7 @@
         errorMsg = '';
         status = 'loading';
         try {
-            const res = await fetch(API_BASE + '/api/newsletter/subscribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: trimmed }),
-            });
-            if (!res.ok) throw new Error('signup failed');
-            try { track(TRACKING_EVENT_TYPES.newsletter_subscribe, { source: 'header' }); } catch {}
+            await submitNewsletter({ email: trimmed, source: newsletterUI.source });
             status = 'success';
             successFinal = false;
             setTimeout(() => {
@@ -48,9 +38,19 @@
             successFinal = false;
         }, 200);
     }
+
+    $effect(() => {
+        if (!newsletterUI.popupOpen) return;
+        function onKey(e) {
+            if (e.key === 'Escape') close();
+        }
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    });
 </script>
 
 {#if newsletterUI.popupOpen}
+    <div class="backdrop" role="presentation" onclick={close}></div>
     <div class="popup" role="dialog" aria-label="Newsletter signup">
         <div class="head">
             <span class="title">Newsletter</span>
@@ -73,6 +73,14 @@
 {/if}
 
 <style>
+    .backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        z-index: 99;
+        cursor: pointer;
+    }
+
     .popup {
         position: fixed;
         top: 16px;
