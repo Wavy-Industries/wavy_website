@@ -19,7 +19,6 @@ export const TRACKING_EVENT_TYPES = {
   // Engagement
   download: 'download',
   newsletter_subscribe: 'newsletter_subscribe',
-  notify_subscribe: 'notify_subscribe',
   feedback_submit: 'feedback_submit',
 }
 

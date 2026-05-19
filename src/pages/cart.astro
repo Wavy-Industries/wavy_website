@@ -2,7 +2,7 @@
 import '~/styles/global.css';
 import Layout from "~/layouts/Layout.astro";
 import Header from "~/layouts/Header.astro";
-import StockSubscribe from '~/components/StockSubscribe.astro';
+import NewsletterSignup from '~/components/NewsletterSignup.astro';
 
 import arrowRightImg from '~/assets/icons/arrow.right.svg';
 import { routes } from '~/routes';
@@ -75,7 +75,8 @@ import { routes } from '~/routes';
       </div>
 
       <div id="stock-notify-form" class="content hidden">
-        <StockSubscribe />
+        <p>Get notified when MONKEY is back in stock</p>
+        <NewsletterSignup tag="stock" source="cart_inline" label="Notify Me" />
       </div>
     </section>
 

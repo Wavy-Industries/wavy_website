@@ -1,18 +1,20 @@
 ---
 interface Props {
+    source: string;
     tag?: string | null;
     placeholder?: string;
     label?: string;
 }
 
 const {
+    source,
     tag = null,
     placeholder = 'email@example.com',
     label = 'Subscribe',
 } = Astro.props;
 ---
 
-<div class="newsletter" data-tag={tag ?? ''}>
+<div class="newsletter" data-tag={tag ?? ''} data-source={source}>
     <form class="form" novalidate>
         <input
             type="email"
@@ -146,6 +148,8 @@ const {
         if (!form || !status || !error || !input || !button) return;
 
         const tag = root.dataset.tag || null;
+        const source = root.dataset.source;
+        if (!source) return;
         error.hidden = true;
 
         form.addEventListener('submit', async (e) => {
@@ -157,7 +161,7 @@ const {
             input.disabled = true;
             button.disabled = true;
             try {
-                await submitNewsletter({ email, tag, source: 'inline' });
+                await submitNewsletter({ email, tag, source });
                 form.hidden = true;
                 status.textContent = SUCCESS_FIRST;
                 status.dataset.state = 'success';

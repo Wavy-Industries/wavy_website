@@ -14,7 +14,7 @@ export async function submitNewsletter(opts) {
 
   if (!email) throw new Error('email required');
 
-  var body = { email: email };
+  var body = { email: email, source: source };
   if (tag) body.tags = [tag];
 
   var res = await fetch(API_BASE + '/api/newsletter/subscribe', {

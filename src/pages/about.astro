@@ -23,7 +23,7 @@ import { routes } from '~/routes';
 				<ul class="contact-list">
 					<li><a href={routes.wavyDiscord} target="_blank">Wavy Discord</a> - the fastest place to reach us and the community.</li>
 					<li><a href={routes.support}>Support</a> - help, contact, and direct email.</li>
-					<li><a href={routes.newsletter} target="_blank">Newsletter</a> - stay up to date with new releases and other updates.</li>
+					<li><a href="#" id="about-newsletter-trigger">Newsletter</a> - stay up to date with new releases and other updates.</li>
 				</ul>
 				<p>Feel free to contact our founder <i>Rein Gundersen Bentdal</i> directly at <a href="mailto:rein@wavyindustries.com">rein@wavyindustries.com</a>.</p>
 				<h2>Company</h2>
@@ -93,3 +93,12 @@ import { routes } from '~/routes';
 		color: #555;
 	}
 </style>
+
+<script>
+import { openNewsletter } from "~/lib/state/newsletter.svelte";
+
+document.getElementById("about-newsletter-trigger")?.addEventListener("click", (e) => {
+	e.preventDefault();
+	openNewsletter("about_popup");
+});
+</script>

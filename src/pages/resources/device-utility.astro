@@ -4,7 +4,7 @@ import '~/styles/device-utility.css';
 import Layout from '~/layouts/Layout.astro';
 import Header from '~/layouts/Header.astro';
 import Footer from '~/layouts/Footer.astro';
-import DeviceUpdateSubscribe from '~/components/DeviceUpdateSubscribe.astro';
+import NewsletterSignup from '~/components/NewsletterSignup.astro';
 import DeviceUtility from '~/features/device-utility/index.svelte';
 
 import MonkeyProgramImg from '~/assets/resources/device-tools/monkey_program.png';
@@ -16,7 +16,10 @@ import MonkeyProgramImg from '~/assets/resources/device-tools/monkey_program.png
 
 		<div>
 			<DeviceUtility client:load />
-			<DeviceUpdateSubscribe style="margin: 30px 0px;" />
+			<div style="margin: 30px 0px;">
+				<p style="font-style: italic; margin-bottom: 1em;">get updates on new firmware releases and new tools</p>
+				<NewsletterSignup tag="device-update" source="device_utility_inline" label="Subscribe" />
+			</div>
 		</div>
 		<Footer />
 	</main>

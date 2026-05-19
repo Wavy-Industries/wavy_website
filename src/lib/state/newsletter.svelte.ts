@@ -1,9 +1,9 @@
 export const newsletterUI = $state<{ popupOpen: boolean; source: string }>({
     popupOpen: false,
-    source: 'unknown',
+    source: '',
 });
 
-export function openNewsletter(source: string = 'unknown') {
+export function openNewsletter(source: string) {
     newsletterUI.source = source;
     newsletterUI.popupOpen = true;
 }
