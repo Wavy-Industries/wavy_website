@@ -1,10 +1,12 @@
 <script>
     import { cartAdd } from '~/lib/state/cart.svelte';
+    import { routes } from '~/routes';
 
     let { sku, name, cta = 'hero', priceClass = 'monkey-price' } = $props();
 
     function handleClick() {
         cartAdd(sku, name, 1, cta);
+        window.location.href = routes.cart;
     }
 </script>
 

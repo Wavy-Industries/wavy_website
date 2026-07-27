@@ -1,6 +1,6 @@
 import { getCountryCode } from '~/lib/api/geo.js';
 import { fetchProduct, createCheckout, DOMAIN, TOKEN } from '~/lib/api/shopify.js';
-import { formatShopifyPrice, formatTaxAmount, resolveTaxSettings, resolveDisplayGrossAndTax } from '~/lib/utils/shopify-util.js';
+import { formatShopifyPrice, resolveTaxSettings, resolveDisplayGrossAndTax } from '~/lib/utils/shopify-util.js';
 import { track, TRACKING_EVENT_TYPES, getVisitorId, getRef } from '~/lib/api/tracking.js';
 import { cart, cartInit, cartUpdate, cartRemove } from '~/lib/state/cart.svelte';
 import { PRODUCTS, getProduct, isPreorder } from '~/lib/config/products';
@@ -30,11 +30,9 @@ var lineItemsEl = document.getElementById('line-items');
 var buyButton = document.getElementById('buy-now-button');
 var errorEl = document.getElementById('buy-error');
 var totalEl = document.getElementById('total-price');
-var taxLabelEl = document.getElementById('tax-label');
 var taxAmountEl = document.getElementById('tax-amount');
 var regionLabelEl = document.getElementById('region-label');
 var preorderDisclosureEl = document.getElementById('preorder-disclosure');
-var termsCheckbox = document.getElementById('terms-accept');
 
 var client;
 
@@ -273,14 +271,12 @@ async function fetchAll() {
 function updateTotal() {
   if (!totalEl) return;
   var totalGross = 0;
-  var totalTax = 0;
   var hasTax = false;
   cart.items.forEach(function (item) {
     var info = productInfo[item.sku];
     if (!info) return;
     totalGross += info.unitGross * clampQty(item.qty);
     if (info.unitTax !== null && info.unitTax !== undefined) {
-      totalTax += info.unitTax * clampQty(item.qty);
       hasTax = true;
     }
   });
@@ -288,26 +284,13 @@ function updateTotal() {
   totalEl.textContent = currencyCode ? formatShopifyPrice(currencyCode, totalGross) : '—';
 
   if (taxAmountEl) {
-    if (!hasTax) {
-      taxAmountEl.textContent = 'paid on delivery';
-    } else {
-      taxAmountEl.textContent = formatTaxAmount(currencyCode || '', totalTax);
-    }
-  }
-
-  if (taxLabelEl) {
-    if (!hasTax) {
-      taxLabelEl.textContent = 'Import duties & taxes';
-    } else {
-      taxLabelEl.textContent = 'incl. ' + (taxNameForDisplay || 'VAT');
-    }
+    taxAmountEl.textContent = (taxNameForDisplay || 'VAT') + (hasTax ? ' inc.' : ' exc.');
   }
 }
 
 function updateBuyButton() {
   if (!buyButton) return;
-  var termsOk = !termsCheckbox || termsCheckbox.checked;
-  if (cart.items.length === 0 || anyOutOfStock() || !termsOk) {
+  if (cart.items.length === 0 || anyOutOfStock()) {
     setButtonState(true);
   } else {
     setButtonState(false);
@@ -392,7 +375,6 @@ function handleBuy() {
 }
 
 if (buyButton) buyButton.addEventListener('click', handleBuy);
-if (termsCheckbox) termsCheckbox.addEventListener('change', updateBuyButton);
 
 if (cart.items.length === 0) {
   showEmptyState();

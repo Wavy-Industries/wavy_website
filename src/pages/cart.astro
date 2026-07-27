@@ -37,8 +37,8 @@ import { routes } from '~/routes';
             <span class="info-value">Worldwide express. 4-12 business days from Norway</span>
           </div>
           <div class="totals-row info-row">
-            <span id="tax-label">Taxes</span>
-            <span id="tax-amount" class="info-value">Calculating…</span>
+            <span>Taxes</span>
+            <span id="tax-amount" class="info-value"></span>
           </div>
           <div class="totals-row subtotal-row">
             <span>Subtotal</span>
@@ -56,10 +56,6 @@ import { routes } from '~/routes';
       </aside>
 
       <div id="buy-now-wrapper">
-        <label class="terms-check">
-          <input type="checkbox" id="terms-accept" />
-          <span>I have read and agree to the <a target="_blank" href={routes.termsAndConditions}>terms &amp; conditions</a>.</span>
-        </label>
         <div class="cart-actions">
           <a class="back-link" href={routes.home}><img src={arrowRightImg.src} alt="" /> Back to shopping</a>
           <button id="buy-now-button" class="chechout-button" disabled>Continue to checkout</button>
@@ -397,25 +393,6 @@ import { routes } from '~/routes';
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.cart-page .terms-check {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 13px;
-  color: #333;
-  cursor: pointer;
-}
-
-.cart-page .terms-check input {
-  margin-top: 2px;
-  cursor: pointer;
-}
-
-.cart-page .terms-check a {
-  text-decoration: underline;
-  font-style: normal;
 }
 
 .cart-page .trust-strip {

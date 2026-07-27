@@ -73,8 +73,6 @@ export function cartAdd(sku: string, name: string, qty = 1, cta?: string) {
         qty,
         ...(cta ? { cta } : {}),
     });
-    cart.popupReason = 'add';
-    cart.popupOpen = true;
 }
 
 export function cartUpdate(sku: string, qty: number) {
