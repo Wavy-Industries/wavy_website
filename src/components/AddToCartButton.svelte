@@ -23,18 +23,22 @@
         align-items: center;
         justify-content: center;
         gap: 8px;
-        padding: 6px 10px;
+        padding: 9px 18px;
         font: inherit;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 400;
         font-style: normal;
-        background-color: rgb(8, 76, 207);
-        color: white;
-        border: 1px solid #a0bee9;
+        letter-spacing: 0.02em;
+        border: 0;
+        border-radius: 3px;
         cursor: pointer;
+        background-color: #57d865;
+        color: #111;
+        transition: background-color 0.15s;
     }
+
     .atc:hover {
-        background-color: blue;
+        background-color: #48ce57;
     }
     .label {
         display: inline-flex;

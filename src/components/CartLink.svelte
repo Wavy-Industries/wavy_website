@@ -37,6 +37,6 @@
         text-decoration: underline;
     }
     .cart-link.full {
-        color: #ff7a1a;
+        color: #57d865;
     }
 </style>

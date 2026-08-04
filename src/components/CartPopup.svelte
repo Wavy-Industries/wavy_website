@@ -44,6 +44,7 @@
     <div
         class="cart-popup"
         role="dialog"
+        tabindex="-1"
         aria-label="Cart"
         onmouseenter={() => { hovered = true; clearTimer(); }}
         onmouseleave={() => { hovered = false; }}
@@ -237,12 +238,13 @@
     }
 
     .btn.primary {
-        background: #ff7a1a;
-        color: white;
-        border-color: #ff7a1a;
+        background: #57d865;
+        color: #111;
+        border-color: #57d865;
     }
 
     .btn.primary:hover {
-        background: #ff8a35;
+        background: #48ce57;
+        border-color: #48ce57;
     }
 </style>

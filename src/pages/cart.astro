@@ -435,20 +435,23 @@ import { routes } from '~/routes';
 }
 
 .cart-page .chechout-button {
-  background-color: #5A88FF;
-  color: white;
+  background-color: #57d865;
+  color: #111;
   flex: 1 1 auto;
-  border: none;
-  padding: 20px 24px;
-  font-weight: bold;
-  font-size: 16px;
+  border: 0;
+  border-radius: 3px;
+  padding: 16px 24px;
+  font-weight: 400;
+  font-size: 14px;
+  letter-spacing: 0.02em;
   text-align: center;
   cursor: pointer;
   font-family: inherit;
+  transition: background-color 0.15s;
 }
 
 .cart-page .chechout-button:hover:not(:disabled) {
-  background-color: #4378ff;
+  background-color: #48ce57;
 }
 
 .cart-page .chechout-button:disabled {
@@ -489,17 +492,20 @@ import { routes } from '~/routes';
 
 .cart-page .empty-cta {
   margin-top: 8px;
-  background-color: rgb(8, 76, 207);
-  color: white;
-  border: 1px solid #a0bee9;
-  padding: 8px 14px;
+  background-color: #57d865;
+  color: #111;
+  border: 0;
+  border-radius: 3px;
+  padding: 9px 18px;
   text-decoration: none;
   font-style: normal;
-  font-size: 14px;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  transition: background-color 0.15s;
 }
 
 .cart-page .empty-cta:hover {
-  background-color: blue;
+  background-color: #48ce57;
   text-decoration: none;
 }
 
