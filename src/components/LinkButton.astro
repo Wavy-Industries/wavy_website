@@ -3,7 +3,8 @@ import '../styles/global.css';
 import type { HTMLAttributes } from 'astro/types';
 
 interface Props extends HTMLAttributes<'a'> {
-  type?: 'highlight' | 'default';
+  /* `buy` is for purchase actions only — it is the one place green appears. */
+  type?: 'buy' | 'default';
   theme?: 'light' | 'dark';
 }
 
@@ -15,6 +16,8 @@ const { href, type = 'default', theme = 'light', ...rest } = Astro.props;
 </a>
 
 <style>
+/* The base owns layout and type. Colour, including hover, belongs to the
+   variant — a background set here would repaint every variant with it. */
 a {
   display: inline-flex;
   align-items: center;
@@ -30,8 +33,6 @@ a {
 
 a:hover {
   text-decoration: none;
-  background-color: var(--accent-color);
-  color: #fff;
 }
 
 .default.light {
@@ -39,13 +40,26 @@ a:hover {
   color: #fff;
 }
 
+.default.light:hover {
+  background-color: var(--accent-color);
+}
+
 .default.dark {
   background-color: #fff;
   color: #111;
 }
 
-.highlight {
-  background-color: #57d865;
+.default.dark:hover {
+  background-color: var(--accent-color);
+  color: #fff;
+}
+
+.buy {
+  background-color: var(--buy-color);
   color: #111;
+}
+
+.buy:hover {
+  background-color: var(--buy-color-hover);
 }
 </style>

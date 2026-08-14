@@ -376,7 +376,7 @@
         gap: 8px;
         border: 0;
         padding: 15px 20px;
-        background: #57d865;
+        background: var(--buy-color);
         color: #111;
         font: inherit;
         font-size: 14px;
@@ -385,7 +385,7 @@
     }
 
     .checkout:hover:not(:disabled) {
-        background: #48ce57;
+        background: var(--buy-color-hover);
     }
 
     .checkout:disabled {

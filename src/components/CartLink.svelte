@@ -46,6 +46,6 @@
         text-decoration: underline;
     }
     .cart-link.full {
-        color: #57d865;
+        color: var(--buy-color);
     }
 </style>

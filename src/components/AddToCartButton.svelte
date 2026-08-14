@@ -37,13 +37,13 @@
         letter-spacing: 0.02em;
         border: 0;
         cursor: pointer;
-        background-color: #57d865;
+        background-color: var(--buy-color);
         color: #111;
         transition: background-color 0.15s;
     }
 
     .atc:hover {
-        background-color: #48ce57;
+        background-color: var(--buy-color-hover);
     }
     .label {
         display: inline-flex;
