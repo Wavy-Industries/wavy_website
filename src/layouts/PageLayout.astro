@@ -54,14 +54,16 @@ main.page article {
 	padding: 40px 0 80px;
 }
 
-main.page h1 {
+/* Content rules stay under `article`. Header and Footer are also inside
+   `main.page`, and reaching them from here silently restyles the site. */
+main.page article h1 {
 	font-size: 36px;
 	font-weight: 300;
 	margin: 0 0 48px;
 	color: #111;
 }
 
-main.page h2 {
+main.page article h2 {
 	font-size: 13px;
 	font-weight: 400;
 	letter-spacing: 0.02em;
@@ -69,7 +71,7 @@ main.page h2 {
 	margin: 0 0 14px;
 }
 
-main.page p {
+main.page article p {
 	font-size: 13px;
 	line-height: 1.6;
 	color: #555;
@@ -77,25 +79,26 @@ main.page p {
 	max-width: 60ch;
 }
 
-main.page ul {
+main.page article ul {
 	list-style: none;
 	padding: 0;
 	margin: 0;
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
 }
 
-main.page li {
+main.page article li {
 	font-size: 13px;
 	line-height: 1.5;
+}
+
+main.page article li + li {
+	margin-top: 6px;
 }
 
 main.page article > section {
 	margin: 0 0 56px;
 }
 
-main.page a {
+main.page article a {
 	font-style: normal;
 }
 
@@ -108,7 +111,7 @@ main.page a {
 		padding: 28px 0 60px;
 	}
 
-	main.page h1 {
+	main.page article h1 {
 		font-size: 28px;
 		margin-bottom: 36px;
 	}
