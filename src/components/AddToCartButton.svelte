@@ -1,19 +1,25 @@
 <script>
-    import { cartAdd } from '~/lib/state/cart.svelte';
-    import { routes } from '~/routes';
+    import { onMount } from 'svelte';
+    import { cartState, initCart, addToCart } from '~/lib/state/cart.svelte';
+    import { formatShopifyPrice } from '~/lib/utils/shopify-util.js';
 
-    let { sku, name, cta = 'hero', priceClass = 'monkey-price' } = $props();
+    let { sku, cta = 'hero', priceClass = 'monkey-price' } = $props();
 
-    function handleClick() {
-        cartAdd(sku, name, 1, cta);
-        window.location.href = routes.cart;
-    }
+    onMount(() => {
+        initCart();
+    });
+
+    // The same page-load fetch that fills the panel fills this label.
+    let price = $derived.by(() => {
+        const product = cartState.products[sku];
+        return product ? formatShopifyPrice(product.price.currencyCode, product.price.amount) : '';
+    });
 </script>
 
-<button class="atc" onclick={handleClick} type="button">
+<button class="atc" onclick={() => addToCart(sku, 1, cta)} type="button">
     <span class="label">
         <span>Add to cart</span>
-        <span class="{priceClass} atc-price atc-price--loading" data-atc-price-for={sku}></span>
+        <span class="{priceClass} atc-price" class:atc-price--loading={!price}>{price}</span>
     </span>
 </button>
 

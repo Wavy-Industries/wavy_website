@@ -47,7 +47,7 @@ import logoImg from '../assets/logo.svg';
 import logoWhiteImg from '../assets/logo-white.svg';
 
 import CartLink from '../components/CartLink.svelte';
-import CartPopup from '../components/CartPopup.svelte';
+import CartPanel from '../components/CartPanel.svelte';
 import NewsletterPopup from '../components/NewsletterPopup.svelte';
 ---
 
@@ -57,9 +57,10 @@ import NewsletterPopup from '../components/NewsletterPopup.svelte';
             <li class={currentPageCheck(routes.monkey)}>
                 <a href={routes.monkey}>MON<b>KEY</b></a>
             </li>
-            <li class={currentPageCheck(routes.bridge)}>
+            <!-- BRIDGE is unannounced. Page lives at src/pages/_bridge.astro. -->
+            <!-- <li class={currentPageCheck(routes.bridge)}>
                 <a href={routes.bridge}>BRIDGE</a><span class="flag-new">new</span>
-            </li>
+            </li> -->
             <li class={currentPageCheck(routes.kd3)}>
                 <a href={routes.kd3}>KD-3</a>
             </li>
@@ -90,7 +91,7 @@ import NewsletterPopup from '../components/NewsletterPopup.svelte';
         </ul>
     </nav>
 
-    <CartPopup client:load />
+    <CartPanel client:load />
     <NewsletterPopup client:load />
 </header>
 

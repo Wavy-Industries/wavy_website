@@ -32,7 +32,7 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 				<h1>MON<span style="font-weight: 400;" >KEY</span></h1>
 				<p class="tagline">An ultra-portable wireless music making device</p>
 				<div class="hero-actions">
-					<AddToCartButton client:load sku="monkey" name="MONKEY" cta="hero" />
+					<AddToCartButton client:load sku="monkey" cta="hero" />
 				</div>
 			</div>
 		</section>
@@ -173,7 +173,7 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 			<div class="container bottom-cta-inner">
 				<p>Join our newsletter and stay up to date.</p>
 				<NewsletterSignup tag="monkey" source="monkey_inline" label="Join newsletter" />
-				<AddToCartButton client:load sku="monkey" name="MONKEY" cta="bottom" />
+				<AddToCartButton client:load sku="monkey" cta="bottom" />
 			</div>
 		</section>
 
@@ -658,7 +658,3 @@ h1 {
 	}
 }
 </style>
-
-<script>
-	import '~/scripts/load-prices.js';
-</script>

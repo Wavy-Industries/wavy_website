@@ -1,23 +1,31 @@
 <script>
     import { onMount } from 'svelte';
-    import { cart, cartInit, cartCount, openCart, closeCart } from '~/lib/state/cart.svelte';
+    import { cartState, initCart, openCart, closeCart, cartCount, CART_HASH } from '~/lib/state/cart.svelte';
 
     onMount(() => {
-        cartInit();
+        initCart();
     });
 
     let count = $derived(cartCount());
-    let hasItems = $derived(count > 0);
 
-    function toggle() {
-        if (cart.popupOpen) closeCart();
-        else openCart('manual');
+    function toggle(e) {
+        // A real href, so it works before hydration and can be opened in a new
+        // tab; the handler only takes over to avoid a scroll jump.
+        e.preventDefault();
+        if (cartState.open) closeCart();
+        else openCart();
     }
 </script>
 
-<button class="cart-link" class:full={hasItems} aria-label={hasItems ? `Cart, ${count} item${count === 1 ? '' : 's'}` : 'Cart, empty'} onclick={toggle}>
-    cart{#if hasItems}&nbsp;({count}){/if}
-</button>
+<a
+    class="cart-link"
+    class:full={count > 0}
+    href={CART_HASH}
+    aria-label={count > 0 ? `Cart, ${count} item${count === 1 ? '' : 's'}` : 'Cart, empty'}
+    onclick={toggle}
+>
+    cart{#if count > 0}&nbsp;({count}){/if}
+</a>
 
 <style>
     .cart-link {
@@ -32,6 +40,7 @@
         letter-spacing: inherit;
         line-height: inherit;
         white-space: nowrap;
+        text-decoration: none;
     }
     .cart-link:hover {
         text-decoration: underline;
