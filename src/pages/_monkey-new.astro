@@ -1,0 +1,305 @@
+---
+import '~/styles/global.css';
+import { routes } from '~/routes';
+import Layout from '~/layouts/Layout.astro';
+import Header from '~/layouts/Header.astro';
+import Footer from '~/layouts/Footer.astro';
+import LinkButton from '~/components/LinkButton.astro';
+import AddToCartButton from '~/components/AddToCartButton.svelte';
+
+import monkeyPlate from '~/assets/monkey/monkey_vertical_lit.png';
+---
+
+<Layout
+	title="MONKEY — Wavy Industries"
+	description="MONKEY by Wavy Industries: an ultra-portable Bluetooth MIDI instrument, 150 × 50 mm, several months of battery life."
+>
+	<meta slot="meta" property="og:title" content="WAVY MONKEY, An ultra-portable wireless music making device" />
+	<meta slot="meta" property="og:description" content="Compact, versatile Bluetooth MIDI keyboard designed for musicians, producers, and anyone eager to start exploring music creation." />
+	<meta slot="meta" property="og:image" content="https://wavyindustries.com/monkey_reveal.png" />
+
+	<main class="gallery">
+		<Header textColor="white" />
+
+		<!-- the wall: generative field, drawn in-browser -->
+		<canvas id="wall" aria-hidden="true"></canvas>
+		<div class="wall-vignette" aria-hidden="true"></div>
+		<div class="wall-lines" aria-hidden="true"></div>
+		<div class="wall-grain" aria-hidden="true"></div>
+
+		<section class="exhibit">
+			<div class="plinth">
+				<img
+					class="artefact"
+					src={monkeyPlate.src}
+					alt="MONKEY, a 150 by 50 millimetre Bluetooth MIDI instrument, shown vertically"
+					width={monkeyPlate.width}
+					height={monkeyPlate.height}
+				/>
+			</div>
+
+			<figcaption class="placard">
+				<p class="placard-eyebrow">Wavy Industries — 2026</p>
+				<h1 class="placard-title">MON<span>KEY</span></h1>
+				<p class="placard-medium">Bluetooth MIDI instrument · FR-4, ENIG, tactile switches</p>
+				<p class="placard-dims">150 × 50 × 5 mm</p>
+				<p class="placard-note">
+					Twenty-seven keys, six MIDI effects, a drum engine and a ten-track looper on a single board.
+					No screen, no cables, and several months of playing on one coin cell.
+				</p>
+				<div class="placard-actions">
+					<AddToCartButton client:load sku="monkey" name="MONKEY" cta="gallery" />
+					<LinkButton href={routes.monkeyGettingStarted} theme="dark">Getting started</LinkButton>
+				</div>
+			</figcaption>
+		</section>
+
+		<Footer />
+	</main>
+</Layout>
+
+<script>
+	// The wall: a generative field drawn into a small buffer (one pixel per
+	// cell) and blitted up with smoothing off, so a frame is one drawImage.
+	// The field itself lives in ~/scripts/museum-field.js.
+	import { makeField } from '~/scripts/museum-field.js';
+
+	const canvas = document.getElementById('wall') as HTMLCanvasElement | null;
+	if (canvas) {
+		const ctx = canvas.getContext('2d', { alpha: false })!;
+		const buf = document.createElement('canvas');
+		const bctx = buf.getContext('2d', { alpha: false })!;
+		const field = makeField();
+
+		const CELL = 6;
+		const FRAME_MS = 1000 / 20; // the field drifts slowly; 20fps reads as continuous
+		let cols = 0;
+		let rows = 0;
+		let img: ImageData | null = null;
+		let px: Uint32Array | null = null;
+		let last = -1e9;
+
+		function resize() {
+			const w = window.innerWidth;
+			const h = window.innerHeight;
+			canvas.width = w;
+			canvas.height = h;
+			canvas.style.width = w + 'px';
+			canvas.style.height = h + 'px';
+			ctx.imageSmoothingEnabled = false;
+			cols = Math.max(4, Math.ceil(w / CELL));
+			rows = Math.max(4, Math.ceil(h / CELL));
+			buf.width = cols;
+			buf.height = rows;
+			img = bctx.createImageData(cols, rows);
+			px = new Uint32Array(img.data.buffer);
+			field.resize(cols, rows);
+		}
+
+		function draw(tMs: number) {
+			if (!img || !px) return;
+			field.render(px, tMs * 0.001);
+			bctx.putImageData(img, 0, 0);
+			ctx.drawImage(buf, 0, 0, canvas.width, canvas.height);
+		}
+
+		let raf = 0;
+		function loop(ts: number) {
+			if (ts - last >= FRAME_MS) {
+				last = ts;
+				draw(ts);
+			}
+			raf = requestAnimationFrame(loop);
+		}
+
+		const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		resize();
+		if (reduceMotion) {
+			draw(12000);
+		} else {
+			raf = requestAnimationFrame(loop);
+		}
+
+		let resizeTimer = 0;
+		window.addEventListener('resize', () => {
+			window.clearTimeout(resizeTimer);
+			resizeTimer = window.setTimeout(() => {
+				resize();
+				draw(reduceMotion ? 12000 : performance.now());
+			}, 120);
+		});
+		document.addEventListener('visibilitychange', () => {
+			if (document.hidden) {
+				cancelAnimationFrame(raf);
+			} else if (!reduceMotion) {
+				raf = requestAnimationFrame(loop);
+			}
+		});
+	}
+</script>
+
+<style>
+	.gallery {
+		position: relative;
+		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+		background: #05070f;
+		color: #f2f4f8;
+		overflow: hidden;
+	}
+
+	#wall,
+	.wall-vignette,
+	.wall-lines,
+	.wall-grain {
+		position: fixed;
+		inset: 0;
+		z-index: 0;
+		pointer-events: none;
+	}
+
+	.wall-vignette {
+		background:
+			radial-gradient(120% 90% at 50% 42%, rgba(5, 7, 15, 0) 22%, rgba(5, 7, 15, 0.80) 70%, rgba(5, 7, 15, 0.95) 100%);
+	}
+
+	/* scanlines: static CSS, so they never touch the per-frame budget */
+	.wall-lines {
+		background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.34) 0 1px, rgba(0, 0, 0, 0) 1px 3px);
+	}
+
+	/* a whisper of print grain so the field does not read as flat vector */
+	.wall-grain {
+		opacity: 0.12;
+		mix-blend-mode: overlay;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+	}
+
+	.gallery :global(header) {
+		position: relative;
+		z-index: 3;
+	}
+
+	.exhibit {
+		position: relative;
+		z-index: 2;
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 46px;
+		padding: 40px 24px 90px;
+	}
+
+	.plinth {
+		position: relative;
+		display: flex;
+		justify-content: center;
+	}
+
+	.artefact {
+		display: block;
+		height: min(74vh, 720px);
+		width: auto;
+		filter: drop-shadow(0 44px 60px rgba(0, 0, 0, 0.62));
+		animation: hover 11s ease-in-out infinite;
+		will-change: transform;
+	}
+
+	@keyframes hover {
+		0%,
+		100% {
+			transform: translateY(-6px) rotate(-0.4deg);
+		}
+		50% {
+			transform: translateY(6px) rotate(0.4deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.artefact {
+			animation: none;
+		}
+	}
+
+	.placard {
+		max-width: 460px;
+		text-align: center;
+		background: rgba(8, 11, 22, 0.42);
+		backdrop-filter: blur(9px);
+		-webkit-backdrop-filter: blur(9px);
+		border: 1px solid rgba(255, 255, 255, 0.09);
+		padding: 26px 30px 30px;
+	}
+
+	.placard-eyebrow {
+		margin: 0 0 12px;
+		font-size: 11px;
+		letter-spacing: 0.26em;
+		text-transform: uppercase;
+		color: rgba(242, 244, 248, 0.55);
+	}
+
+	.placard-title {
+		margin: 0;
+		font-size: 40px;
+		font-weight: 200;
+		letter-spacing: 0.04em;
+	}
+
+	.placard-title span {
+		font-weight: 500;
+	}
+
+	.placard-medium {
+		margin: 14px 0 2px;
+		font-size: 13px;
+		font-style: italic;
+		color: rgba(242, 244, 248, 0.72);
+	}
+
+	.placard-dims {
+		margin: 0;
+		font-size: 13px;
+		color: rgba(242, 244, 248, 0.52);
+	}
+
+	.placard-note {
+		margin: 18px 0 0;
+		font-size: 14px;
+		line-height: 1.65;
+		font-weight: 300;
+		color: rgba(242, 244, 248, 0.86);
+	}
+
+	.placard-actions {
+		display: flex;
+		gap: 14px;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin-top: 22px;
+	}
+
+	@media (min-width: 900px) {
+		.exhibit {
+			flex-direction: row;
+			gap: 70px;
+			padding: 20px 40px 60px;
+		}
+
+		.placard {
+			text-align: left;
+		}
+
+		.placard-actions {
+			justify-content: flex-start;
+		}
+	}
+
+	.gallery :global(footer) {
+		position: relative;
+		z-index: 2;
+	}
+</style>

@@ -30,9 +30,12 @@ const fallbackProfile: DeviceProfile = {
     icon: null,
 };
 
+// WIMKY002_DEV1 lacks the LFXO crystal and must never receive WIMKY002 builds
 const HW_TO_FIRMWARE_FOLDER: Record<string, string> = {
-    WIMKY001: 'MONKEY',
-    WIMKY002: 'MONKEY',
+    WIMKY001: 'WIMKY001',
+    WIMKY002: 'WIMKY002',
+    WIMKY002_DEV1: 'WIMKY002_DEV1',
+    WIMKY002V1: 'WIMKY002_DEV1', // pre-1.6 firmware reports the old name for WIMKY002_DEV1
     WIBRG001: 'BRIDGE',
     WIBRG002: 'BRIDGE',
 };
