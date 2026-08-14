@@ -19,42 +19,33 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  text-decoration: none;
-  font-style: normal;
+  padding: 12px 20px;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
+  font-style: normal;
   letter-spacing: 0.02em;
-  padding: 9px 18px;
+  text-decoration: none;
   border: 0;
-  border-radius: 3px;
-  transition: background-color 0.15s;
 }
 
 a:hover {
   text-decoration: none;
+  background-color: var(--accent-color);
+  color: #fff;
+}
+
+.default.light {
+  background-color: #111;
+  color: #fff;
+}
+
+.default.dark {
+  background-color: #fff;
+  color: #111;
 }
 
 .highlight {
   background-color: #57d865;
   color: #111;
-}
-.highlight:hover {
-  background-color: #48ce57;
-}
-
-.default.light {
-  background-color: #f0f0f0;
-  color: #111;
-}
-.default.light:hover {
-  background-color: #e4e4e4;
-}
-
-.default.dark {
-  background-color: rgba(255, 255, 255, 0.12);
-  color: #fff;
-}
-.default.dark:hover {
-  background-color: rgba(255, 255, 255, 0.2);
 }
 </style>

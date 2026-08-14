@@ -1,108 +1,47 @@
 ---
-import '~/styles/global.css';
-import Layout from '~/layouts/Layout.astro';
-import Header from '~/layouts/Header.astro';
-import Footer from '~/layouts/Footer.astro';
+import PageLayout from '~/layouts/PageLayout.astro';
 import Accordion from '~/components/Accordion.astro';
 import { routes } from '~/routes';
 ---
 
-<Layout title="MONKEY FAQ - Wavy Industries">
-    <main>
-        <Header />
-        <section class="faq-page">
-            <article>
-                <h1>Frequently Asked Questions</h1>
+<PageLayout title="MONKEY FAQ - Wavy Industries" heading="Frequently asked questions">
+	<Accordion title="Do I need to turn MONKEY off?">
+		No. MONKEY automatically goes to sleep when not in use and wakes instantly when you tap a key. The lock switch forces it into a low-power state and disables the keybed, but this is only needed in situations like traveling where accidental key presses could wake it.
+	</Accordion>
 
-                <Accordion title="Do I need to turn MONKEY off?">
-                    No. MONKEY automatically goes to sleep when not in use and wakes instantly when you tap a key. The lock switch forces it into a low-power state and disables the keybed, but this is only needed in situations like traveling where accidental key presses could wake it.
-                </Accordion>
+	<Accordion title="How long does the battery last?">
+		MONKEY is expected to last many months on a single CR2032 battery with moderate usage. Battery life depends on how frequently you play and how often Bluetooth is actively connected.
+	</Accordion>
 
-                <Accordion title="How long does the battery last?">
-                    MONKEY is expected to last many months on a single CR2032 battery with moderate usage. Battery life depends on how frequently you play and how often Bluetooth is actively connected.
-                </Accordion>
+	<Accordion title="How do I connect MONKEY to my computer?">
+		MONKEY connects via Bluetooth MIDI. On macOS and Windows, we recommend using <a href={routes.midiConnect}>MIDI Connect</a> for the simplest setup. On mobile, connect directly within your music app. See the <a href={routes.monkeyGettingStarted}>Getting Started</a> guide for detailed instructions.
+	</Accordion>
 
-                <Accordion title="How do I connect MONKEY to my computer?">
-                    MONKEY connects via Bluetooth MIDI. On macOS and Windows, we recommend using <a href={routes.midiConnect}>MIDI Connect</a> for the simplest setup. On mobile, connect directly within your music app. See the <a href={routes.monkeyGettingStarted}>Getting Started</a> guide for detailed instructions.
-                </Accordion>
+	<Accordion title="Why doesn't MONKEY show up in my Bluetooth settings?">
+		On macOS, Bluetooth MIDI devices do not appear in system Bluetooth settings. You need to use Audio MIDI Setup or our <a href={routes.midiConnect}>MIDI Connect</a> app. On iOS/Android, connect directly from within the music app.
+	</Accordion>
 
-                <Accordion title="Why doesn't MONKEY show up in my Bluetooth settings?">
-                    On macOS, Bluetooth MIDI devices do not appear in system Bluetooth settings. You need to use Audio MIDI Setup or our <a href={routes.midiConnect}>MIDI Connect</a> app. On iOS/Android, connect directly from within the music app.
-                </Accordion>
+	<Accordion title="Which DAWs work with MONKEY?">
+		MONKEY works with any DAW that supports MIDI input — Ableton Live, FL Studio, Logic Pro, GarageBand, and many others. It also works with mobile apps that accept Bluetooth MIDI.
+	</Accordion>
 
-                <Accordion title="Which DAWs work with MONKEY?">
-                    MONKEY works with any DAW that supports MIDI input — Ableton Live, FL Studio, Logic Pro, GarageBand, and many others. It also works with mobile apps that accept Bluetooth MIDI.
-                </Accordion>
+	<Accordion title="How do I update the firmware?">
+		MONKEY is updated directly through the browser using Bluetooth. Open the <a href={routes.deviceUtility}>Device Utility</a> and follow the update instructions. No cables or downloads needed.
+	</Accordion>
 
-                <Accordion title="How do I update the firmware?">
-                    MONKEY is updated directly through the browser using Bluetooth. Open the <a href={routes.deviceUtility}>Device Utility</a> and follow the update instructions. No cables or downloads needed.
-                </Accordion>
+	<Accordion title="What are MIDI channels and how does MONKEY use them?">
+		MIDI channels let you control different instruments from one device. MONKEY can send on channels 1–10. Assign instruments in your DAW to different channels, and use channel 10 for drums. See the <a href={routes.monkeyManual}>Manual</a> for details.
+	</Accordion>
 
-                <Accordion title="What are MIDI channels and how does MONKEY use them?">
-                    MIDI channels let you control different instruments from one device. MONKEY can send on channels 1–10. Assign instruments in your DAW to different channels, and use channel 10 for drums. See the <a href={routes.monkeyManual}>Manual</a> for details.
-                </Accordion>
+	<Accordion title="Can I use MONKEY without Bluetooth?">
+		No. MONKEY communicates exclusively via Bluetooth MIDI. There is no USB or wired connection.
+	</Accordion>
 
-                <Accordion title="Can I use MONKEY without Bluetooth?">
-                    No. MONKEY communicates exclusively via Bluetooth MIDI. There is no USB or wired connection.
-                </Accordion>
-
-                <p class="faq-footer">Still have questions? Ask on <a href={routes.wavyDiscord}>Discord</a> or <a href={routes.support}>contact us</a>.</p>
-            </article>
-        </section>
-        <Footer />
-    </main>
-</Layout>
+	<p class="faq-footer">Still have questions? Ask on <a href={routes.wavyDiscord}>Discord</a> or <a href={routes.support}>contact us</a>.</p>
+</PageLayout>
 
 <style>
-main {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: #fff;
-}
-
-.faq-page {
-    width: 100%;
-    padding: 0 24px;
-    flex-grow: 1;
-}
-
-.faq-page article {
-    margin: 0 auto;
-    max-width: 800px;
-    width: 100%;
-    padding: 40px 0 80px;
-}
-
-h1 {
-    font-size: 36px;
-    font-weight: 300;
-    margin: 0 0 24px 0;
-    color: #111;
-}
-
-.faq-footer {
-    margin-top: 40px;
-    font-size: 14px;
-    color: #888;
-}
-
-.faq-footer a {
-    color: var(--accent-color);
-    font-style: normal;
-}
-
-@media (max-width: 768px) {
-    .faq-page {
-        padding: 0 16px;
-    }
-
-    .faq-page article {
-        padding: 28px 0 60px;
-    }
-
-    h1 {
-        font-size: 28px;
-    }
-}
+	.faq-footer {
+		margin-top: 40px;
+	}
 </style>

@@ -1,0 +1,120 @@
+---
+/*
+ * The shell every text page shares: header, centred measure, footer, and one
+ * type scale. Pages that use this own their content and nothing else.
+ *
+ * Styles are `is:global` because the content arrives through a slot and so
+ * carries the calling page's scope, not this one's. Every rule is prefixed
+ * with `.page` to keep it contained.
+ */
+interface Props {
+	title: string;
+	description?: string;
+	heading: string;
+}
+
+const { title, description, heading } = Astro.props;
+
+import Layout from '~/layouts/Layout.astro';
+import Header from '~/layouts/Header.astro';
+import Footer from '~/layouts/Footer.astro';
+---
+
+<Layout title={title} description={description}>
+	<main class="page">
+		<Header />
+		<section>
+			<article>
+				<h1>{heading}</h1>
+				<slot />
+			</article>
+		</section>
+		<Footer />
+	</main>
+</Layout>
+
+<style is:global>
+main.page {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background: #fff;
+}
+
+main.page > section {
+	width: 100%;
+	padding: 0 24px;
+	flex-grow: 1;
+}
+
+main.page article {
+	margin: 0 auto;
+	max-width: 800px;
+	width: 100%;
+	padding: 40px 0 80px;
+}
+
+main.page h1 {
+	font-size: 36px;
+	font-weight: 300;
+	margin: 0 0 48px;
+	color: #111;
+}
+
+main.page h2 {
+	font-size: 13px;
+	font-weight: 400;
+	letter-spacing: 0.02em;
+	color: #111;
+	margin: 0 0 14px;
+}
+
+main.page p {
+	font-size: 13px;
+	line-height: 1.6;
+	color: #555;
+	margin: 0 0 14px;
+	max-width: 60ch;
+}
+
+main.page ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+main.page li {
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+main.page article > section {
+	margin: 0 0 56px;
+}
+
+main.page a {
+	font-style: normal;
+}
+
+@media (max-width: 640px) {
+	main.page > section {
+		padding: 0 16px;
+	}
+
+	main.page article {
+		padding: 28px 0 60px;
+	}
+
+	main.page h1 {
+		font-size: 28px;
+		margin-bottom: 36px;
+	}
+
+	main.page article > section {
+		margin-bottom: 36px;
+	}
+}
+</style>

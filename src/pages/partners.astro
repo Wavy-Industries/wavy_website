@@ -1,8 +1,5 @@
 ---
-import '~/styles/global.css';
-import Layout from '~/layouts/Layout.astro';
-import Header from '~/layouts/Header.astro';
-import Footer from '~/layouts/Footer.astro';
+import PageLayout from '~/layouts/PageLayout.astro';
 
 const retailers = [
 	{
@@ -23,140 +20,66 @@ const pressKit = [
 ];
 ---
 
-<Layout title="Partners - Wavy Industries" description="Where to buy Wavy Industries products and how to become a retailer.">
-	<main>
-		<Header />
-		<section class="partners">
-			<article>
-				<h1>Partners</h1>
+<PageLayout
+	title="Partners - Wavy Industries"
+	description="Where to buy Wavy Industries products and how to become a retailer."
+	heading="Partners"
+>
+	<section>
+		<h2>retailers</h2>
+		<p>Buy Wavy Industries products from an authorized retailer.</p>
+		<ul>
+			{retailers.map(r => (
+				<li>
+					<a href={r.url} target="_blank" rel="noopener">{r.name}</a>
+					<span class="meta">{r.country}</span>
+				</li>
+			))}
+		</ul>
+	</section>
 
-				<div class="block">
-					<h2>retailers</h2>
-					<p>Buy Wavy Industries products from an authorized retailer.</p>
-					<ul>
-						{retailers.map(r => (
-							<li>
-								<a href={r.url} target="_blank" rel="noopener">{r.name}</a>
-								<span class="meta">{r.country}</span>
-							</li>
-						))}
-					</ul>
-				</div>
+	<section>
+		<h2>become a partner</h2>
+		<p>For retailers, educators and collaborators. Enter your email and we'll send you a link to continue.</p>
 
-				<div class="block">
-					<h2>become a partner</h2>
-					<p>For retailers, educators and collaborators. Enter your email and we'll send you a link to continue.</p>
+		<div class="partners-form" id="partners-form">
+			<form class="form" novalidate>
+				<input
+					type="email"
+					name="email"
+					required
+					autocomplete="email"
+					placeholder="email@retailer.com"
+				/>
+				<button type="submit">Continue</button>
+			</form>
+			<p class="error" hidden></p>
+		</div>
 
-					<div class="partners-form" id="partners-form">
-						<form class="form" novalidate>
-							<input
-								type="email"
-								name="email"
-								required
-								autocomplete="email"
-								placeholder="email@retailer.com"
-							/>
-							<button type="submit">Continue</button>
-						</form>
-						<p class="error" hidden></p>
-					</div>
+		<div class="partners-success" hidden>
+			<p>Check your email — we've sent you a link to continue.</p>
+		</div>
+	</section>
 
-					<div class="partners-success" hidden>
-						<p>Check your email — we've sent you a link to continue.</p>
-					</div>
-				</div>
-
-				<div class="block">
-					<h2>press kit</h2>
-					<p>Logos and product images for press, retailers and partners. Each download is a ZIP.</p>
-					<ul>
-						{pressKit.map(a => (
-							<li>
-								<a href={a.href} download>{a.name}</a>
-								<span class="meta">{a.contents}</span>
-							</li>
-						))}
-					</ul>
-				</div>
-			</article>
-		</section>
-		<Footer />
-	</main>
-</Layout>
+	<section>
+		<h2>press kit</h2>
+		<p>Logos and product images for press, retailers and partners. Each download is a ZIP.</p>
+		<ul>
+			{pressKit.map(a => (
+				<li>
+					<a href={a.href} download>{a.name}</a>
+					<span class="meta">{a.contents}</span>
+				</li>
+			))}
+		</ul>
+	</section>
+</PageLayout>
 
 <style>
-main {
-	min-height: 100vh;
-	display: flex;
-	flex-direction: column;
-	background: #fff;
-}
-
-.partners {
-	width: 100%;
-	padding: 0 24px;
-	flex-grow: 1;
-}
-
-.partners article {
-	margin: 0 auto;
-	max-width: 800px;
-	width: 100%;
-	padding: 40px 0 80px;
-}
-
-h1 {
-	font-size: 36px;
-	font-weight: 300;
-	margin: 0 0 48px;
-	color: #111;
-}
-
-.block {
-	margin: 0 0 56px;
-}
-
-h2 {
-	font-size: 13px;
-	font-weight: 400;
-	letter-spacing: 0.02em;
-	color: #111;
-	margin: 0 0 14px;
-}
-
-p {
-	font-size: 13px;
-	line-height: 1.6;
-	color: #555;
-	margin: 0 0 14px;
-	max-width: 60ch;
-}
-
-ul {
-	list-style: none;
-	padding: 0;
-	margin: 0;
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-}
-
 li {
-	font-size: 13px;
-	line-height: 1.5;
 	display: flex;
 	gap: 10px;
 	align-items: baseline;
-}
-
-a {
-	text-decoration: none;
-	font-style: normal;
-	cursor: pointer;
-}
-
-a:hover {
-	text-decoration: underline;
 }
 
 .meta {
@@ -166,18 +89,15 @@ a:hover {
 .form {
 	display: flex;
 	align-items: stretch;
-	height: 36px;
-	background: #fff;
-	border: 1px solid #ccc;
+	height: 40px;
 	max-width: 380px;
 }
 
 input {
 	flex-grow: 1;
 	min-width: 0;
-	height: 100%;
-	box-sizing: border-box;
-	border: 0;
+	border: 1px solid #ccc;
+	border-right: 0;
 	padding: 0 12px;
 	font-size: 13px;
 	color: #111;
@@ -190,28 +110,27 @@ input::placeholder {
 	color: #bbb;
 }
 
-input:disabled {
-	color: #888;
-	background: #f5f5f5;
+input:focus {
+	border-color: #111;
 }
 
 button {
-	height: 100%;
-	box-sizing: border-box;
 	border: 0;
-	border-left: 1px solid #ccc;
-	background: #fff;
-	color: #111;
+	background: #111;
+	color: #fff;
 	font-size: 13px;
-	padding: 0 14px;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	padding: 0 20px;
 	cursor: pointer;
 	font-family: inherit;
 }
 
 button:hover:not(:disabled) {
-	background: #f5f5f5;
+	background: var(--accent-color);
 }
 
+input:disabled,
 button:disabled {
 	color: #888;
 	background: #f5f5f5;
@@ -223,28 +142,7 @@ button:disabled {
 	color: #b3261e;
 }
 
-.partners-success p {
-	margin: 0;
-}
-
 @media (max-width: 640px) {
-	.partners {
-		padding: 0 16px;
-	}
-
-	.partners article {
-		padding: 28px 0 60px;
-	}
-
-	h1 {
-		font-size: 28px;
-		margin-bottom: 36px;
-	}
-
-	.block {
-		margin-bottom: 36px;
-	}
-
 	li {
 		flex-direction: column;
 		gap: 2px;

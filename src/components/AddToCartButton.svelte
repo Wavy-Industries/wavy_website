@@ -36,7 +36,6 @@
         font-style: normal;
         letter-spacing: 0.02em;
         border: 0;
-        border-radius: 3px;
         cursor: pointer;
         background-color: #57d865;
         color: #111;

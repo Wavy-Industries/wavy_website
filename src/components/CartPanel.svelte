@@ -251,7 +251,6 @@
         color: #1a1a1a;
         font-size: 10px;
         font-weight: 600;
-        border-radius: 3px;
         letter-spacing: 0.3px;
         white-space: nowrap;
     }
@@ -376,7 +375,6 @@
         justify-content: center;
         gap: 8px;
         border: 0;
-        border-radius: 3px;
         padding: 15px 20px;
         background: #57d865;
         color: #111;
@@ -434,7 +432,6 @@
         color: #333;
         background: #fff;
         border: 1px solid #ddd;
-        border-radius: 3px;
         padding: 3px 4px;
         max-width: 60%;
     }
