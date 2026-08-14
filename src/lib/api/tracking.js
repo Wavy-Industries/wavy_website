@@ -1,3 +1,5 @@
+import { metaTrack } from '~/lib/api/metaPixel.js';
+
 var API_BASE = import.meta.env.MODE === 'development'
   ? 'http://localhost:8000'
   : 'https://server.wavyindustries.com';
@@ -47,6 +49,7 @@ function captureRef() {
 }
 
 export function track(eventType, metadata) {
+  metaTrack(eventType, metadata);
   try {
     var ref = captureRef();
     var merged = metadata || {};
