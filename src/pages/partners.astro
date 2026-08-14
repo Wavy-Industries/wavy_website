@@ -3,34 +3,23 @@ import '~/styles/global.css';
 import Layout from '~/layouts/Layout.astro';
 import Header from '~/layouts/Header.astro';
 import Footer from '~/layouts/Footer.astro';
-import { Image } from 'astro:assets';
-import noisetoneLogo from '~/assets/partners/noisetone.jpg';
-import filterMusikkLogo from '~/assets/partners/filter-musikk.png';
-import wavyLogo from '~/assets/logo.svg';
-import wavyLogoWhite from '~/assets/logo-white.svg';
-import monkeyImg from '~/assets/monkey/Monkey 2D.png';
 
 const retailers = [
 	{
 		name: 'NoiseTone Synthesizer Store',
 		country: 'CN',
 		url: 'https://noisetone.store/',
-		logo: noisetoneLogo,
 	},
 	{
 		name: 'Filter Musikk',
 		country: 'NO',
 		url: 'https://filtermusikk.no/produkt/wavy-industries-monkey',
-		logo: filterMusikkLogo,
 	},
 ];
 
-const brandAssets = [
-	{ name: 'Wavy logo', contents: 'SVG, black + white', preview: wavyLogo, href: '/assets/press-kit/wavy-logo.zip', dark: false },
-];
-
-const productAssets = [
-	{ name: 'MONKEY', contents: 'Renders, photos, packaging, 2D layout', preview: monkeyImg, href: '/assets/press-kit/monkey.zip', dark: true },
+const pressKit = [
+	{ name: 'Wavy logo', contents: 'SVG, black + white', href: '/assets/press-kit/wavy-logo.zip' },
+	{ name: 'MONKEY', contents: 'Renders, photos, packaging, 2D layout', href: '/assets/press-kit/monkey.zip' },
 ];
 ---
 
@@ -41,80 +30,53 @@ const productAssets = [
 			<article>
 				<h1>Partners</h1>
 
-				<h2>Retailers</h2>
-				<p>Buy Wavy Industries products from one of our authorized retailers worldwide.</p>
-
-				<div class="retailer-grid">
-					{retailers.map(r => (
-						<a href={r.url} target="_blank" rel="noopener" class="retailer-card">
-							<div class="retailer-logo">
-								<Image src={r.logo} alt={`${r.name} logo`} widths={[120, 240]} sizes="60px" />
-							</div>
-							<div class="retailer-body">
-								<h3>{r.name}</h3>
-								<p>{r.country}</p>
-							</div>
-							<span class="retailer-arrow">&rarr;</span>
-						</a>
-					))}
+				<div class="block">
+					<h2>retailers</h2>
+					<p>Buy Wavy Industries products from an authorized retailer.</p>
+					<ul>
+						{retailers.map(r => (
+							<li>
+								<a href={r.url} target="_blank" rel="noopener">{r.name}</a>
+								<span class="meta">{r.country}</span>
+							</li>
+						))}
+					</ul>
 				</div>
 
-				<h2>Become a partner</h2>
-				<p>
-					If you'd like to work with Wavy Industries as a retailer, educator, or partner, enter your email below. Approved partners will receive a sign-in link to the partner portal. Everyone else will receive an email where you can tell us a bit about what you have in mind.
-				</p>
+				<div class="block">
+					<h2>become a partner</h2>
+					<p>For retailers, educators and collaborators. Enter your email and we'll send you a link to continue.</p>
 
-				<div class="partners-form" id="partners-form">
-					<form class="form" novalidate>
-						<input
-							type="email"
-							name="email"
-							required
-							autocomplete="email"
-							placeholder="email@retailer.com"
-						/>
-						<button type="submit">Request access</button>
-					</form>
-					<p class="error" hidden></p>
+					<div class="partners-form" id="partners-form">
+						<form class="form" novalidate>
+							<input
+								type="email"
+								name="email"
+								required
+								autocomplete="email"
+								placeholder="email@retailer.com"
+							/>
+							<button type="submit">Continue</button>
+						</form>
+						<p class="error" hidden></p>
+					</div>
+
+					<div class="partners-success" hidden>
+						<p>Check your email — we've sent you a link to continue.</p>
+					</div>
 				</div>
 
-				<div class="partners-success" hidden>
-					<p><strong>Check your email.</strong> If your address is on file, a sign-in link is on its way. Otherwise we've sent instructions on how to apply.</p>
-				</div>
-
-				<h2>Brand &amp; product assets</h2>
-				<p>Logos and product images for press, retailers, and partners. Each download is a ZIP containing the assets listed.</p>
-
-				<h3 class="asset-group-title">Brand</h3>
-				<div class="asset-grid">
-					{brandAssets.map(a => (
-						<a href={a.href} download class="asset-card">
-							<div class={`asset-preview ${a.dark ? 'asset-preview-dark' : ''}`}>
-								<Image src={a.preview} alt={a.name} widths={[160, 320]} sizes="80px" />
-							</div>
-							<div class="asset-body">
-								<h4>{a.name}</h4>
-								<p>{a.contents}</p>
-							</div>
-							<span class="asset-download" aria-label="Download">↓</span>
-						</a>
-					))}
-				</div>
-
-				<h3 class="asset-group-title">Products</h3>
-				<div class="asset-grid">
-					{productAssets.map(a => (
-						<a href={a.href} download class="asset-card">
-							<div class={`asset-preview ${a.dark ? 'asset-preview-dark' : ''}`}>
-								<Image src={a.preview} alt={a.name} widths={[160, 320]} sizes="80px" />
-							</div>
-							<div class="asset-body">
-								<h4>{a.name}</h4>
-								<p>{a.contents}</p>
-							</div>
-							<span class="asset-download" aria-label="Download">↓</span>
-						</a>
-					))}
+				<div class="block">
+					<h2>press kit</h2>
+					<p>Logos and product images for press, retailers and partners. Each download is a ZIP.</p>
+					<ul>
+						{pressKit.map(a => (
+							<li>
+								<a href={a.href} download>{a.name}</a>
+								<span class="meta">{a.contents}</span>
+							</li>
+						))}
+					</ul>
 				</div>
 			</article>
 		</section>
@@ -123,289 +85,176 @@ const productAssets = [
 </Layout>
 
 <style>
-	main {
-		min-height: 100vh;
-		display: flex;
-		flex-direction: column;
-	}
+main {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background: #fff;
+}
+
+.partners {
+	width: 100%;
+	padding: 0 24px;
+	flex-grow: 1;
+}
+
+.partners article {
+	margin: 0 auto;
+	max-width: 800px;
+	width: 100%;
+	padding: 40px 0 80px;
+}
+
+h1 {
+	font-size: 36px;
+	font-weight: 300;
+	margin: 0 0 48px;
+	color: #111;
+}
+
+.block {
+	margin: 0 0 56px;
+}
+
+h2 {
+	font-size: 13px;
+	font-weight: 400;
+	letter-spacing: 0.02em;
+	color: #111;
+	margin: 0 0 14px;
+}
+
+p {
+	font-size: 13px;
+	line-height: 1.6;
+	color: #555;
+	margin: 0 0 14px;
+	max-width: 60ch;
+}
+
+ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+li {
+	font-size: 13px;
+	line-height: 1.5;
+	display: flex;
+	gap: 10px;
+	align-items: baseline;
+}
+
+a {
+	color: #111;
+	text-decoration: none;
+	font-style: normal;
+	cursor: pointer;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+.meta {
+	color: #bbb;
+}
+
+.form {
+	display: flex;
+	align-items: stretch;
+	height: 36px;
+	background: #fff;
+	border: 1px solid #ccc;
+	max-width: 380px;
+}
+
+input {
+	flex-grow: 1;
+	min-width: 0;
+	height: 100%;
+	box-sizing: border-box;
+	border: 0;
+	padding: 0 12px;
+	font-size: 13px;
+	color: #111;
+	background: #fff;
+	outline: none;
+	font-family: inherit;
+}
+
+input::placeholder {
+	color: #bbb;
+}
+
+input:disabled {
+	color: #888;
+	background: #f5f5f5;
+}
+
+button {
+	height: 100%;
+	box-sizing: border-box;
+	border: 0;
+	border-left: 1px solid #ccc;
+	background: #fff;
+	color: #111;
+	font-size: 13px;
+	padding: 0 14px;
+	cursor: pointer;
+	font-family: inherit;
+}
+
+button:hover:not(:disabled) {
+	background: #f5f5f5;
+}
+
+button:disabled {
+	color: #888;
+	background: #f5f5f5;
+	cursor: default;
+}
+
+.error {
+	margin: 8px 0 0;
+	color: #b3261e;
+}
+
+.partners-success p {
+	margin: 0;
+}
+
+@media (max-width: 640px) {
 	.partners {
-		width: 100%;
-		padding: 0 24px;
-		flex-grow: 1;
+		padding: 0 16px;
 	}
+
 	.partners article {
-		margin: 0 auto;
-		max-width: 720px;
-		padding: 40px 0 80px;
+		padding: 28px 0 60px;
 	}
+
 	h1 {
-		font-size: 36px;
-		font-weight: 300;
-		margin: 0 0 8px;
-		color: #111;
-	}
-	h2 {
-		font-size: 14px;
-		font-weight: 500;
-		color: #999;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		margin: 40px 0 12px;
-	}
-	p {
-		font-size: 16px;
-		line-height: 1.7;
-		color: #333;
-		margin: 0 0 16px;
+		font-size: 28px;
+		margin-bottom: 36px;
 	}
 
-	.retailer-grid {
-		display: flex;
+	.block {
+		margin-bottom: 36px;
+	}
+
+	li {
 		flex-direction: column;
-		gap: 8px;
-		margin-top: 16px;
-	}
-
-	.retailer-card {
-		display: flex;
-		align-items: center;
-		gap: 16px;
-		padding: 16px 20px;
-		border: 1px solid #d0d0d0;
-		border-radius: 2px;
-		background: #f7f7f7;
-		text-decoration: none;
-		color: inherit;
-		transition: border-color 0.15s, background 0.15s;
-	}
-
-	.retailer-card:hover {
-		border-color: #aaa;
-		background: #f0f0f0;
-		text-decoration: none;
-	}
-
-	.retailer-logo {
-		flex-shrink: 0;
-		width: 60px;
-		height: 60px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: #fff;
-		border: 1px solid #e5e5e5;
-		border-radius: 2px;
-		overflow: hidden;
-	}
-
-	.retailer-logo :global(img) {
-		max-width: 100%;
-		max-height: 100%;
-		width: auto;
-		height: auto;
-		object-fit: contain;
-	}
-
-	.retailer-body {
-		flex-grow: 1;
-	}
-
-	.retailer-body h3 {
-		font-size: 15px;
-		font-weight: 500;
-		margin: 0 0 2px;
-		color: #111;
-	}
-
-	.retailer-body p {
-		font-size: 13px;
-		line-height: 1.5;
-		color: #666;
-		margin: 0;
-	}
-
-	.retailer-arrow {
-		flex-shrink: 0;
-		font-size: 16px;
-		color: #bbb;
-		transition: color 0.15s;
-	}
-
-	.retailer-card:hover .retailer-arrow {
-		color: #888;
-	}
-
-	.asset-group-title {
-		font-size: 13px;
-		font-weight: 500;
-		color: #555;
-		margin: 16px 0 8px;
-	}
-
-	.asset-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-		gap: 8px;
-		margin-bottom: 16px;
-	}
-
-	.asset-card {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		padding: 12px;
-		border: 1px solid #d0d0d0;
-		border-radius: 2px;
-		background: #f7f7f7;
-		text-decoration: none;
-		color: inherit;
-		transition: border-color 0.15s, background 0.15s;
-	}
-
-	.asset-card:hover {
-		border-color: #aaa;
-		background: #f0f0f0;
-		text-decoration: none;
-	}
-
-	.asset-preview {
-		flex-shrink: 0;
-		width: 56px;
-		height: 56px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: #fff;
-		border: 1px solid #e5e5e5;
-		border-radius: 2px;
-		overflow: hidden;
-		padding: 6px;
-		box-sizing: border-box;
-	}
-
-	.asset-preview-dark {
-		background: #111;
-		border-color: #111;
-	}
-
-	.asset-preview :global(img) {
-		max-width: 100%;
-		max-height: 100%;
-		width: auto;
-		height: auto;
-		object-fit: contain;
-	}
-
-	.asset-body {
-		flex-grow: 1;
-		min-width: 0;
-	}
-
-	.asset-body h4 {
-		font-size: 14px;
-		font-weight: 500;
-		margin: 0 0 2px;
-		color: #111;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.asset-body p {
-		font-size: 12px;
-		line-height: 1.4;
-		color: #888;
-		margin: 0;
-	}
-
-	.asset-download {
-		flex-shrink: 0;
-		font-size: 16px;
-		color: #bbb;
-		transition: color 0.15s;
-	}
-
-	.asset-card:hover .asset-download {
-		color: #333;
-	}
-
-	.partners-form {
-		margin-top: 8px;
+		gap: 2px;
 	}
 
 	.form {
-		display: flex;
-		align-items: stretch;
-		height: 40px;
-		background: white;
-		border: 1px solid #ccc;
-		max-width: 420px;
+		max-width: none;
 	}
-
-	input {
-		flex-grow: 1;
-		min-width: 0;
-		height: 100%;
-		box-sizing: border-box;
-		border: 0;
-		padding: 0 12px;
-		font-size: 14px;
-		font-weight: 400;
-		color: black;
-		background: white;
-		outline: none;
-		font-family: inherit;
-	}
-
-	input::placeholder {
-		color: #999;
-	}
-
-	input:disabled {
-		color: #888;
-		background: #f5f5f5;
-	}
-
-	button {
-		height: 100%;
-		box-sizing: border-box;
-		border: 0;
-		border-left: 1px solid #ccc;
-		background: white;
-		color: black;
-		font-size: 14px;
-		font-weight: 400;
-		padding: 0 14px;
-		cursor: pointer;
-		font-family: inherit;
-	}
-
-	button:hover:not(:disabled) {
-		background: #f0f0f0;
-	}
-
-	button:disabled {
-		color: #888;
-		background: #f5f5f5;
-		cursor: default;
-	}
-
-	.error {
-		margin: 8px 0 0;
-		font-size: 13px;
-		color: #ff6b6b;
-	}
-
-	.partners-success p {
-		padding: 16px;
-		border: 1px solid #d0d0d0;
-		background: #f7f7f7;
-		margin-top: 16px;
-	}
-
-	@media (max-width: 480px) {
-		.form { max-width: none; }
-	}
+}
 </style>
 
 <script>
