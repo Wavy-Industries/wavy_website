@@ -43,7 +43,7 @@ a:hover {
 }
 
 a:link, a:visited {
-    color: inherit; /* Makes the link color inherit from the parent element */
+    color: var(--accent-color);
 }
 
 h3 {

@@ -337,6 +337,11 @@
         line-height: 1.5;
     }
 
+    .body a {
+        font-style: normal;
+        align-self: flex-start;
+    }
+
     .preorder {
         display: flex;
         gap: 10px;
