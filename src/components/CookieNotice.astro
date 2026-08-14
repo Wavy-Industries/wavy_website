@@ -1,0 +1,88 @@
+---
+// A brief notice that the site uses cookies.
+// Appears once per browser. Auto-dismisses after a short timeout.
+// This is a disclosure, not a consent gate — it does not block any tracking.
+---
+
+<div id="cookie-notice" class="cookie-notice" hidden>
+    <span>This site uses cookies for analytics and advertising.</span>
+    <button type="button" class="dismiss" aria-label="Dismiss">×</button>
+</div>
+
+<style>
+    .cookie-notice {
+        position: fixed;
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        z-index: 90;
+        margin: 0 auto;
+        max-width: 480px;
+        background: #1a1a1a;
+        color: #f5f5f5;
+        padding: 10px 12px 10px 14px;
+        font-size: 13px;
+        font-style: normal;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-radius: 4px;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+        transform: translateY(0);
+        opacity: 1;
+        transition: transform 220ms ease, opacity 220ms ease;
+    }
+
+    .cookie-notice[hidden] {
+        display: none;
+    }
+
+    .cookie-notice.leaving {
+        transform: translateY(20px);
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .dismiss {
+        background: none;
+        border: 0;
+        color: #aaa;
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+        padding: 0 4px;
+        font-family: inherit;
+    }
+    .dismiss:hover { color: #fff; }
+</style>
+
+<script>
+    const STORAGE_KEY = 'wavy_cookie_notice_seen';
+    const SHOW_MS = 5000;
+
+    function setupCookieNotice() {
+        const banner = document.getElementById('cookie-notice');
+        if (!banner) return;
+        try {
+            if (localStorage.getItem(STORAGE_KEY)) return;
+        } catch {}
+
+        banner.hidden = false;
+
+        let leaving = false;
+        const dismiss = () => {
+            if (leaving) return;
+            leaving = true;
+            banner.classList.add('leaving');
+            try { localStorage.setItem(STORAGE_KEY, '1'); } catch {}
+            setTimeout(() => { banner.hidden = true; }, 240);
+        };
+
+        const closeBtn = banner.querySelector<HTMLButtonElement>('.dismiss');
+        closeBtn?.addEventListener('click', dismiss);
+        setTimeout(dismiss, SHOW_MS);
+    }
+
+    setupCookieNotice();
+</script>

@@ -5,6 +5,9 @@ interface Props {
 }
 
 const { title, description = "Wavy Industries Bluetooth MIDI keyboards for music creation." } = Astro.props;
+
+import TopBannerAlert from '~/components/TopBannerAlert.astro';
+import CookieNotice from '~/components/CookieNotice.astro';
 ---
 
 <!doctype html>
@@ -25,7 +28,9 @@ const { title, description = "Wavy Industries Bluetooth MIDI keyboards for music
 		<title>{title}</title>
 	</head>
 	<body>
+		<TopBannerAlert>Limited offer, €10 off using the discount code <b>SUMMER10</b> at checkout</TopBannerAlert>
 		<slot />
+		<CookieNotice />
 		<script>
 			import { track, TRACKING_EVENT_TYPES } from '~/lib/api/tracking.js';
 			track(TRACKING_EVENT_TYPES.page_view);

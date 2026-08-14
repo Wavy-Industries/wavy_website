@@ -5,6 +5,7 @@ import { disState } from "~/features/device-utility/states/dis.svelte";
 import { fetchServerPack as fetchServerPackBase } from "~/lib/services/samplePackFetcher";
 
 import { Log } from "~/lib/utils/Log";
+import { assetUrl } from "~/lib/utils/assetUrl";
 
 const LOG_LEVEL = Log.LEVEL_INFO
 const log = new Log("serverSamplePacks", LOG_LEVEL);
@@ -25,7 +26,7 @@ export const fetchServerPack = async (id: string, mode: SampleMode = SampleMode.
 
 export const fetchAvailableServerPacks = async (mode: SampleMode = SampleMode.DRM): Promise<{[key: string]: SamplePackInfo}> => {
     log.debug("Fetching available server packs");
-    const res = await fetch(`/assets/${disState.modelNumber}/${sampleModeLabel(mode)}/record.json`);
+    const res = await fetch(assetUrl(`/assets/${disState.modelNumber}/${sampleModeLabel(mode)}/record.json`));
     if (res.ok) {
         const record = await res.json() as {[key: string]: SamplePackInfo};
         // Add display key to each pack info

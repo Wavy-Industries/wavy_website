@@ -6,6 +6,7 @@ import type { DrumKitManifest, DrumSampleMap, EffectInstance, ISoundBackend, Osc
 import { DEFAULT_CHANNEL_CONFIG } from './types';
 import { EffectChain } from './effectChain';
 import { createEffectModule } from './effects';
+import { assetUrl } from '~/lib/utils/assetUrl';
 
 type Voice = { stop: () => void };
 
@@ -911,7 +912,7 @@ export class WebAudioBackend implements ISoundBackend {
       const layers: LoadedDrumLayer[] = [];
       for (const layer of layersIn) {
         if (!layer || typeof layer.sample !== 'string') continue;
-        const sampleUrl = encodeURI(`${basePath}${layer.sample}`);
+        const sampleUrl = assetUrl(encodeURI(`${basePath}${layer.sample}`));
         const buffer = await this.fetchDrumBuffer(ctx, sampleUrl);
         layers.push({
           buffer,

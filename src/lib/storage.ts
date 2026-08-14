@@ -17,9 +17,10 @@
  *   wavy_cart_v1   [{ sku, qty }]
  *
  * Keys owned elsewhere (listed so this file stays the map of client storage):
- *   wavy_vid             src/lib/api/tracking.js   visitor id
- *   wavy_ref             src/lib/api/tracking.js   referral code from ?ref=
- *   wavy_blog_last_seen  src/layouts/Header.astro  blog "new" dot
+ *   wavy_vid                  src/lib/api/tracking.js        visitor id
+ *   wavy_ref                  src/lib/api/tracking.js        referral code from ?ref=
+ *   wavy_blog_last_seen       src/layouts/Header.astro       blog "new" dot
+ *   wavy_cookie_notice_seen   src/components/CookieNotice.astro
  */
 
 const COUNTRY_KEY = 'wavy_country';
