@@ -4,9 +4,6 @@ export const routes = {
     'home': '/monkey',
     'monkey': '/monkey',
     'monkeyGettingStarted': '/monkey/getting-started',
-    // The cart is a panel on whatever page you are already on, opened by the
-    // `#cart` hash. This is the address to send someone who has no page yet.
-    'cart': '/monkey#cart',
     'monkeyManual': '/monkey/manual',
     'monkeyTemplates': '/monkey/templates',
     'monkeyFaq': '/monkey/faq',
