@@ -44,6 +44,11 @@ export default defineConfig({
     format: 'directory',
     assets: 'build_assets'
   },
+  // /cart was a real page before the cart became a panel. The deploy deletes
+  // orphaned files, so without this it would 404 for anyone with a bookmark.
+  redirects: {
+    '/cart': '/monkey#cart',
+  },
   markdown: {
     remarkPlugins: [obsidianEmbeds, firstParagraphIntro],
   },
