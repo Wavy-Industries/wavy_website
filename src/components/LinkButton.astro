@@ -3,41 +3,63 @@ import '../styles/global.css';
 import type { HTMLAttributes } from 'astro/types';
 
 interface Props extends HTMLAttributes<'a'> {
-  type?: 'highlight' | 'default';
+  /* `buy` is for purchase actions only — it is the one place green appears. */
+  type?: 'buy' | 'default';
+  theme?: 'light' | 'dark';
 }
 
-const { href, type = 'default', ...rest } = Astro.props;
+const { href, type = 'default', theme = 'light', ...rest } = Astro.props;
 ---
 
-<a href={href} class={type} {...rest}>
+<a href={href} class:list={[type, theme]} {...rest}>
   <slot />
 </a>
 
 <style>
+/* The base owns layout and type. Colour, including hover, belongs to the
+   variant — a background set here would repaint every variant with it. */
 a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  font-style: normal;
+  letter-spacing: 0.02em;
   text-decoration: none;
-  
-  font-size: 14px;
-  font-weight: 400;
-  padding: 6px 10px;
+  border: 0;
 }
 
-.default {
-  background-color: white;
-  color: black;
-  border: 1px solid #ccc;
-}
-.default:hover {
-  background-color: #f0f0f0;
+a:hover {
+  text-decoration: none;
 }
 
-.highlight {
-  background-color: rgb(8 76 207);
-  color: white;
-  border: 1px solid #A0BEE9;
+.default.light {
+  background-color: #111;
+  color: #fff;
 }
 
-.highlight:hover {
-  background-color: blue;
+.default.light:hover {
+  background-color: var(--accent-color);
+}
+
+.default.dark {
+  background-color: #fff;
+  color: #111;
+}
+
+.default.dark:hover {
+  background-color: var(--accent-color);
+  color: #fff;
+}
+
+.buy {
+  background-color: var(--buy-color);
+  color: #111;
+}
+
+.buy:hover {
+  background-color: var(--buy-color-hover);
 }
 </style>

@@ -4,10 +4,16 @@
     
     --font-family: "Inter", sans-serif;
 
-    /* colors */
+    /* Two colours, two jobs. Nothing else is coloured.
+
+       accent — interactive: links, and the hover state of anything actionable.
+       buy    — commerce only: add to cart, checkout. Never navigation. */
     --accent-color: rgb(8 76 207);
     --accent-color-bg-light: #F0F5FD;
     --accent-color-bg-dark: #DDE4F1;
+
+    --buy-color: #57d865;
+    --buy-color-hover: #48ce57;
 }
 
 * {
@@ -43,7 +49,7 @@ a:hover {
 }
 
 a:link, a:visited {
-    color: inherit; /* Makes the link color inherit from the parent element */
+    color: var(--accent-color);
 }
 
 h3 {

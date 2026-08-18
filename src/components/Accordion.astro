@@ -1,58 +1,55 @@
 ---
-const {title, ...rest} = Astro.props;
+const { title, ...rest } = Astro.props;
 ---
 
-<div class="accordion" {...rest}>
-  <input type="checkbox" id={title} class="accordion-toggle"/>
-  <label for={title} class="accordion-label">{title}</label>
-  <div class="accordion-content">
-    <slot>
-  </div>
-</div>
+<details {...rest}>
+  <summary>{title}</summary>
+  <div class="content"><slot /></div>
+</details>
 
 <style>
-.accordion {
-  margin-bottom: 5px;
+details {
+  border-bottom: 1px solid #eee;
 }
 
-/* Hide the checkbox */
-.accordion-toggle {
+summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 14px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #111;
+  cursor: pointer;
+  list-style: none;
+}
+
+summary::-webkit-details-marker {
   display: none;
 }
 
-/* Styling for the label */
-.accordion-label {
-  display: block;
-  background-color: #f0f0f0;
-  padding: 10px;
-  cursor: pointer;
-  border: 1px solid #ccc;
+summary::after {
+  content: '+';
+  flex: 0 0 auto;
+  color: #bbb;
 }
 
-.accordion-toggle:checked + .accordion-label {
-  background-color: #c3c3c3;
+details[open] summary::after {
+  content: '−';
 }
 
-.accordion-toggle + .accordion-label::before {
-    content: "⏵";
-    margin-right: 5px;
-}
-.accordion-toggle:checked + .accordion-label::before {
-    content: "⏷";
+summary:hover,
+details[open] summary,
+details[open] summary::after {
+  color: var(--accent-color);
 }
 
-/* Hide the content by default */
-.accordion-content {
-  visibility: hidden;
-  overflow: hidden;
-  background-color: #f0f0f0;
-  height: 0px;
-}
-
-/* Show content when checkbox is checked */
-.accordion-toggle:checked + .accordion-label + .accordion-content {
-  visibility: visible;
-  height: auto;
-  padding: 10px;
+.content {
+  padding: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #555;
+  max-width: 60ch;
 }
 </style>

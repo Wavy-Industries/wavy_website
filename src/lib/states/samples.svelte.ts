@@ -7,6 +7,7 @@ import { canonicalize } from '~/lib/utils/canonicalize';
 import { Log } from '~/lib/utils/Log';
 import { SampleMode, sampleModeLabel } from '~/lib/types/sampleMode';
 import { fetchServerPack } from '~/lib/services/samplePackFetcher';
+import { assetUrl } from '~/lib/utils/assetUrl';
 
 const log = new Log("device-samples", Log.LEVEL_INFO);
 
@@ -223,7 +224,7 @@ export const uplaodDeviceSamples = async (newSamples: DeviceSamples, mode: Sampl
 
 export const fetchDefaultPackIds = async (mode: SampleMode): Promise<string[]> => {
   try {
-    const res = await fetch(`/assets/${disState.modelNumber}/${sampleModeLabel(mode)}/default.json`);
+    const res = await fetch(assetUrl(`/assets/${disState.modelNumber}/${sampleModeLabel(mode)}/default.json`));
     if (!res.ok) {
       log.error(`Failed to fetch default pack IDs for ${sampleModeLabel(mode)}`);
       return [];

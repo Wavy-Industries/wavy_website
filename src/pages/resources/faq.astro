@@ -1,34 +1,9 @@
 ---
-import '~/styles/global.css';
-import Layout from '~/layouts/Layout.astro';
-import Header from '~/layouts/Header.astro';
-import Footer from '~/layouts/Footer.astro';
+import PageLayout from '~/layouts/PageLayout.astro';
+import { routes } from '~/routes';
 ---
 
-<Layout title="FAQ - Wavy Industries">
-	<main>
-		<Header />
-		<section>
-			<h1>Frequently asked questions</h1>
-		</section>
-		<Footer />
-	</main>
-</Layout>
-
-<style>
-main {
-	min-height: 100vh;
-	display: flex;
-	flex-direction: column;
-}
-section {
-	width: 100%;
-	padding: 0 20px;
-	max-width: 1000px;
-	margin: 0 auto;
-}
-h1 {
-	font-weight: 300;
-	font-size: 64px;
-}
-</style>
+<PageLayout title="FAQ - Wavy Industries" heading="Frequently asked questions">
+	<p>Questions about MONKEY are answered on the <a href={routes.monkeyFaq}>MONKEY FAQ</a>.</p>
+	<p>For anything else, see <a href={routes.support}>support</a>.</p>
+</PageLayout>

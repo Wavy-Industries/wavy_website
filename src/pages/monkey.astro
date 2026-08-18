@@ -32,7 +32,7 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 				<h1>MON<span style="font-weight: 400;" >KEY</span></h1>
 				<p class="tagline">An ultra-portable wireless music making device</p>
 				<div class="hero-actions">
-					<AddToCartButton client:load sku="monkey" name="MONKEY" cta="hero" />
+					<AddToCartButton client:load sku="monkey" cta="hero" />
 				</div>
 			</div>
 		</section>
@@ -73,7 +73,7 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 					<p>
 						The device is plug-and-play, fun at any level of musical experience, and with customisation options with a musical playground straight in the browser. You can try it here:
 					</p>
-					<LinkButton class="portability-cta" href={routes.deviceUtility}>Visit device utility</LinkButton>
+					<LinkButton class="portability-cta" href={routes.deviceUtility} theme="dark">Visit device utility</LinkButton>
 				</div>
 			</div>
 		</section>
@@ -173,7 +173,7 @@ import sonicstateProfile from '~/assets/monkey/profiles/sonicstate.jpg';
 			<div class="container bottom-cta-inner">
 				<p>Join our newsletter and stay up to date.</p>
 				<NewsletterSignup tag="monkey" source="monkey_inline" label="Join newsletter" />
-				<AddToCartButton client:load sku="monkey" name="MONKEY" cta="bottom" />
+				<AddToCartButton client:load sku="monkey" cta="bottom" />
 			</div>
 		</section>
 
@@ -658,7 +658,3 @@ h1 {
 	}
 }
 </style>
-
-<script>
-	import '~/scripts/load-prices.js';
-</script>

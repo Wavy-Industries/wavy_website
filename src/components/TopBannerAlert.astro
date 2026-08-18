@@ -1,9 +1,9 @@
 
 <section id="top-banner">
   <!-- <div id="remove-btn">×</div> -->
-  <div>
+  <div class="track">
     <span><slot /></span>
-    <span><slot /></span>
+    <span aria-hidden="true"><slot /></span>
   </div>
 </section>
 
@@ -31,19 +31,43 @@ section {
 
 @keyframes scroll {
   0% {
-    transform: translateX(0vw); /* Start fully outside the right of the container */
+    transform: translateX(0);
   }
   100% {
-    transform: translateX(-100vw); /* End fully outside the left of the container */
+    transform: translateX(-50%); /* Exactly one copy, so the loop is seamless */
   }
 }
 
+.track {
+  display: flex;
+  width: max-content;
+  animation: scroll 15s linear infinite;
+}
+
 section span {
-    position: relative;
-    display: inline-block;
-    width: 100vw;
-    animation: scroll 15s linear infinite;
-    padding: 5px 0;
+  flex: 0 0 auto;
+  /* At least a full viewport so the copies never bunch up, but wider when the
+     message itself is longer than the viewport (narrow phones). */
+  min-width: 100vw;
+  padding: 5px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  section {
+    white-space: normal;
   }
+  .track {
+    animation: none;
+    width: 100%;
+  }
+  section span {
+    min-width: 0;
+    width: 100%;
+    text-align: center;
+  }
+  section span + span {
+    display: none;
+  }
+}
 
 </style>

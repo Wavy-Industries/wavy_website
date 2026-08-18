@@ -1,6 +1,4 @@
-var API_BASE = import.meta.env.MODE === 'development'
-  ? 'http://localhost:8000'
-  : 'https://server.wavyindustries.com';
+import { API_BASE } from '~/lib/config/server';
 
 // Requests partner portal access for the given email. The server responds
 // identically whether or not the email is on the approved list, so callers

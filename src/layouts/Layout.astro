@@ -6,7 +6,8 @@ interface Props {
 
 const { title, description = "Wavy Industries Bluetooth MIDI keyboards for music creation." } = Astro.props;
 
-import NoCookiesBanner from '~/components/NoCookiesBanner.astro';
+import TopBannerAlert from '~/components/TopBannerAlert.astro';
+import CookieNotice from '~/components/CookieNotice.astro';
 ---
 
 <!doctype html>
@@ -27,11 +28,13 @@ import NoCookiesBanner from '~/components/NoCookiesBanner.astro';
 		<title>{title}</title>
 	</head>
 	<body>
+		<TopBannerAlert>Limited offer, €10 off using the discount code <b>SUMMER10</b> at checkout</TopBannerAlert>
 		<slot />
-		<NoCookiesBanner />
+		<CookieNotice />
 		<script>
 			import { track, TRACKING_EVENT_TYPES } from '~/lib/api/tracking.js';
 			track(TRACKING_EVENT_TYPES.page_view);
 		</script>
+		<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=828004349726924&ev=PageView&noscript=1" alt="" /></noscript>
 	</body>
 </html>

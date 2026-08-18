@@ -29,8 +29,8 @@ import midiConnectWinImg from '~/assets/midi_connect/screenshot-win.png';
 				<h1>MIDI Connect</h1>
 				<p class="tagline">🛑✋ STOP menu-diving each time you want to connect to a Bluetooth MIDI device on macOS or Windows</p>
 				<div class="hero-actions">
-					<LinkButton href={routes.midiConnectAppStore} type="highlight" id="macos-download">Download for macOS</LinkButton>
-					<LinkButton href={routes.midiConnectWindowsInstaller} type="default" download id="windows-download">Download for Windows (experimental)</LinkButton>
+					<LinkButton href={routes.midiConnectAppStore} theme="dark" id="macos-download">Download for macOS</LinkButton>
+					<LinkButton href={routes.midiConnectWindowsInstaller} type="default" theme="dark" download id="windows-download">Download for Windows (experimental)</LinkButton>
 				</div>
 			</div>
 		</section>
@@ -211,6 +211,11 @@ h1 {
 	line-height: 1.6;
 	margin: 0 0 20px 0;
 	color: #d0d0d0;
+}
+
+.intro-content a {
+	color: inherit;
+	text-decoration: underline;
 }
 
 .intro-content p:last-child {

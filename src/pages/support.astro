@@ -1,302 +1,82 @@
 ---
-import '~/styles/global.css';
-import Layout from '~/layouts/Layout.astro';
-import Header from '~/layouts/Header.astro';
-import Footer from '~/layouts/Footer.astro';
+import PageLayout from '~/layouts/PageLayout.astro';
 import { routes } from '~/routes';
 ---
 
-<Layout title="Support - Wavy Industries">
-    <main>
-        <Header />
-        <section class="support-page">
-            <article>
-                <h1>Support</h1>
-                <h2>Tools</h2>
+<PageLayout title="Support - Wavy Industries" heading="Support">
+    <section class="columns">
+        <div>
+            <h2>MON<b>KEY</b></h2>
+            <ul>
+                <li><a href={routes.monkeyGettingStarted}>getting started</a></li>
+                <li><a href={routes.monkeyManual}>manual</a></li>
+                <li><a href={routes.monkeyFaq}>faq</a></li>
+                <li><a href={routes.monkeyTemplates}>templates</a></li>
+            </ul>
+        </div>
 
-                <div class="contact-grid">
-                    <a href={routes.deviceUtility} class="contact-card">
-                        <div class="contact-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="4" y1="6" x2="20" y2="6"/>
-                                <line x1="4" y1="12" x2="20" y2="12"/>
-                                <line x1="4" y1="18" x2="20" y2="18"/>
-                                <circle cx="9" cy="6" r="2" fill="currentColor"/>
-                                <circle cx="15" cy="12" r="2" fill="currentColor"/>
-                                <circle cx="7" cy="18" r="2" fill="currentColor"/>
-                            </svg>
-                        </div>
-                        <div class="contact-body">
-                            <h3>Device utility</h3>
-                            <p>Configure, update firmware, and try playgrounds for your device — straight in the browser.</p>
-                        </div>
-                        <span class="contact-arrow">&rarr;</span>
-                    </a>
+        <!-- BRIDGE is unannounced.
+        <div>
+            <h2>BRIDGE</h2>
+            <ul>
+                <li class="none">&mdash;</li>
+            </ul>
+        </div>
+        -->
 
-                    <a href={routes.midiConnect} class="contact-card">
-                        <div class="contact-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M7 7l10 10M17 7L7 17"/>
-                                <path d="M12 2v4M12 18v4"/>
-                            </svg>
-                        </div>
-                        <div class="contact-body">
-                            <h3>MIDI Connect</h3>
-                            <p>Desktop helper to bridge Bluetooth MIDI devices on macOS and Windows.</p>
-                        </div>
-                        <span class="contact-arrow">&rarr;</span>
-                    </a>
-                </div>
+        <div>
+            <h2>KD-3</h2>
+            <ul>
+                <li class="none">&mdash;</li>
+            </ul>
+        </div>
+    </section>
 
-                <h2>Community</h2>
+    <section class="columns">
+        <div>
+            <h2>tools</h2>
+            <ul>
+                <li><a href={routes.deviceUtility}>device utility</a></li>
+                <li><a href={routes.midiConnect}>MIDI connect</a></li>
+            </ul>
+        </div>
 
-                <a href={routes.wavyDiscord} target="_blank" class="discord-card">
-                    <div class="discord-icon">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189z"/>
-                        </svg>
-                    </div>
-                    <div class="discord-body">
-                        <h3>Join us on Discord</h3>
-                        <p>Ask questions, share ideas, get help from the community and the Wavy Industries team.</p>
-                    </div>
-                    <span class="discord-arrow">&rarr;</span>
-                </a>
-
-                <h2>Other ways to reach us</h2>
-
-                <div class="contact-grid">
-                    <a id="contact-card" class="contact-card">
-                        <div class="contact-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-                            </svg>
-                        </div>
-                        <div class="contact-body">
-                            <h3>Email</h3>
-                            <p id="contact-text">For direct inquiries and support requests.</p>
-                        </div>
-                        <span class="contact-arrow">&rarr;</span>
-                    </a>
-
-                    <a href={routes.wavyIndstagram} target="_blank" class="contact-card">
-                        <div class="contact-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
-                            </svg>
-                        </div>
-                        <div class="contact-body">
-                            <h3>Instagram</h3>
-                            <p>Follow for product updates and tips.</p>
-                        </div>
-                        <span class="contact-arrow">&rarr;</span>
-                    </a>
-                </div>
-            </article>
-        </section>
-        <Footer />
-    </main>
-</Layout>
+        <div>
+            <h2>contact</h2>
+            <ul>
+                <li><a href={routes.wavyDiscord} target="_blank">join discord</a></li>
+                <li><a id="contact-email">email us</a></li>
+                <li><a href={routes.wavyIndstagram} target="_blank">instagram</a></li>
+            </ul>
+        </div>
+    </section>
+</PageLayout>
 
 <style>
-main {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: #fff;
+.columns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
 }
 
-.support-page {
-    width: 100%;
-    padding: 0 24px;
-    flex-grow: 1;
-}
-
-.support-page article {
-    margin: 0 auto;
-    max-width: 800px;
-    width: 100%;
-    padding: 40px 0 80px;
-}
-
-h1 {
-    font-size: 36px;
-    font-weight: 300;
-    margin: 0 0 8px 0;
-    color: #111;
-}
-
-.support-page > article > p {
-    font-size: 16px;
-    line-height: 1.7;
-    color: #555;
-    margin: 0 0 32px 0;
-}
-
-.discord-card {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    padding: 24px;
-    border: 1px solid #d0d0d0;
-    border-radius: 2px;
-    background: #f7f7f7;
-    text-decoration: none;
-    font-style: normal;
-    color: inherit;
-    transition: border-color 0.15s, background 0.15s;
-    cursor: pointer;
-}
-
-.discord-card:hover {
-    border-color: #aaa;
-    background: #f0f0f0;
-    text-decoration: none;
-}
-
-.discord-icon {
-    flex-shrink: 0;
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 2px;
-    background: #5865F2;
-    color: #fff;
-}
-
-.discord-body {
-    flex-grow: 1;
-}
-
-.discord-body h3 {
-    font-size: 18px;
-    font-weight: 500;
-    margin: 0 0 4px 0;
-    color: #111;
-}
-
-.discord-body p {
-    font-size: 15px;
-    line-height: 1.5;
-    color: #666;
-    margin: 0;
-}
-
-.discord-arrow {
-    flex-shrink: 0;
-    font-size: 20px;
+.none {
     color: #bbb;
-    transition: color 0.15s;
 }
 
-.discord-card:hover .discord-arrow {
-    color: #888;
-}
-
-h2 {
-    font-size: 14px;
-    font-weight: 500;
-    color: #999;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin: 40px 0 16px 0;
-}
-
-.contact-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.contact-card {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 20px;
-    border: 1px solid #d0d0d0;
-    border-radius: 2px;
-    background: #f7f7f7;
-    text-decoration: none;
-    font-style: normal;
-    color: inherit;
-    transition: border-color 0.15s, background 0.15s;
-    cursor: pointer;
-}
-
-.contact-card:hover {
-    border-color: #aaa;
-    background: #f0f0f0;
-    text-decoration: none;
-}
-
-.contact-icon {
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 2px;
-    background: #eee;
-    color: #555;
-}
-
-.contact-body {
-    flex-grow: 1;
-}
-
-.contact-body h3 {
-    font-size: 15px;
-    font-weight: 500;
-    margin: 0 0 2px 0;
-    color: #111;
-}
-
-.contact-body p {
-    font-size: 13px;
-    line-height: 1.5;
-    color: #666;
-    margin: 0;
-}
-
-.contact-arrow {
-    flex-shrink: 0;
-    font-size: 16px;
-    color: #bbb;
-    transition: color 0.15s;
-}
-
-.contact-card:hover .contact-arrow {
-    color: #888;
-}
-
-@media (max-width: 768px) {
-    .support-page {
-        padding: 0 16px;
-    }
-
-    .support-page article {
-        padding: 28px 0 60px;
-    }
-
-    h1 {
-        font-size: 28px;
-    }
-
-    .discord-card {
-        padding: 16px;
+@media (max-width: 640px) {
+    .columns {
+        grid-template-columns: 1fr;
+        gap: 28px;
     }
 }
 </style>
 
 <script>
-function setupContactCard() {
-    const card = document.getElementById('contact-card') as HTMLAnchorElement;
+function setupContactEmail() {
+    const link = document.getElementById('contact-email') as HTMLAnchorElement;
     const p1 = "hell";
     const p2 = "o";
-    card.href = "mai" + "lto:" + p1 + p2 + "@" + "wavyindustries.com";
+    link.href = "mai" + "lto:" + p1 + p2 + "@" + "wavyindustries.com";
 }
-setTimeout(setupContactCard, 100);
+setTimeout(setupContactEmail, 100);
 </script>

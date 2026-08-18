@@ -1,15 +1,16 @@
 ---
-// A brief, friendly banner stating we don't use cookies.
+// A brief notice that the site uses cookies.
 // Appears once per browser. Auto-dismisses after a short timeout.
+// This is a disclosure, not a consent gate — it does not block any tracking.
 ---
 
-<div id="no-cookies-banner" class="no-cookies-banner" hidden>
-    <span>This site doesn't use cookies. Just a quick hello.</span>
+<div id="cookie-notice" class="cookie-notice" hidden>
+    <span>This site uses cookies for analytics and advertising.</span>
     <button type="button" class="dismiss" aria-label="Dismiss">×</button>
 </div>
 
 <style>
-    .no-cookies-banner {
+    .cookie-notice {
         position: fixed;
         left: 16px;
         right: 16px;
@@ -33,11 +34,11 @@
         transition: transform 220ms ease, opacity 220ms ease;
     }
 
-    .no-cookies-banner[hidden] {
+    .cookie-notice[hidden] {
         display: none;
     }
 
-    .no-cookies-banner.leaving {
+    .cookie-notice.leaving {
         transform: translateY(20px);
         opacity: 0;
         pointer-events: none;
@@ -57,11 +58,11 @@
 </style>
 
 <script>
-    const STORAGE_KEY = 'wavy_no_cookies_seen';
+    const STORAGE_KEY = 'wavy_cookie_notice_seen';
     const SHOW_MS = 5000;
 
-    function setupNoCookiesBanner() {
-        const banner = document.getElementById('no-cookies-banner');
+    function setupCookieNotice() {
+        const banner = document.getElementById('cookie-notice');
         if (!banner) return;
         try {
             if (localStorage.getItem(STORAGE_KEY)) return;
@@ -83,5 +84,5 @@
         setTimeout(dismiss, SHOW_MS);
     }
 
-    setupNoCookiesBanner();
+    setupCookieNotice();
 </script>

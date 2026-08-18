@@ -1,6 +1,4 @@
-var API_BASE = import.meta.env.MODE === 'development'
-  ? 'http://localhost:8000'
-  : 'https://server.wavyindustries.com';
+import { API_BASE } from '~/lib/config/server';
 
 export async function getCountryCode() {
   try {

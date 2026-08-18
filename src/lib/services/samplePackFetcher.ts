@@ -9,6 +9,7 @@ import { SamplePack } from '~/lib/parsers/device_storage_parser';
 import { SampleMode, sampleModeLabel } from '~/lib/types/sampleMode';
 import { disState } from '~/features/device-utility/states/dis.svelte';
 import { Log } from '~/lib/utils/Log';
+import { assetUrl } from '~/lib/utils/assetUrl';
 
 const LOG_LEVEL = Log.LEVEL_INFO;
 const log = new Log('samplePackFetcher', LOG_LEVEL);
@@ -29,7 +30,7 @@ export const fetchServerPack = async (
 
     try {
         const url = `/assets/${disState.modelNumber}/${sampleModeLabel(mode)}/${encodeURIComponent(normalizedId)}.json`;
-        const res = await fetch(url);
+        const res = await fetch(assetUrl(url));
 
         if (!res.ok) {
             log.error(`Failed to fetch pack ${normalizedId} from server (${res.status})`);

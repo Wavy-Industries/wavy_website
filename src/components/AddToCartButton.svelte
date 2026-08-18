@@ -1,17 +1,25 @@
 <script>
-    import { cartAdd } from '~/lib/state/cart.svelte';
+    import { onMount } from 'svelte';
+    import { cartState, initCart, addToCart } from '~/lib/state/cart.svelte';
+    import { formatShopifyPrice } from '~/lib/utils/shopify-util.js';
 
-    let { sku, name, cta = 'hero', priceClass = 'monkey-price' } = $props();
+    let { sku, cta = 'hero', priceClass = 'monkey-price' } = $props();
 
-    function handleClick() {
-        cartAdd(sku, name, 1, cta);
-    }
+    onMount(() => {
+        initCart();
+    });
+
+    // The same page-load fetch that fills the panel fills this label.
+    let price = $derived.by(() => {
+        const product = cartState.products[sku];
+        return product ? formatShopifyPrice(product.price.currencyCode, product.price.amount) : '';
+    });
 </script>
 
-<button class="atc" onclick={handleClick} type="button">
+<button class="atc" onclick={() => addToCart(sku, 1, cta)} type="button">
     <span class="label">
         <span>Add to cart</span>
-        <span class="{priceClass} atc-price atc-price--loading" data-atc-price-for={sku}></span>
+        <span class="{priceClass} atc-price" class:atc-price--loading={!price}>{price}</span>
     </span>
 </button>
 
@@ -21,18 +29,21 @@
         align-items: center;
         justify-content: center;
         gap: 8px;
-        padding: 6px 10px;
+        padding: 9px 18px;
         font: inherit;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 400;
         font-style: normal;
-        background-color: rgb(8, 76, 207);
-        color: white;
-        border: 1px solid #a0bee9;
+        letter-spacing: 0.02em;
+        border: 0;
         cursor: pointer;
+        background-color: var(--buy-color);
+        color: #111;
+        transition: background-color 0.15s;
     }
+
     .atc:hover {
-        background-color: blue;
+        background-color: var(--buy-color-hover);
     }
     .label {
         display: inline-flex;

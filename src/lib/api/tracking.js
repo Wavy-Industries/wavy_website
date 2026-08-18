@@ -1,8 +1,11 @@
-var API_BASE = import.meta.env.MODE === 'development'
-  ? 'http://localhost:8000'
-  : 'https://server.wavyindustries.com';
+import { metaTrack } from '~/lib/api/metaPixel.js';
+import { googleAdsTrack } from '~/lib/api/googleAds.js';
+import { Log } from '~/lib/utils/Log';
+import { API_BASE } from '~/lib/config/server';
 
 var TRACKING_URL = API_BASE + '/api/tracking/event';
+
+var log = new Log('tracking', Log.LEVEL_DEBUG);
 
 export const TRACKING_EVENT_TYPES = {
   // Funnel
@@ -36,6 +39,9 @@ export function getRef() {
   return localStorage.getItem('wavy_ref') || undefined;
 }
 
+// Referral attribution: partners share links with ?ref=<code>. The first page
+// load stores it so every later event (and the Shopify order, via getRef at
+// checkout) carries the partner code even after the param is gone from the URL.
 function captureRef() {
   var key = 'wavy_ref';
   var params = new URLSearchParams(window.location.search);
@@ -47,29 +53,25 @@ function captureRef() {
 }
 
 export function track(eventType, metadata) {
-  try {
-    var ref = captureRef();
-    var merged = metadata || {};
-    if (ref) {
-      merged.ref = ref;
-    }
+  metaTrack(eventType, metadata);
+  googleAdsTrack(eventType, metadata);
 
-    fetch(TRACKING_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        visitor_id: getVisitorId(),
-        event_type: eventType,
-        page_url: window.location.pathname,
-        referrer: !document.referrer ? 'unknown'
-          : document.referrer.includes(window.location.hostname) ? undefined
-          : document.referrer,
-        metadata: Object.keys(merged).length ? merged : undefined,
-      }),
-      credentials: 'omit',
-      keepalive: true,
-    }).catch(function () {});
-  } catch (err) {
-    console.warn('track(' + eventType + ') failed', err);
-  }
+  fetch(TRACKING_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      visitor_id: getVisitorId(),
+      event_type: eventType,
+      page_url: window.location.pathname,
+      referrer: !document.referrer ? 'unknown'
+        : document.referrer.includes(window.location.hostname) ? undefined
+        : document.referrer,
+      ref: captureRef(),
+      metadata: metadata,
+    }),
+    credentials: 'omit',
+    keepalive: true,
+  }).catch(function (err) {
+    log.warning('track(' + eventType + ') failed to reach tracking server', err);
+  });
 }

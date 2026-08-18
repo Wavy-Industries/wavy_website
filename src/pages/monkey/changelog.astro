@@ -6,7 +6,7 @@ import Footer from '~/layouts/Footer.astro';
 import { parseChangelog } from '~/lib/parsers/changelog_parser';
 import fs from 'node:fs';
 
-const markdown = fs.readFileSync('public/firmware/MONKEY/changelog.md', 'utf-8');
+const markdown = fs.readFileSync('public/firmware/WIMKY002/changelog.md', 'utf-8');
 const changelog = parseChangelog(markdown);
 const versions = changelog.versions.filter(v => !v.isObsolete && !v.isDev);
 ---

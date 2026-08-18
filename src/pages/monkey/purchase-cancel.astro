@@ -1,8 +1,9 @@
 ---
 import { routes } from '~/routes';
+import { CART_HASH } from '~/lib/state/cart.svelte';
 ---
 
-<script define:vars={{ cartUrl: routes.cart }}>
+<script define:vars={{ cartUrl: routes.home + CART_HASH }}>
 	import('~/lib/api/tracking.js')
 		.then(({ track, TRACKING_EVENT_TYPES }) => {
 			track(TRACKING_EVENT_TYPES.checkout_cancel);

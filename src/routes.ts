@@ -4,7 +4,6 @@ export const routes = {
     'home': '/monkey',
     'monkey': '/monkey',
     'monkeyGettingStarted': '/monkey/getting-started',
-    'cart': '/cart',
     'monkeyManual': '/monkey/manual',
     'monkeyTemplates': '/monkey/templates',
     'monkeyFaq': '/monkey/faq',
