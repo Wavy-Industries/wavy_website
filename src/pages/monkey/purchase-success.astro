@@ -398,11 +398,8 @@ import monkeyImg from "~/assets/monkey/packaging/Monkey with packaging.jpg";
 
 <script>
   import { track, TRACKING_EVENT_TYPES } from "~/lib/api/tracking.js";
+  import { API_BASE } from "~/lib/config/server";
 
-  const apiUrl =
-    import.meta.env.MODE === "development"
-      ? "http://localhost:8000"
-      : "https://server.wavyindustries.com";
   const queryString = window.location.search;
   const urlParams = new URLSearchParams(queryString);
   const sessionId = urlParams.get("session_id");
@@ -427,7 +424,7 @@ import monkeyImg from "~/assets/monkey/packaging/Monkey with packaging.jpg";
 
   function checkFormAvailable(orderId) {
     console.log("Checking form availability for order:", orderId);
-    fetch(`${apiUrl}/api/order/${orderId}/post_purchase_form/available`)
+    fetch(`${API_BASE}/api/order/${orderId}/post_purchase_form/available`)
       .then((response) => response.json())
       .then((data) => {
         console.log("Form availability response:", data);
@@ -521,7 +518,7 @@ import monkeyImg from "~/assets/monkey/packaging/Monkey with packaging.jpg";
       return;
     }
 
-    fetch(`${apiUrl}/api/order/${orderId}/post_purchase_form`, {
+    fetch(`${API_BASE}/api/order/${orderId}/post_purchase_form`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -596,7 +593,7 @@ import monkeyImg from "~/assets/monkey/packaging/Monkey with packaging.jpg";
     console.log("Session ID found:", sessionId);
     const fetchOrderId = (retryCount = 0) => {
       console.log("Fetching order ID, attempt:", retryCount + 1);
-      fetch(`${apiUrl}/api/order/fromExternal/stripe/${sessionId}`)
+      fetch(`${API_BASE}/api/order/fromExternal/stripe/${sessionId}`)
         .then((response) => {
           if (!response.ok) {
             if (response.status === 404 && retryCount < 5) {

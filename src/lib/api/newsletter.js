@@ -1,8 +1,5 @@
 import { track, TRACKING_EVENT_TYPES } from '~/lib/api/tracking.js';
-
-var API_BASE = import.meta.env.MODE === 'development'
-  ? 'http://localhost:8000'
-  : 'https://server.wavyindustries.com';
+import { API_BASE } from '~/lib/config/server';
 
 // Subscribes the given email to the newsletter and fires the tracking event on
 // success. Throws on network or server error so callers can show a UI error;

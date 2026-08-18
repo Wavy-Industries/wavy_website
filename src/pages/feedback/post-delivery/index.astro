@@ -206,10 +206,7 @@ import { routes } from '~/routes';
 </style>
 
 <script>
-  const apiUrl =
-    import.meta.env.MODE === "development"
-      ? "http://localhost:8000"
-      : "https://server.wavyindustries.com";
+  import { API_BASE } from "~/lib/config/server";
 
   const FEEDBACK_KIND = "post-delivery";
   const FORM_VERSION = 1;
@@ -239,7 +236,7 @@ import { routes } from '~/routes';
   async function _checkAvailable() {
     try {
       const res = await fetch(
-        `${apiUrl}/api/feedback/${FEEDBACK_KIND}/${encodeURIComponent(orderId!)}/available`
+        `${API_BASE}/api/feedback/${FEEDBACK_KIND}/${encodeURIComponent(orderId!)}/available`
       );
       const body = await res.json().catch(() => ({}));
       return { available: !!body.available, reason: body.reason || null };
@@ -251,7 +248,7 @@ import { routes } from '~/routes';
 
   async function _submit(payload: object) {
     const res = await fetch(
-      `${apiUrl}/api/feedback/${FEEDBACK_KIND}/${encodeURIComponent(orderId!)}`,
+      `${API_BASE}/api/feedback/${FEEDBACK_KIND}/${encodeURIComponent(orderId!)}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept": "application/json" },

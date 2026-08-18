@@ -1,7 +1,10 @@
 import { PRODUCTS } from '~/lib/config/products';
+import { Log } from '~/lib/utils/Log';
 
 var PIXEL_ID = '828004349726924';
 var IS_DEV = import.meta.env.MODE === 'development';
+
+var log = new Log('meta_pixel', Log.LEVEL_DEBUG);
 
 // Pages that count as a product view. Keys are pathnames with the
 // trailing slash stripped (build uses directory format URLs).
@@ -76,16 +79,10 @@ function mapEvent(eventType, metadata) {
 }
 
 export function metaTrack(eventType, metadata) {
-  try {
-    var events = mapEvent(eventType, metadata);
-    if (events.length === 0) return;
-    if (IS_DEV) {
-      events.forEach(function (e) { console.debug('[meta-pixel]', e[0], e[1] || {}); });
-      return;
-    }
-    ensurePixel();
-    events.forEach(function (e) { window.fbq('track', e[0], e[1]); });
-  } catch (err) {
-    console.warn('metaTrack(' + eventType + ') failed', err);
-  }
+  var events = mapEvent(eventType, metadata);
+  if (events.length === 0) return;
+  events.forEach(function (e) { log.debug(e[0], e[1] || {}); });
+  if (IS_DEV) return;
+  ensurePixel();
+  events.forEach(function (e) { window.fbq('track', e[0], e[1]); });
 }
