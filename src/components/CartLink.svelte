@@ -47,5 +47,6 @@
     }
     .cart-link.full {
         color: var(--buy-color);
+        font-weight: bold;
     }
 </style>
