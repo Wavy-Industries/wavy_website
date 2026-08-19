@@ -73,17 +73,17 @@ import NewsletterPopup from '../components/NewsletterPopup.svelte';
 
     <nav class="utility" aria-label="Site">
         <ul>
-            <li class={currentPageCheck(routes.about)}>
-                <a href={routes.about}>about</a>
-            </li>
-            <li class={currentPageCheck(routes.blog)} data-blog-link data-latest-blog={latestBlogIso}>
-                <a href={routes.blog}>blog{latestBlogIso && <span class="blog-dot" hidden></span>}</a>
-            </li>
             <li class={currentPageCheck(routes.support)}>
                 <a href={routes.support}>support</a>
             </li>
             <li class={currentPageCheck(routes.partners)}>
                 <a href={routes.partners}>partners</a>
+            </li>
+            <li class={currentPageCheck(routes.about)}>
+                <a href={routes.about}>about</a>
+            </li>
+            <li class={currentPageCheck(routes.blog)} data-blog-link data-latest-blog={latestBlogIso}>
+                <a href={routes.blog}>blog{latestBlogIso && <span class="blog-dot" hidden></span>}</a>
             </li>
             <li>
                 <CartLink client:load />
