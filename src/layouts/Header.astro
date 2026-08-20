@@ -43,9 +43,6 @@ try {
 } catch {}
 const latestBlogIso = latestBlogDateMs !== null ? new Date(latestBlogDateMs).toISOString() : '';
 
-import logoImg from '../assets/logo.svg';
-import logoWhiteImg from '../assets/logo-white.svg';
-
 import CartLink from '../components/CartLink.svelte';
 import CartPanel from '../components/CartPanel.svelte';
 import NewsletterPopup from '../components/NewsletterPopup.svelte';
@@ -57,7 +54,6 @@ import NewsletterPopup from '../components/NewsletterPopup.svelte';
             <li class={currentPageCheck(routes.monkey)}>
                 <a href={routes.monkey}>MON<b>KEY</b></a>
             </li>
-            <!-- BRIDGE is unannounced. Page lives at src/pages/_bridge.astro. -->
             <!-- <li class={currentPageCheck(routes.bridge)}>
                 <a href={routes.bridge}>BRIDGE</a><span class="flag-new">new</span>
             </li> -->
@@ -68,7 +64,7 @@ import NewsletterPopup from '../components/NewsletterPopup.svelte';
     </nav>
 
     <a class="logo" href={routes.home} aria-label="Wavy Industries">
-        <img src={textColor == 'white' ? logoWhiteImg.src : logoImg.src} alt="Wavy Industries" />
+        <b>WAVY</b> INDUSTRIES
     </a>
 
     <nav class="utility" aria-label="Site">
@@ -97,20 +93,16 @@ import NewsletterPopup from '../components/NewsletterPopup.svelte';
 
 <style>
     header {
-        padding: 18px 24px;
+        padding: 5px 10px;
         width: 100%;
 
         display: grid;
         grid-template-columns: 1fr auto 1fr;
-        align-items: center;
+        align-items: top;
         gap: 24px;
 
         font-size: 12px;
         font-weight: 400;
-        letter-spacing: 0.02em;
-
-        transition: all 0.3s;
-        height: auto;
     }
 
     header[hide] {
@@ -145,12 +137,8 @@ import NewsletterPopup from '../components/NewsletterPopup.svelte';
         grid-column: 2;
         justify-self: center;
         display: block;
-    }
-
-    .logo img {
-        display: block;
-        width: 56px;
-        height: auto;
+        font-size: 18px;
+        font-weight: 300;
     }
 
     .utility {
