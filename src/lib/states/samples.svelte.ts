@@ -1,5 +1,5 @@
 /* Shared device samples state/API for use across features */
-import { DeviceSamples, SamplePack } from '~/lib/parsers/device_storage_parser';
+import { DeviceSamples, SamplePack, sampleParser_validateSamples } from '~/lib/parsers/device_storage_parser';
 import { smpService } from '~/lib/states/bluetooth.svelte';
 import { disState } from '~/features/device-utility/states/dis.svelte';
 import { SampleManager } from '~/lib/bluetooth/smp/SampleManager';
@@ -198,6 +198,8 @@ export const uplaodDeviceSamples = async (newSamples: DeviceSamples, mode: Sampl
   if (_isTransfering) { log.error('Transfer already in progress, aborting new upload request.'); deviceSampleTransferState.upload = { type: 'error', message: 'Transfer already in progress' }; return false; }
   if (deviceSamplesState.isSupported !== true) { log.error('Device does not support samples'); deviceSampleTransferState.upload = { type: 'error', message: 'Device does not support samples' }; return false; }
   if (!newSamples || !Array.isArray(newSamples.pages) || newSamples.pages.length !== 10) { log.error('Invalid samples payload'); deviceSampleTransferState.upload = { type: 'error', message: 'Invalid samples payload' }; return false; }
+  const problems = sampleParser_validateSamples(newSamples);
+  if (problems.length > 0) { log.error(`Samples failed validation: ${problems.join('; ')}`); deviceSampleTransferState.upload = { type: 'error', message: problems.length === 1 ? problems[0] : `${problems[0]} (and ${problems.length - 1} more problems)` }; return false; }
   const modeReady = await setSampleMode(mode);
   if (!modeReady && mode !== SampleMode.DRM) { return false; }
   const modeState = getModeState(mode);

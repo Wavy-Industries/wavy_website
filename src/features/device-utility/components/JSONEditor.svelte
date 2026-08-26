@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   const { json, onSave, onClose } = $props();
   let jsonText = $state(JSON.stringify(json ?? {}, null, 2));
+  let saveError = $state('');
   let jsonAreaEl = null;
 
   function close() {
@@ -25,14 +26,22 @@
       close();
     }
   }
+  // onSave may return a message to reject the input; the dialog then stays open and shows it
   function handleSave() {
+    let parsed;
     try {
-      const parsed = JSON.parse(jsonText);
-      if (typeof onSave === 'function') onSave(parsed);
-      close();
-    } catch (_) {
-      alert('Invalid JSON');
+      parsed = JSON.parse(jsonText);
+    } catch (e) {
+      saveError = e?.message ? `Invalid JSON: ${e.message}` : 'Invalid JSON';
+      return;
     }
+    const rejection = typeof onSave === 'function' ? onSave(parsed) : null;
+    if (typeof rejection === 'string' && rejection.length > 0) {
+      saveError = rejection;
+      return;
+    }
+    saveError = '';
+    onClose && onClose(); // saved, so skip the unsaved-changes prompt in close()
   }
 
   onMount(() => {
@@ -53,6 +62,9 @@
     </div>
     <div class="modal-body padded">
       <textarea class="json-input" bind:value={jsonText} bind:this={jsonAreaEl} placeholder='Paste loops array or an object with a "loops" array'></textarea>
+      {#if saveError}
+        <div class="save-error" role="alert">{saveError}</div>
+      {/if}
     </div>
     <div class="modal-actions">
         <button class="button-link" onclick={close}>Cancel</button>
@@ -69,6 +81,7 @@
 .modal-body { padding: 0; }
 .modal-body.padded { padding: 12px; display:flex; flex-direction:column; gap:8px; }
 .modal-actions { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid #eee; }
+.save-error { border: 1px solid #ef4444; background: #fef2f2; color: #991b1b; border-radius: var(--du-radius); padding: 8px 10px; font-size: 12px; }
 .json-input { width: 100%; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
 .button-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border:1px solid var(--du-border); border-radius:var(--du-radius); background:#fff; color:inherit; text-decoration:none; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
 .icon { width: 36px; height: 36px; border-radius: var(--du-radius); display: inline-flex; align-items: center; justify-content: center; }

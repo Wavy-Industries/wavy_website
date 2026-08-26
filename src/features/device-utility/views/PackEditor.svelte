@@ -1,13 +1,13 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { editState, closePackEditor, setEditorLoopData, saveEditor, saveEditorAsNew, setEditorName7 } from '~/features/device-utility/states/edits.svelte';
-  import { sampleParser_packSize, TICKS_PER_BEAT } from '~/lib/parsers/device_storage_parser';
+  import { sampleParser_packSize, sampleParser_validatePack, TICKS_PER_BEAT } from '~/lib/parsers/device_storage_parser';
   import { soundBackend } from '~/lib/soundBackend';
   import MidiEditor from '~/features/device-utility/views/MidiEditor.svelte';
   import MidiPreview from '~/features/device-utility/components/MidiPreview.svelte';
   import { computeLoopEndTicks } from '~/lib/utils/loop_utils';
   import { parseMidiFile, indexLoopEvents, clampVelocity } from '~/features/device-utility/utils/midiUtils';
-  import { validatePage, getSamplePack } from '~/features/device-utility/utils/samples';
+  import { getSamplePack } from '~/features/device-utility/utils/samples';
   import { deviceSamplesState } from '~/lib/states/samples.svelte';
   import { SampleMode } from '~/lib/types/sampleMode';
   import NameBoxes from '~/features/device-utility/components/NameBoxes.svelte';
@@ -18,6 +18,23 @@
 
   const slots = $derived(editState.loops);
   const modeState = $derived(deviceSamplesState.modes[deviceSamplesState.activeMode]);
+
+  // Validate the working pack with the same parser that encodes it, so the editor cannot hold
+  // anything the device would reject. Re-runs on every edit, so problems surface immediately.
+  const validationIssues = $derived(sampleParser_validatePack(slots[0] ?? null));
+  const issuesByLoop = $derived(validationIssues.reduce((byLoop, issue) => {
+    if (issue.loopIndex === null) return byLoop;
+    (byLoop[issue.loopIndex] ??= []).push(issue.message);
+    return byLoop;
+  }, {}));
+  const firstIssueLoopIndex = $derived(validationIssues.find((issue) => issue.loopIndex !== null)?.loopIndex ?? null);
+  const MAX_LISTED_ISSUES = 8;
+  const listedIssues = $derived(validationIssues.slice(0, MAX_LISTED_ISSUES));
+
+  let loopRowElements = $state(Array(15).fill(null));
+  function scrollToLoop(idx) {
+    loopRowElements[idx]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
   const previewChannel = $derived(() =>
     deviceSamplesState.activeMode === SampleMode.DRM ? 9 : 0
   );
@@ -158,11 +175,9 @@
   }
 
   // Import raw JSON dialog
-  let importDialog = $state({ open: false, json: {}, error: '', errors: [] });
+  let importDialog = $state({ open: false, json: {} });
   async function openImportDialog() {
     importDialog.open = true;
-    importDialog.error = '';
-    importDialog.errors = [];
     // Prefill with current JSON (same as View raw)
     try {
       if (slots[0]) {
@@ -184,27 +199,15 @@
     for (let i = 0; i < Math.min(15, loops.length); i++) out[i] = loops[i] ?? null;
     return out;
   }
-  async function doImportRaw() {
-    try {
-      importDialog.error = '';
-      importDialog.errors = [];
-      const obj = importDialog.json || {};
-      const loops = Array.isArray(obj) ? obj : (Array.isArray(obj?.loops) ? obj.loops : null);
-      if (!loops) throw new Error('Expected an array of loops or an object with a "loops" array');
-      const currentName = slots[0]?.name || `U-${editState.name7}`;
-      const page = { name: currentName, loops: normalizeLoops(loops) };
-      // Validate using central validator
-      const uiId = editState.id ?? `U-${(editState.name7 || 'NONAME').slice(0,7)}`;
-      const errs = validatePage(uiId, page) || [];
-      if (errs.length > 0) {
-        importDialog.errors = errs;
-        return; // keep dialog open
-      }
-      setEditorLoopData(0, page);
-      importDialog.open = false;
-    } catch (e) {
-      importDialog.error = (e && e.message) ? e.message : 'Invalid JSON input';
-    }
+  // Returns a message to keep the dialog open, or null once the pack has been loaded into the editor.
+  // Data that is merely invalid is still accepted, so the editor can point at the offending loop.
+  function importRaw(parsed) {
+    const loops = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.loops) ? parsed.loops : null);
+    if (!loops) return 'Expected an array of loops or an object with a "loops" array';
+    const currentName = slots[0]?.name || `U-${editState.name7}`;
+    setEditorLoopData(0, { name: currentName, loops: normalizeLoops(loops) });
+    importDialog.open = false;
+    return null;
   }
 </script>
 
@@ -221,20 +224,29 @@
     <div class="actions">
       <button class="button-link" onclick={openImportDialog}>View raw</button>
       {#if editState.id && editState.id.startsWith('L-')}
-        <button onclick={saveEditor} class:primary={editState.unsaved} class:attention={editState.unsaved}>Save</button>
+        <button onclick={saveEditor} disabled={validationIssues.length > 0} title={validationIssues.length > 0 ? 'Fix the errors below before saving' : null} class:primary={editState.unsaved} class:attention={editState.unsaved}>Save</button>
       {:else}
-        <button onclick={saveEditorAsNew} class:primary={editState.unsaved || !editState.id} class:attention={editState.unsaved || !editState.id}>Save As New Pack</button>
+        <button onclick={saveEditorAsNew} disabled={validationIssues.length > 0} title={validationIssues.length > 0 ? 'Fix the errors below before saving' : null} class:primary={editState.unsaved || !editState.id} class:attention={editState.unsaved || !editState.id}>Save As New Pack</button>
       {/if}
     </div>
   </div>
   {#if editState.unsaved}
     <div class="unsaved">You have unsaved changes</div>
   {/if}
-  {#if editState.errors?.length}
-    <div class="errors">
-      {#each editState.errors as e}
-        <div class="error">{e}</div>
+  {#if validationIssues.length}
+    <div class="errors" role="alert">
+      <div class="errors-title">
+        This pack cannot be sent to the device
+        {#if firstIssueLoopIndex !== null}
+          <button class="button-link" onclick={() => scrollToLoop(firstIssueLoopIndex)}>Go to loop {firstIssueLoopIndex + 1}</button>
+        {/if}
+      </div>
+      {#each listedIssues as issue}
+        <div class="error">{issue.message}</div>
       {/each}
+      {#if validationIssues.length > listedIssues.length}
+        <div class="error">and {validationIssues.length - listedIssues.length} more</div>
+      {/if}
     </div>
   {/if}
   <div class="toolbar settings">
@@ -251,7 +263,8 @@
   <div class="list">
     {#each Array(15) as _, idx}
       {@const loop = slots[0]?.loops?.[idx]}
-      <div class="row">
+      {@const loopIssues = issuesByLoop[idx] ?? []}
+      <div class="row" class:has-error={loopIssues.length > 0} bind:this={loopRowElements[idx]}>
         <div class="idx">{idx+1}</div>
         <div class="play">
           <PlayStopButton
@@ -260,6 +273,13 @@
           />
         </div>
         <div class="content">
+          {#if loopIssues.length}
+            <div class="row-errors">
+              {#each loopIssues as message}
+                <div class="row-error">{message}</div>
+              {/each}
+            </div>
+          {/if}
           {#if loop}
             <div class="preview-stack">
               <MidiPreview class="clickable" {loop} playhead={previewPlayhead.idx === idx ? previewPlayhead.progress : null} onOpen={() => openMidiEditorFor(idx)} />
@@ -324,10 +344,14 @@
 {/if}
 
 {#if importDialog.open}
-  <JSONEditor json={importDialog.json} onSave={(o)=>{ importDialog.json=o; doImportRaw(); }} onClose={closeImportDialog} />
+  <JSONEditor json={importDialog.json} onSave={(o)=>{ importDialog.json=o; return importRaw(o); }} onClose={closeImportDialog} />
 {/if}
 
 <style>
+.errors-title { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.row.has-error { border-color: #ef4444; box-shadow: 0 0 0 1px #ef4444 inset; }
+.row-errors { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.row-error { color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--pe-radius, 6px); padding: 4px 8px; font-size: 12px; }
 .page {
   display: flex;
   flex-direction: column;
@@ -422,7 +446,7 @@ input[type="file"] { width: 100%; }
 
 /* Modal reused styles */
 .error { color: var(--du-danger); background:#ffecec; border:1px solid #ffc1c1; padding:4px 8px; border-radius: var(--pe-radius); }
-.errors { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.errors { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; position: sticky; top: 0; z-index: 5; background: #fff; border: 1px solid #ffc1c1; border-radius: var(--pe-radius); padding: 8px; box-shadow: var(--du-shadow); }
 /* Embedded MIDI editor container */
 .embedded-editor { margin-top: 8px; display: flex; justify-content: center; width: 100%; overflow-x: hidden; }
 

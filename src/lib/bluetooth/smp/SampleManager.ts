@@ -1,6 +1,6 @@
 import { SMPService, MGMT_OP, MGMT_ERR, ResponseError } from '~/lib/bluetooth/SMPService';
 import { Log } from '~/lib/utils/Log';
-import { samplesParser_encode, DeviceSamples, samplesParser_decode, decodeAsciiString } from '~/lib/parsers/device_storage_parser';
+import { samplesParser_encode, sampleParser_validateSamples, DeviceSamples, samplesParser_decode, decodeAsciiString } from '~/lib/parsers/device_storage_parser';
 
 let log = new Log('smpl_mgr', Log.LEVEL_INFO);
 
@@ -184,16 +184,20 @@ export class SampleManager {
         log.debug('Starting sample upload process');
         if (this.state !== _STATE.IDLE) {
             log.error('Cant start upload when not in idle state');
-            return Promise.reject('Cant start upload when not in idle state');
+            return false;
         }
+
+        /* encode before entering the upload state, so unencodable samples cannot strand the state machine */
+        const problems = sampleParser_validateSamples(image);
+        if (problems.length > 0) {
+            log.error(`Cant upload samples that fail validation: ${problems.join('; ')}`);
+            return false;
+        }
+        const samplesBlob = samplesParser_encode(image);
 
         this.state = _STATE.UPLOADING; // start upload state
 
         const maxPayloadSize = this.smpBluetoothCharacteristic.maxPayloadSize; // Max payload size from MCUManager
-        const samplesBlob = samplesParser_encode(image);
-        console.log("samplesBlob:")
-        console.log(samplesBlob)
-
         const totalLength = samplesBlob.byteLength;
         let offset = 0;
         

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { editState, setEditorLoopData } from '~/features/device-utility/states/edits.svelte';
-  import { TICKS_PER_BEAT, type LoopData, type DrumEvent } from '~/lib/parsers/device_storage_parser';
+  import { TICKS_PER_BEAT, MAX_TICKS, MAX_NOTE, MAX_VELOCITY, MAX_LENGTH_BEATS, type LoopData, type DrumEvent } from '~/lib/parsers/device_storage_parser';
   import { soundBackend } from '~/lib/soundBackend';
   import { deviceSamplesState } from '~/lib/states/samples.svelte';
   import { SampleMode } from '~/lib/types/sampleMode';
@@ -17,7 +17,6 @@
   // Constants
   const PIANO_WIDTH = 60;
   const HEADER_HEIGHT = 30;
-  const MAX_TICKS = 511;
 
   // Props
   let { index, close } = $props<{ index: number, close?: () => void }>();
@@ -383,11 +382,11 @@
       // Keep the grabbed offset so the note stays under the cursor
       const desiredPress = pointerTick - (dragOffsetTick ?? 0);
       const newTick = snapTick(desiredPress);
-      const newNote = clamp(pointerNote - (dragOffsetNote ?? 0), 0, 127);
+      const newNote = clamp(pointerNote - (dragOffsetNote ?? 0), 0, MAX_NOTE);
 
       // Ensure the note stays within bounds
       const clampedTick = clamp(newTick, 0, MAX_TICKS - originalLength);
-      const clampedNote = clamp(newNote, 0, 127);
+      const clampedNote = clamp(newNote, 0, MAX_NOTE);
 
       currentNote.time_ticks_press = clampedTick;
       currentNote.time_ticks_release = clampedTick + originalLength;
@@ -575,12 +574,12 @@
   function applyJsonObject(parsed: any) {
     try {
       if (!parsed || typeof parsed !== 'object') return;
-      const length_beats = Math.max(1, Math.min(64, Number(parsed.length_beats) || 16));
+      const length_beats = Math.max(1, Math.min(MAX_LENGTH_BEATS, Number(parsed.length_beats) || 16));
       const events = Array.isArray(parsed.events) ? parsed.events.map((e: any) => ({
-        note: clamp(Number(e.note) || 60, 0, 127),
-        velocity: clamp(Number(e.velocity) || 100, 1, 127),
-        time_ticks_press: clamp(Number(e.time_ticks_press) || 0, 0, MAX_TICKS),
-        time_ticks_release: clamp(Number(e.time_ticks_release) || 1, 0, MAX_TICKS)
+        note: clamp(Number(e.note) || 60, 0, MAX_NOTE),
+        velocity: clamp(Number(e.velocity) || 100, 1, MAX_VELOCITY),
+        time_ticks_press: clamp(Number(e.time_ticks_press) || 0, 0, MAX_TICKS - 1),
+        time_ticks_release: clamp(Number(e.time_ticks_release) || 1, 1, MAX_TICKS)
       })) : [];
       localLoop = { length_beats, events };
     } catch {}

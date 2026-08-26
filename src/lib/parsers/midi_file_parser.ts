@@ -1,4 +1,4 @@
-import { TICKS_PER_BEAT, type LoopData } from '~/lib/parsers/device_storage_parser';
+import { TICKS_PER_BEAT, sampleParser_truncateLoop, type LoopData } from '~/lib/parsers/device_storage_parser';
 import { computeLoopLengthBeatsFromEvents } from '~/lib/utils/loop_utils';
 
 function readStr(buf: Uint8Array, o: number, len: number) { return String.fromCharCode(...buf.slice(o, o+len)); }
@@ -94,10 +94,8 @@ export function parseMidiToLoop(data: ArrayBuffer): { loop: LoopData } {
   // Compute loop length in beats using shared utility (clamped to device limits)
   const length_beats = computeLoopLengthBeatsFromEvents(events, { minBeats: 4, maxBeats: 16, ticksPerBeat: TICKS_PER_BEAT });
 
-  // Ensure any zero-length events are 1 tick
-  for (const ev of events) {
-    if (ev.time_ticks_release <= ev.time_ticks_press) ev.time_ticks_release = ev.time_ticks_press + 1;
-  }
+  // A MIDI file may be longer than a loop can represent, so cut it down to what the device can store
+  const loop = sampleParser_truncateLoop({ length_beats, events })!;
 
-  return { loop: { length_beats, events } };
+  return { loop };
 }

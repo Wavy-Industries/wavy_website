@@ -10,7 +10,6 @@ type EditorState = {
   name7: string; // editable suffix (7 chars max)
   loops: (SamplePack | null)[]; // editor slots; slot 0 contains the working pack
   unsaved: boolean;
-  errors: string[];
 };
 
 export const editState = $state<EditorState>({
@@ -20,7 +19,6 @@ export const editState = $state<EditorState>({
   name7: "",
   loops: [null],
   unsaved: false,
-  errors: [],
 });
 
 function makeLocalId(name7: string): string {
@@ -66,7 +64,6 @@ export async function openPackEditorForId(id: string) {
   editState.open = true;
   editState.sourceId = id || null;
   editState.unsaved = false;
-  editState.errors = [];
 }
 
 export async function openPackEditorNew() {
@@ -75,7 +72,6 @@ export async function openPackEditorNew() {
   editState.loops[0] = ensurePageScaffold("");
   editState.open = true;
   editState.unsaved = false;
-  editState.errors = [];
 }
 
 export function closePackEditor() {
@@ -87,7 +83,6 @@ export function closePackEditor() {
   editState.open = false;
   editState.id = null;
   editState.loops = [null];
-  editState.errors = [];
   editState.unsaved = false;
   editState.sourceId = null;
 }
