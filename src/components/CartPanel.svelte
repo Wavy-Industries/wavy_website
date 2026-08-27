@@ -43,6 +43,25 @@
     function price(money) {
         return money ? formatShopifyPrice(money.currencyCode, money.amount) : '—';
     }
+
+    // Every tax state reads as one value on the VAT line; only one of them
+    // leaves the buyer with something still to pay, so only one carries a note.
+    let vat = $derived.by(() => {
+        switch (taxes.state) {
+            case 'vatIncluded':
+                return { value: `${price(taxes.vatInSubtotal)} included`, note: null };
+            case 'vatOnDelivery':
+                return { value: 'collected on delivery', note: null };
+            case 'noVatCollected':
+                return {
+                    value: 'not collected',
+                    note: `${taxes.countryName ?? 'Your country'} may charge import VAT on arrival.`,
+                };
+            case 'domestic':
+            case 'unknown':
+                return { value: 'calculated at checkout', note: null };
+        }
+    });
 </script>
 
 {#if cartState.open}
@@ -96,21 +115,11 @@
                     </div>
                     <div class="summaryLine">
                         <span>VAT</span>
-                        {#if taxes.state === 'vatIncluded'}
-                            <span>{price(taxes.vatInSubtotal)} included</span>
-                        {:else if taxes.state === 'vatOnDelivery'}
-                            <span>collected on delivery</span>
-                        {:else if taxes.state === 'domestic' || taxes.state === 'unknown'}
-                            <span>calculated at checkout</span>
-                        {:else}
-                            <span>not collected</span>
-                        {/if}
+                        <span>{vat.value}</span>
                     </div>
 
-                    {#if taxes.state === 'noVatCollected'}
-                        <p class="quiet">
-                            {taxes.countryName ?? 'Your country'} may charge import VAT on arrival.
-                        </p>
+                    {#if vat.note}
+                        <p class="quiet">{vat.note}</p>
                     {/if}
 
                     <p class="quiet">Ships worldwide from Norway, 4–12 business days.</p>

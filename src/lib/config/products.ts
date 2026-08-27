@@ -6,11 +6,9 @@ export interface Product {
     shopifyProductId: string; // Shopify GID
     preorder: boolean;
     /*
-     * The EUR price before VAT, exactly as set on the EUR market in Shopify.
-     * Shopify adds each country's VAT on top of this before the Storefront API
-     * returns a price, and reports no flag or amount saying it did, so the cart
-     * needs the untaxed figure to tell how much of a price is tax. Keep it in
-     * step with Shopify by hand — nothing checks it for us.
+     * The EUR price before VAT, as set on the EUR market in Shopify, which adds
+     * each country's VAT on top before returning a price and says nothing about
+     * having done so. Keep in step with Shopify by hand — nothing checks it.
      */
     basePriceEur: number;
 }
