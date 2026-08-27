@@ -4,8 +4,14 @@
  * Prices are fetched exactly once per page load into `products`, keyed by SKU.
  * Everything the panel shows — line totals, subtotal — is that map multiplied
  * by a quantity, so adding, removing and changing quantity are instant and
- * never touch the network. The only price arithmetic here is × quantity, which
- * is the same sum Shopify does; no tax is inferred, ever.
+ * never touch the network.
+ *
+ * Shopify hands us a price with the buyer country's VAT already inside it and
+ * no way to ask how much of it is tax. Multiplying such a price by a quantity
+ * is the same sum Shopify does only while the consignment stays under the IOSS
+ * limit; past it Shopify takes the VAT off again at checkout. So the cart keeps
+ * the untaxed price as well and switches to it there. The tax section below is
+ * the only place any of that reasoning lives.
  *
  * The Shopify cart is created once, when the buyer clicks through to checkout.
  * That is the only moment we need Shopify to have an opinion, and it is the one
@@ -109,7 +115,11 @@ async function resolveCountry(): Promise<string | null> {
 async function loadPrices(country: string | null) {
     const context = await fetchStorefrontContext(country);
     cartState.products = context.products;
-    cartState.countries = context.countries;
+    // Shopify orders these by ISO code, which lands United Arab Emirates third.
+    // A dropdown is read by name, so sort by name — collating in the language
+    // Shopify wrote the names in, so the order follows whatever it hands us.
+    const byName = new Intl.Collator(context.languageCode ?? undefined);
+    cartState.countries = [...context.countries].sort((a, b) => byName.compare(a.name, b.name));
     // Shopify resolves the country itself when we could not, so take its answer.
     cartState.country = context.countryCode ?? country;
 
@@ -253,6 +263,147 @@ export async function startCheckout() {
 }
 
 // ---------------------------------------------------------------------------
+// Tax — reading what Shopify already decided, rather than deciding it again
+// ---------------------------------------------------------------------------
+
+/*
+ * Where we ship from. A buyer here is a domestic sale: MVA is added at checkout
+ * rather than folded into the price, and nothing crosses a border, so none of
+ * the import reasoning below applies to them.
+ */
+const SHIP_FROM = 'NO';
+
+/*
+ * IOSS only covers consignments holding up to EUR 150 of goods. Above that we
+ * cannot ship VAT-paid, so Shopify takes the VAT back off at checkout and the
+ * buyer's customs authority charges it on delivery instead. Shopify decides
+ * this on its own and will not say so before checkout, so the cart has to know
+ * the limit to arrive at the same total.
+ */
+const IOSS_GOODS_LIMIT_EUR = 150;
+
+/*
+ * A gap outside this band is not a VAT rate we could be charging: EU law floors
+ * a standard rate at 15% and Hungary has the steepest at 27%. Reading anything
+ * else means basePriceEur has drifted from what Shopify charges, and a wrong
+ * number stated confidently is worse than the vague line we fall back to.
+ */
+const MIN_VAT_RATE = 0.15;
+const MAX_VAT_RATE = 0.3;
+
+export type TaxState =
+    | 'domestic'        // shipped within Norway: MVA added at checkout, no border
+    | 'vatIncluded'     // registered here and under the limit: price is final
+    | 'vatOnDelivery'   // registered here but over the limit: customs bills it
+    | 'noVatCollected'  // not registered here: customs may bill it
+    | 'unknown';        // basePriceEur no longer agrees with Shopify
+
+export interface TaxSummary {
+    state: TaxState;
+    countryName: string | null;
+    /** The part of the subtotal that is tax, when any of it is. */
+    vatInSubtotal: { amount: number; currencyCode: string } | null;
+}
+
+/*
+ * The untaxed price of a SKU. It exists only for the EUR market: every other
+ * market we sell through prices a single country, so its price is whatever
+ * Shopify says and there is no second country to measure a gap against.
+ */
+function _basePriceEur(sku: string): number | null {
+    const product = cartState.products[sku];
+    if (!product || product.price.currencyCode !== 'EUR') return null;
+    return PRODUCTS[sku]?.basePriceEur ?? null;
+}
+
+/*
+ * The goods value of the consignment, which is what the IOSS limit is measured
+ * against — not the tax-inclusive total, and not counting shipping.
+ */
+function _goodsTotalEur(): number | null {
+    if (cartState.lines.length === 0) return null;
+    let amount = 0;
+    for (const line of cartState.lines) {
+        const base = _basePriceEur(line.sku);
+        if (base === null) return null;
+        amount += base * line.qty;
+    }
+    return amount;
+}
+
+/*
+ * How much VAT Shopify folded into this country's prices, read straight off the
+ * gap between what it charges and what the goods cost untaxed. Zero means we
+ * are not registered in that country. Null means we cannot tell: either there
+ * is no base to compare against, or the gap is not the shape of a VAT rate,
+ * which means basePriceEur has drifted from Shopify and we would rather say
+ * nothing than state a rate that is wrong.
+ */
+function _vatRate(): number | null {
+    for (const line of cartState.lines) {
+        const base = _basePriceEur(line.sku);
+        const price = cartState.products[line.sku]?.price;
+        if (base === null || !price) continue;
+        const rate = price.amount / base - 1;
+        if (rate === 0) return 0;
+        if (rate < MIN_VAT_RATE || rate > MAX_VAT_RATE) return null;
+        return rate;
+    }
+    return null;
+}
+
+/*
+ * Over the limit Shopify drops the VAT again at checkout, so its tax-inclusive
+ * price would promise a total the buyer never pays. Lines and subtotal both go
+ * through this, so the panel keeps adding up whichever side of the limit it is.
+ */
+function _vatDroppedAtCheckout(): boolean {
+    const goodsTotal = _goodsTotalEur();
+    if (goodsTotal === null || goodsTotal <= IOSS_GOODS_LIMIT_EUR) return false;
+    const rate = _vatRate();
+    return rate !== null && rate > 0;
+}
+
+/*
+ * What, if anything, this buyer still owes after they click through. Shopify
+ * folds VAT into the price for countries we are registered in and leaves it off
+ * everywhere else, so the gap between its price and our untaxed one settles the
+ * question without us keeping a list of countries anywhere.
+ */
+export function taxSummary(): TaxSummary {
+    const countryName = cartState.countries.find((c) => c.isoCode === cartState.country)?.name ?? null;
+    const summary: TaxSummary = { state: 'noVatCollected', countryName, vatInSubtotal: null };
+
+    if (cartState.country === SHIP_FROM) return { ...summary, state: 'domestic' };
+
+    // No base to compare against means a single-country market, which is a
+    // market we hold no registration in.
+    const goodsTotal = _goodsTotalEur();
+    if (goodsTotal === null) return summary;
+
+    const rate = _vatRate();
+    if (rate === null) return { ...summary, state: 'unknown' };
+    if (rate === 0) return summary;
+
+    // Over the limit the subtotal has already dropped to the untaxed goods, so
+    // there is no tax inside it — what customs bills is between them and the
+    // buyer, and we do not know their shipping to guess at it.
+    if (goodsTotal > IOSS_GOODS_LIMIT_EUR) return { ...summary, state: 'vatOnDelivery' };
+
+    // Under the limit Shopify's price is what the buyer pays, so the tax inside
+    // it is the exact difference from the untaxed goods — no rounding a rate.
+    let taxedTotal = 0;
+    for (const line of cartState.lines) {
+        taxedTotal += (cartState.products[line.sku]?.price.amount ?? 0) * line.qty;
+    }
+    return {
+        ...summary,
+        state: 'vatIncluded',
+        vatInSubtotal: { amount: taxedTotal - goodsTotal, currencyCode: 'EUR' },
+    };
+}
+
+// ---------------------------------------------------------------------------
 // Read helpers — plain arithmetic over the price map
 // ---------------------------------------------------------------------------
 
@@ -261,7 +412,10 @@ export function cartCount(): number {
 }
 
 export function unitPrice(sku: string) {
-    return cartState.products[sku]?.price ?? null;
+    const price = cartState.products[sku]?.price ?? null;
+    if (!price || !_vatDroppedAtCheckout()) return price;
+    const base = _basePriceEur(sku);
+    return base === null ? price : { amount: base, currencyCode: price.currencyCode };
 }
 
 export function linePrice(line: CartLine) {

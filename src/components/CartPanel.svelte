@@ -11,6 +11,7 @@
         cartHasPreorder,
         linePrice,
         subtotal,
+        taxSummary,
         MAX_QTY,
     } from '~/lib/state/cart.svelte';
     import { formatShopifyPrice } from '~/lib/utils/shopify-util.js';
@@ -31,6 +32,7 @@
     });
 
     let total = $derived(subtotal());
+    let taxes = $derived(taxSummary());
     let canCheckout = $derived(
         cartState.lines.length > 0 &&
         !cartState.loading &&
@@ -92,7 +94,25 @@
                         <span>Subtotal</span>
                         <span>{price(total)}</span>
                     </div>
-                    <p class="quiet">Shipping and taxes are calculated at checkout.</p>
+                    <div class="summaryLine">
+                        <span>VAT</span>
+                        {#if taxes.state === 'vatIncluded'}
+                            <span>{price(taxes.vatInSubtotal)} included</span>
+                        {:else if taxes.state === 'vatOnDelivery'}
+                            <span>collected on delivery</span>
+                        {:else if taxes.state === 'domestic' || taxes.state === 'unknown'}
+                            <span>calculated at checkout</span>
+                        {:else}
+                            <span>not collected</span>
+                        {/if}
+                    </div>
+
+                    {#if taxes.state === 'noVatCollected'}
+                        <p class="quiet">
+                            {taxes.countryName ?? 'Your country'} may charge import VAT on arrival.
+                        </p>
+                    {/if}
+
                     <p class="quiet">Ships worldwide from Norway, 4–12 business days.</p>
                 </div>
 
@@ -326,6 +346,15 @@
         justify-content: space-between;
         font-size: 16px;
         font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .summaryLine {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 13px;
+        color: #555;
         font-variant-numeric: tabular-nums;
     }
 

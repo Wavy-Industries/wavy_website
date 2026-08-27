@@ -37,6 +37,8 @@ export interface StorefrontContext {
     /** The country Shopify actually priced in. */
     countryCode: string | null;
     countries: CountryOption[];
+    /** The language Shopify wrote the country names in. */
+    languageCode: string | null;
 }
 
 async function storefront(query: string, variables: Record<string, unknown>): Promise<any> {
@@ -72,6 +74,7 @@ export async function fetchStorefrontContext(countryCode: string | null): Promis
            ${productFields}
            localization {
              country { isoCode }
+             language { isoCode }
              availableCountries { isoCode name }
            }
          }`,
@@ -97,6 +100,7 @@ export async function fetchStorefrontContext(countryCode: string | null): Promis
         products,
         countryCode: data.localization?.country?.isoCode ?? null,
         countries: data.localization?.availableCountries ?? [],
+        languageCode: data.localization?.language?.isoCode ?? null,
     };
 }
 

@@ -5,6 +5,14 @@ export interface Product {
     productCode: string;      // Shopify product code for tracking, e.g. 'WIMKY001'
     shopifyProductId: string; // Shopify GID
     preorder: boolean;
+    /*
+     * The EUR price before VAT, exactly as set on the EUR market in Shopify.
+     * Shopify adds each country's VAT on top of this before the Storefront API
+     * returns a price, and reports no flag or amount saying it did, so the cart
+     * needs the untaxed figure to tell how much of a price is tax. Keep it in
+     * step with Shopify by hand — nothing checks it for us.
+     */
+    basePriceEur: number;
 }
 
 export const PRODUCTS: Record<string, Product> = {
@@ -15,6 +23,7 @@ export const PRODUCTS: Record<string, Product> = {
         productCode: 'WIMKY001',
         shopifyProductId: 'gid://shopify/Product/14798616985972',
         preorder: false,
+        basePriceEur: 79,
     },
     bridge: {
         sku: 'bridge',
@@ -23,6 +32,7 @@ export const PRODUCTS: Record<string, Product> = {
         productCode: 'WIBRG001',
         shopifyProductId: 'gid://shopify/Product/15048558838132',
         preorder: true,
+        basePriceEur: 89,
     },
 };
 
